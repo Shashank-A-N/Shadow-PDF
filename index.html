@@ -58,6 +58,9 @@
         .dark .tool-card:hover {
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
         }
+        #documentary-section p {
+            text-align: justify;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 transition-colors duration-300">
@@ -70,7 +73,67 @@
                 <svg id="theme-toggle-light-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05A1 1 0 003.636 6.464l.707.707a1 1 0 001.414-1.414l-.707-.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1zM6.464 16.364a1 1 0 01-1.414 0l-.707-.707a1 1 0 011.414-1.414l.707.707zM13.536 6.464a1 1 0 010-1.414l.707-.707a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414 0z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
             </button>
         </div>
+
+        <nav class="ml-6">
+            <a href="#" id="show-documentary" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400" style="color: blueviolet;">Documentary</a>
+        </nav>
+
     </header>
+
+    <section id="documentary-section" class="hidden bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg mt-12 max-w-5xl mx-auto">
+        <h2 class="text-4xl font-bold text-center text-gray-900 dark:text-white mb-6">📄 Project Documentary Report</h2>
+
+        <div class="space-y-6 text-gray-700 dark:text-gray-300 leading-relaxed text-justify">
+            <p><strong>Project Title:</strong> <span class="text-blue-600 dark:text-blue-400">AI-Powered PDF & Image Toolkit</span></p>
+
+            <p><strong>Introduction:</strong><br>
+            The AI-Powered PDF & Image Toolkit is a web-based suite designed to empower users with a seamless and intelligent experience for handling documents and images. From converting and editing PDFs to AI-assisted summarization and question-answering, the platform aims to revolutionize how users interact with digital files.</p>
+
+            <p><strong>Objectives:</strong></p>
+            <ul class="list-disc list-inside">
+            <li>To offer a clean, user-friendly interface for all PDF and image utilities.</li>
+            <li>To integrate AI models (e.g., Gemini AI) for tasks like summarization and Q&A.</li>
+            <li>To support commonly needed operations like merging, compressing, and converting files.</li>
+            </ul>
+
+            <p><strong>Key Features:</strong></p>
+            <ul class="list-disc list-inside">
+            <li><strong>AI Summarizer:</strong> Uses Google Gemini to generate concise summaries of uploaded PDFs.</li>
+            <li><strong>Document Q&A:</strong> Users can interact with their documents by asking questions and receiving answers instantly.</li>
+            <li><strong>PDF Editor:</strong> Edit PDF content including text, images, and formatting directly from the web.</li>
+            <li><strong>Conversion Tools:</strong> Includes PDF-to-Word, Word-to-PDF, image-to-PDF, and PDF-to-image converters.</li>
+            <li><strong>Splitter & Merger:</strong> Enables splitting of large PDFs and merging of multiple PDFs into one.</li>
+            <li><strong>Page Reordering:</strong> Rearrange or remove pages in PDFs easily.</li>
+            <li><strong>Compression:</strong> Reduce file sizes without sacrificing readability.</li>
+            </ul>
+
+            <p><strong>Technology Stack:</strong></p>
+            <ul class="list-disc list-inside">
+            <li><strong>Frontend:</strong> HTML, Tailwind CSS, JavaScript</li>
+            <li><strong>AI Integration:</strong> Google Gemini API</li>
+            <li><strong>Planned Backend:</strong> Python (Flask/FastAPI) or Node.js (Express) for user authentication and file storage</li>
+            </ul>
+
+            <p><strong>User Interface:</strong><br>
+            A responsive design has been implemented using Tailwind CSS to ensure usability across all devices. A light/dark mode toggle enhances the visual experience.</p>
+
+            <p><strong>Development Status:</strong><br>
+            The project is in its prototype stage. While many core features are in place, backend integration, real-time processing, and file storage are being developed.</p>
+
+            <p><strong>Future Scope:</strong></p>
+            <ul class="list-disc list-inside">
+            <li>Implement cloud-based file history for user accounts</li>
+            <li>Add support for OCR (Optical Character Recognition) to process scanned documents</li>
+            <li>Incorporate more advanced AI tools for translation, tone analysis, and summarization</li>
+            <li>Introduce collaborative editing and annotations</li>
+            </ul>
+
+            <p><strong>Conclusion:</strong><br>
+            This toolkit provides a comprehensive platform for document handling enhanced with intelligent AI capabilities. It is designed to be scalable, user-friendly, and secure, making it ideal for students, professionals, and enterprise users alike.</p>
+        </div>
+    </section>
+
+
 
     <main class="container mx-auto px-6 py-12">
 
@@ -251,6 +314,14 @@
                 }
             }
         });
+
+        document.getElementById('show-documentary').addEventListener('click', function (e) {
+            e.preventDefault();
+            const section = document.getElementById('documentary-section');
+            section.classList.toggle('hidden');
+            section.scrollIntoView({ behavior: 'smooth' });
+        });
+
     </script>
 
 </body>
