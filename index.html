@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered PDF & Image Tools</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tool-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Dark mode styles */
+        .dark .bg-gray-50 { background-color: #111827; }
+        .dark .bg-white { background-color: #1f2937; }
+        .dark .text-gray-800 { color: #f3f4f6; }
+        .dark .text-gray-900 { color: #ffffff; }
+        .dark .text-gray-600 { color: #d1d5db; }
+        .dark .text-gray-500 { color: #9ca3af; }
+        .dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.2); }
+        .dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4), 0 4px 6px -2px rgba(0,0,0,0.2); }
+        .dark .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0,0,0,0.2); }
+        .dark .border-t { border-color: #374151; }
+        .dark .bg-blue-100 { background-color: #1e40af; }
+        .dark .text-blue-600 { color: #60a5fa; }
+        .dark .bg-red-100 { background-color: #991b1b; }
+        .dark .text-red-600 { color: #f87171; }
+        .dark .bg-green-100 { background-color: #065f46; }
+        .dark .text-green-600 { color: #4ade80; }
+        .dark .bg-yellow-100 { background-color: #92400e; }
+        .dark .text-yellow-600 { color: #2e99d6; }
+        .dark .bg-purple-100 { background-color: #581c87; }
+        .dark .text-purple-600 { color: #c084fc; }
+        .dark .bg-indigo-100 { background-color: #4338ca; }
+        .dark .text-indigo-600 { color: #a5b4fc; }
+        .dark .bg-pink-100 { background-color: #9d174d; }
+        .dark .text-pink-600 { color: #f9a8d4; }
+        .dark .bg-teal-100 { background-color: #134e4a; }
+        .dark .text-teal-600 { color: #5eead4; }
+        .dark .bg-orange-100 { background-color: #9a3412; }
+        .dark .text-orange-600 { color: #fb923c; }
+        .dark .bg-gray-100 { background-color: #374151; }
+        .dark .text-gray-600 { color: #d1d5db; }
+        .dark .bg-slate-100 { background-color: #334155; }
+        .dark .text-slate-600 { color: #cbd5e1; }
+        .dark .bg-cyan-100 { background-color: #164e63; }
+        .dark .text-cyan-600 { color: #67e8f9; }
+        .dark .tool-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 transition-colors duration-300">
+
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-900">PDF & Image Toolkit</h1>
+            <button id="theme-toggle" class="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                <svg id="theme-toggle-dark-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                <svg id="theme-toggle-light-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05A1 1 0 003.636 6.464l.707.707a1 1 0 001.414-1.414l-.707-.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1zM6.464 16.364a1 1 0 01-1.414 0l-.707-.707a1 1 0 011.414-1.414l.707.707zM13.536 6.464a1 1 0 010-1.414l.707-.707a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414 0z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-12">
+
+        <section class="text-center mb-12">
+            <h2 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500 mb-4">AI-Powered PDF & Image Toolkit</h2>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto">Convert, edit, and analyze your documents and images, now supercharged with **Google Gemini AI** for intelligent features you won't find anywhere else.</p>
+        </section>
+
+        <section class="mb-12">
+            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md dark:bg-yellow-900/20 dark:border-yellow-400 dark:text-yellow-300" role="alert">
+                <div class="flex">
+                    <div class="py-1">
+                        <svg class="w-6 h-6 mr-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path clip-rule="evenodd" fill-rule="evenodd" d="M8.257 3.099c.636-1.026 2.252-1.026 2.888 0l6.234 10.05c.64 1.03-.19 2.351-1.444 2.351H3.467c-1.254 0-2.084-1.32-1.444-2.351L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="font-bold" style="background-image: linear-gradient(to right,red,blue);">Under Development</p>
+                        <p class="text-sm" style="background-image: linear-gradient(to right,red,blue);"><b>Please Note:</b> The new AI tools and other features are for demonstration only and are not yet functional.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <section>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                
+                <a href="ai summery/index.html" class="relative tool-card bg-white p-6 rounded-lg shadow-lg flex flex-col items-center text-center border-2 border-purple-500 dark:border-purple-400 ring-4 ring-purple-500/20">
+                    <div class="absolute top-0 right-0 -mt-3 -mr-3">
+                        <span class="flex h-6 items-center justify-center rounded-full bg-purple-600 px-3 py-1 text-xs font-bold text-white">✨ GEMINI AI</span>
+                    </div>
+                    <div class="bg-purple-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">AI Document Summarizer</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Let Gemini read and create a concise summary of your PDFs.</p>
+                </a>
+                
+                <a href="Q&A pdf/index.html" class="relative tool-card bg-white p-6 rounded-lg shadow-lg flex flex-col items-center text-center border-2 border-green-500 dark:border-green-400 ring-4 ring-green-500/20">
+                    <div class="absolute top-0 right-0 -mt-3 -mr-3">
+                        <span class="flex h-6 items-center justify-center rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">✨ GEMINI AI</span>
+                    </div>
+                    <div class="bg-green-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Q&A with Document</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Ask questions about your PDF and get intelligent answers instantly.</p>
+                </a>
+
+
+                <a href="pdf editor/index.html" class="relative tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="absolute top-0 right-0 -mt-3 -mr-3">
+                        <span class="flex h-6 items-center justify-center rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">ADVANCED</span>
+                    </div>
+                    <div class="bg-slate-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">PDF Editor</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Edit text, images, and links in your PDF files.</p>
+                </a>
+                
+                <a href="pdf merger/index.html" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-indigo-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Merge PDF</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Combine multiple PDF files into one single document.</p>
+                </a>
+
+                <a href="pdf split/index.html" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-pink-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879a1 1 0 000 1.414l2.879 2.879a1 1 0 001.414 0zM5 5l7 7m-7-7l2.879-2.879a1 1 0 011.414 0L12 5"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Split PDF</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Extract specific pages or page ranges from a PDF.</p>
+                </a>
+
+                <!-- Tool: Modify PDF Pages -->
+                <a href="pdf page changer/index.html" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-cyan-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Modify PDF Pages</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Reorder, rotate, or delete pages within your PDF.</p>
+                </a>
+
+                <!-- Tool: PDF to Word -->
+                <a href="pdf to doc/index.html" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-red-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">PDF to Word</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Convert your PDF files to editable Word documents.</p>
+                </a>
+
+                <!-- Tool: Word to PDF -->
+                <a href="doc to pdf/" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-blue-100 p-4 rounded-full mb-4">
+                         <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Word to PDF</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Save your Word documents as high-quality PDFs.</p>
+                </a>
+
+                <a href="img to pdf/index.html" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-blue-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Images to PDF</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Combine JPG, PNG, and other images into a single PDF.</p>
+                </a>
+
+                <a href="pdf to imgs/index.html" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-green-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">PDF to Images</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Extract all pages from a PDF into JPG or PNG images.</p>
+                </a>
+
+                <!-- Tool: Compress PDF -->
+                <a href="pdf compress/index.html" class="tool-card bg-white p-6 rounded-lg shadow-md flex flex-col items-center text-center">
+                    <div class="bg-teal-100 p-4 rounded-full mb-4">
+                        <svg class="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Compress PDF</h3>
+                    <p class="text-gray-500 mt-1 text-sm">Reduce the file size of your PDFs while maintaining quality.</p>
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-white mt-16 border-t">
+        <div class="container mx-auto px-6 py-4 text-center text-gray-500">
+            <p>&copy; 2025 PDF & Image Toolkit. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+        const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+        // Change the icons inside the button based on previous settings
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            themeToggleLightIcon.classList.remove('hidden');
+            document.documentElement.classList.add('dark');
+        } else {
+            themeToggleDarkIcon.classList.remove('hidden');
+            document.documentElement.classList.remove('dark')
+        }
+
+        themeToggleBtn.addEventListener('click', function() {
+            // toggle icons inside button
+            themeToggleDarkIcon.classList.toggle('hidden');
+            themeToggleLightIcon.classList.toggle('hidden');
+
+            // if set via local storage previously
+            if (localStorage.getItem('color-theme')) {
+                if (localStorage.getItem('color-theme') === 'light') {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                }
+
+            // if NOT set via local storage previously
+            } else {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>
