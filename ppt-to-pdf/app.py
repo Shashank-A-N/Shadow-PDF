@@ -1,3 +1,5 @@
+
+
 import os
 import sys
 import tempfile
@@ -5,6 +7,9 @@ import shutil
 import subprocess
 from pathlib import Path
 from datetime import datetime
+import pythoncom
+import win32com.client
+
 from flask import Flask, render_template, request, send_file, jsonify, abort
 
 # PDF -> PPT deps
@@ -20,7 +25,7 @@ PDF_EXTS = {".pdf"}
 
 
 # ---------------------------
-# Engine detection
+# Engine detection (PPT->PDF)
 # ---------------------------
 
 def which_libreoffice():
@@ -28,6 +33,7 @@ def which_libreoffice():
         p = shutil.which(cand)
         if p:
             return p
+
     if os.name == "nt":
         for c in (
             r"C:\Program Files\LibreOffice\program\soffice.exe",
@@ -35,10 +41,12 @@ def which_libreoffice():
         ):
             if os.path.exists(c):
                 return c
+
     if sys.platform == "darwin":
         c = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
         if os.path.exists(c):
             return c
+
     env = os.environ.get("LIBREOFFICE_PATH", "").strip()
     if env and os.path.exists(env):
         return env
@@ -51,12 +59,12 @@ def powerpoint_available():
     try:
         import win32com.client  # noqa
         return True
-    except ImportError:
+    except Exception:
         return False
 
 
 # ---------------------------
-# Conversion functions
+# PPT -> PDF engines
 # ---------------------------
 
 def convert_with_libreoffice(soffice_path, input_file, out_dir):
@@ -84,8 +92,7 @@ def convert_with_libreoffice(soffice_path, input_file, out_dir):
 
 
 def convert_with_powerpoint(input_file, out_dir):
-    import pythoncom
-    import win32com.client
+    # Initialize COM for this thread, crucial for use in web servers like Flask
     pythoncom.CoInitialize()
 
     input_file = str(Path(input_file).resolve())
@@ -99,13 +106,17 @@ def convert_with_powerpoint(input_file, out_dir):
     pres = None
     try:
         pp = win32com.client.Dispatch("PowerPoint.Application")
+        # Keep PowerPoint invisible during the conversion
         pres = pp.Presentations.Open(input_file, WithWindow=False)
-        pres.SaveAs(str(out_pdf), 32)
+        pres.SaveAs(str(out_pdf), 32)  # 32 = PDF format
+
     finally:
+        # IMPORTANT: Always close and quit to avoid orphaned PowerPoint processes
         if pres is not None:
             pres.Close()
         if pp is not None:
             pp.Quit()
+        # Uninitialize COM for this thread
         pythoncom.CoUninitialize()
 
     if not out_pdf.exists():
@@ -125,22 +136,28 @@ def ppt_to_pdf(input_file, prefer="AUTO"):
 
     if prefer == "POWERPOINT":
         if not pp_ok:
-            raise RuntimeError("PowerPoint COM not available.")
+            raise RuntimeError("PowerPoint COM not available (install PowerPoint + pywin32).")
         return convert_with_powerpoint(input_file, tmp_out), "PowerPoint"
 
+    # AUTO logic: Prefer PowerPoint on Windows if available, otherwise use LibreOffice
     if pp_ok:
         return convert_with_powerpoint(input_file, tmp_out), "PowerPoint"
     if lo:
         return convert_with_libreoffice(lo, input_file, tmp_out), "LibreOffice"
 
-    raise RuntimeError("No conversion engine found. Install LibreOffice or PowerPoint+pywin32 on Windows.")
+    raise RuntimeError("No conversion engine found. Install LibreOffice or (on Windows) PowerPoint+pywin32.")
 
 
 # ---------------------------
-# PDF -> PPT
+# PDF -> PPT (image-based)
 # ---------------------------
 
 def pdf_to_ppt_image_based(input_pdf, scale=2.0):
+    """
+    Convert each PDF page to an image and place it on its own slide.
+    - scale: 1.0 = 72 dpi, 2.0 = 144 dpi, 3.0 = 216 dpi (quality vs. file size)
+    Returns path to generated .pptx.
+    """
     input_pdf = str(Path(input_pdf).resolve())
     tmp_out = tempfile.mkdtemp(prefix="pdf2ppt_out_")
     out_pptx = str(Path(tmp_out) / (Path(input_pdf).stem + ".pptx"))
@@ -148,23 +165,25 @@ def pdf_to_ppt_image_based(input_pdf, scale=2.0):
     doc = fitz.open(input_pdf)
     prs = Presentation()
 
+    # For each page, we set the slide size to match the page size (in inches)
     for page in doc:
-        rect = page.rect
+        rect = page.rect  # in points (1 pt = 1/72 inch)
         width_in = float(rect.width) / 72.0
         height_in = float(rect.height) / 72.0
 
         prs.slide_width = Inches(width_in)
         prs.slide_height = Inches(height_in)
 
-        mat = fitz.Matrix(scale, scale)
+        # Render page to image
+        mat = fitz.Matrix(scale, scale)  # scale up for sharper image
         pix = page.get_pixmap(matrix=mat, alpha=False)
         img_path = str(Path(tmp_out) / f"page_{page.number+1}.png")
         pix.save(img_path)
 
-        blank = prs.slide_layouts[6]
+        # Add slide with the image filling the entire slide
+        blank = prs.slide_layouts[6]  # blank layout
         slide = prs.slides.add_slide(blank)
-        slide.shapes.add_picture(img_path, Inches(0), Inches(0),
-                                 width=prs.slide_width, height=prs.slide_height)
+        slide.shapes.add_picture(img_path, Inches(0), Inches(0), width=prs.slide_width, height=prs.slide_height)
 
     prs.save(out_pptx)
     doc.close()
@@ -192,6 +211,12 @@ def health():
 
 @app.route("/convert", methods=["POST"])
 def convert():
+    """
+    Handles both directions:
+    - mode = PPT2PDF  (accepts .ppt/.pptx)   -> returns .pdf
+    - mode = PDF2PPT  (accepts .pdf)         -> returns .pptx
+    Optional for PPT2PDF: engine = AUTO | LIBREOFFICE | POWERPOINT
+    """
     mode = (request.form.get("mode") or "PPT2PDF").upper()
     engine = (request.form.get("engine") or "AUTO").upper()
 
@@ -212,35 +237,47 @@ def convert():
     try:
         if mode == "PPT2PDF":
             if ext not in PPT_EXTS:
-                abort(400, "Please upload a .ppt or .pptx file.")
+                abort(400, "Please upload a .ppt or .pptx file for PPT2PDF.")
             pdf_path, engine_used = ppt_to_pdf(src_path, prefer=engine)
             out_name = f"{Path(src_name).stem} (via {engine_used}) {datetime.now().strftime('%Y-%m-%d_%H-%M')}.pdf"
+
             resp = send_file(pdf_path, as_attachment=True, download_name=out_name, mimetype="application/pdf")
             @resp.call_on_close
             def _cleanup():
-                shutil.rmtree(Path(pdf_path).parent, ignore_errors=True)
-                shutil.rmtree(tmp_in, ignore_errors=True)
+                try:
+                    shutil.rmtree(Path(pdf_path).parent, ignore_errors=True)
+                    shutil.rmtree(tmp_in, ignore_errors=True)
+                except Exception:
+                    pass
             return resp
 
         elif mode == "PDF2PPT":
             if ext not in PDF_EXTS:
-                abort(400, "Please upload a .pdf file.")
+                abort(400, "Please upload a .pdf file for PDF2PPT.")
             pptx_path = pdf_to_ppt_image_based(src_path, scale=2.0)
             out_name = f"{Path(src_name).stem} (slides from PDF) {datetime.now().strftime('%Y-%m-%d_%H-%M')}.pptx"
+
             resp = send_file(pptx_path, as_attachment=True, download_name=out_name,
                              mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation")
             @resp.call_on_close
             def _cleanup2():
-                shutil.rmtree(Path(pptx_path).parent, ignore_errors=True)
-                shutil.rmtree(tmp_in, ignore_errors=True)
+                try:
+                    shutil.rmtree(Path(pptx_path).parent, ignore_errors=True)
+                    shutil.rmtree(tmp_in, ignore_errors=True)
+                except Exception:
+                    pass
             return resp
 
         else:
-            abort(400, "Unknown mode.")
+            abort(400, "Unknown mode. Use PPT2PDF or PDF2PPT.")
+
+    except subprocess.CalledProcessError as e:
+        shutil.rmtree(tmp_in, ignore_errors=True)
+        abort(500, f"LibreOffice failed: {e}")
     except Exception as e:
         shutil.rmtree(tmp_in, ignore_errors=True)
         abort(500, f"Conversion failed: {e}")
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    app.run(host="127.0.0.1", port=5000, debug=True)
