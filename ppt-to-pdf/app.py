@@ -295,7 +295,18 @@ def convert():
         shutil.rmtree(tmp_in, ignore_errors=True)
         abort(500, f"Conversion failed: {e}")
 
+def which_libreoffice():
+    for cand in ("soffice", "libreoffice"):
+        p = shutil.which(cand)
+        if p:
+            print(f"[DEBUG] Found LibreOffice binary: {p}")
+            return p
+    print("[DEBUG] LibreOffice not found in PATH.")
+    ...
+
+
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
+
 
