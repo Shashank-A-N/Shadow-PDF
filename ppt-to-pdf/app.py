@@ -1,5 +1,18 @@
 
 
+# import os
+# import sys
+# import tempfile
+# import shutil
+# import subprocess
+# from pathlib import Path
+# from datetime import datetime
+# import pythoncom
+# import win32com.client
+
+# from flask import Flask, render_template, request, send_file, jsonify, abort
+
+
 import os
 import sys
 import tempfile
@@ -7,15 +20,19 @@ import shutil
 import subprocess
 from pathlib import Path
 from datetime import datetime
-import pythoncom
-import win32com.client
-
 from flask import Flask, render_template, request, send_file, jsonify, abort
 
 # PDF -> PPT deps
 import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Inches
+
+
+# # PDF -> PPT deps
+# import fitz  # PyMuPDF
+# from pptx import Presentation
+# from pptx.util import Inches
+
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024  # 300 MB
@@ -281,3 +298,4 @@ def convert():
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
+
