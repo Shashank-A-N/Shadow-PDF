@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PPT ⇄ PDF Converter (Offline)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="/static/style.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>PPT ⇄ PDF Converter</h1>
+      <p class="sub">Runs locally. No third-party APIs.</p>
+    </header>
+
+    <section class="card">
+      <form id="convertForm">
+        <div class="row">
+          <label for="mode">Conversion</label>
+          <select id="mode" name="mode">
+            <option value="PPT2PDF" selected>PPT/PPTX → PDF</option>
+            <option value="PDF2PPT">PDF → PPTX (image-based)</option>
+          </select>
+        </div>
+
+        <div class="row engine" id="engineRow">
+          <label for="engine">Engine</label>
+          <select id="engine" name="engine">
+            <option value="AUTO" selected>AUTO (best available)</option>
+            <option value="LIBREOFFICE">LibreOffice</option>
+            <option value="POWERPOINT">PowerPoint (Windows)</option>
+          </select>
+          <button type="button" id="checkBtn">Check Engines</button>
+        </div>
+
+        <div class="row">
+          <input type="file" id="file" name="file" accept=".ppt,.pptx" required />
+        </div>
+
+        <button type="submit" class="primary" id="submitBtn">Convert</button>
+      </form>
+
+      <div id="status" class="status"></div>
+      <div id="download" class="download"></div>
+
+      <ul class="notes">
+        <li><b>PPT → PDF</b>: Needs LibreOffice or (Windows) PowerPoint+pywin32.</li>
+        <li><b>PDF → PPTX</b>: Each PDF page becomes a slide image (looks identical; text not directly editable).</li>
+      </ul>
+    </section>
+
+    <footer>
+      <small>Tip: Install LibreOffice for cross-platform PPT → PDF. On Windows, PowerPoint gives best fidelity.</small>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
