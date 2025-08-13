@@ -25,60 +25,72 @@ PDF_EXTS = {".pdf"}
 
 
 # ---------------------------
-# PPT -> PDF Conversion Engine (LibreOffice only)
+# Engine detection (PPT->PDF) - Works on Windows, Linux, and macOS
 # ---------------------------
 
-def convert_with_libreoffice(input_file, out_dir):
-    """
-    Converts a file to PDF using the LibreOffice/soffice command line tool.
-    This is the only engine used in the Docker container.
-    """
-    # In the Docker container, 'libreoffice' is installed and should be in the PATH
-    soffice_path = "libreoffice"
+def which_libreoffice():
+    """Find the path to the LibreOffice executable."""
+    # Check common command names first
+    for cand in ("soffice", "libreoffice"):
+        p = shutil.which(cand)
+        if p:
+            return p
+
+    # Check default installation paths for Windows
+    if sys.platform == "win32":
+        for c in (
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ):
+            if os.path.exists(c):
+                return c
+
+    # Check default installation path for macOS
+    if sys.platform == "darwin":
+        c = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+        if os.path.exists(c):
+            return c
     
+    return None
+
+
+def powerpoint_available():
+    """Check if PowerPoint can be controlled via COM on Windows."""
+    if sys.platform != "win32":
+        return False
+    try:
+        # This import will fail on non-windows systems
+        import win32com.client
+        # Try to create a dispatch object. If this fails, PowerPoint is not installed.
+        win32com.client.Dispatch("PowerPoint.Application")
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------
+# PPT -> PDF Conversion Engines
+# ---------------------------
+
+def convert_with_libreoffice(soffice_path, input_file, out_dir):
+    """Converts a file using the LibreOffice command line."""
     input_file = str(Path(input_file).resolve())
     out_dir = str(Path(out_dir).resolve())
     os.makedirs(out_dir, exist_ok=True)
 
-    logging.info(f"Starting conversion for {input_file} using {soffice_path}")
-
+    logging.info(f"Attempting conversion with LibreOffice: {input_file}")
     cmd = [
         soffice_path,
-        "--headless",
-        "--nologo",
-        "--invisible",
+        "--headless", "--nologo", "--invisible",
         "--convert-to", "pdf",
         input_file,
         "--outdir", out_dir,
     ]
-    
-    try:
-        # Run the conversion command
-        process = subprocess.run(
-            cmd, 
-            check=True, 
-            capture_output=True, 
-            text=True,
-            timeout=120 # 2-minute timeout
-        )
-        logging.info("LibreOffice stdout: %s", process.stdout)
-        logging.error("LibreOffice stderr: %s", process.stderr)
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
 
-    except subprocess.CalledProcessError as e:
-        # This catches errors if LibreOffice returns a non-zero exit code
-        logging.error(f"LibreOffice command failed with exit code {e.returncode}")
-        logging.error(f"Stderr: {e.stderr}")
-        raise RuntimeError(f"LibreOffice conversion failed. Error: {e.stderr}")
-    except FileNotFoundError:
-        # This catches an error if the 'libreoffice' command itself isn't found
-        logging.error("The 'libreoffice' command was not found. Is it installed and in the system's PATH?")
-        raise RuntimeError("LibreOffice is not installed or not found in the container's PATH.")
-
-    # Find the output file and return its path
     stem = Path(input_file).stem
     expected = Path(out_dir) / f"{stem}.pdf"
     if expected.exists():
-        logging.info(f"Conversion successful. Output file: {expected}")
         return str(expected)
     
     # Fallback for any unexpected naming
@@ -89,14 +101,66 @@ def convert_with_libreoffice(input_file, out_dir):
     raise FileNotFoundError("LibreOffice reported success, but the output PDF could not be found.")
 
 
+def convert_with_powerpoint(input_file, out_dir):
+    """Converts a file using PowerPoint COM automation (Windows only)."""
+    # These imports are safe because this function is only called on Windows
+    import pythoncom
+    import win32com.client
+
+    pythoncom.CoInitialize()
+    
+    input_file = str(Path(input_file).resolve())
+    out_dir = Path(out_dir).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_pdf = out_dir / f"{Path(input_file).stem}.pdf"
+
+    pp = None
+    pres = None
+    try:
+        logging.info(f"Attempting conversion with PowerPoint: {input_file}")
+        pp = win32com.client.Dispatch("PowerPoint.Application")
+        pres = pp.Presentations.Open(input_file, WithWindow=False)
+        pres.SaveAs(str(out_pdf), 32)  # 32 = PDF format
+    finally:
+        if pres:
+            pres.Close()
+        if pp:
+            pp.Quit()
+        pythoncom.CoUninitialize()
+
+    if not out_pdf.exists():
+        raise FileNotFoundError("PowerPoint did not create the PDF file.")
+    return str(out_pdf)
+
+
+def ppt_to_pdf(input_file):
+    """
+    Master function to convert PPT to PDF.
+    It automatically chooses the best available engine.
+    """
+    tmp_out = tempfile.mkdtemp(prefix="ppt2pdf_out_")
+    
+    # On Windows, prefer PowerPoint if available.
+    if sys.platform == "win32" and powerpoint_available():
+        try:
+            return convert_with_powerpoint(input_file, tmp_out), "PowerPoint"
+        except Exception as e:
+            logging.warning(f"PowerPoint conversion failed: {e}. Falling back to LibreOffice.")
+
+    # Fallback to LibreOffice on all platforms
+    lo_path = which_libreoffice()
+    if lo_path:
+        return convert_with_libreoffice(lo_path, input_file, tmp_out), "LibreOffice"
+
+    raise RuntimeError("No conversion engine found. Please install LibreOffice or (on Windows) Microsoft PowerPoint.")
+
+
 # ---------------------------
 # PDF -> PPT (image-based) - This part is already cross-platform
 # ---------------------------
 
 def pdf_to_ppt_image_based(input_pdf, scale=2.0):
-    """
-    Convert each PDF page to an image and place it on its own slide.
-    """
+    """Convert each PDF page to an image and place it on its own slide."""
     input_pdf = str(Path(input_pdf).resolve())
     tmp_out = tempfile.mkdtemp(prefix="pdf2ppt_out_")
     out_pptx = str(Path(tmp_out) / (Path(input_pdf).stem + ".pptx"))
@@ -138,20 +202,18 @@ def index():
 @app.route("/health")
 def health():
     """A simple health check endpoint."""
-    # Check if shutil can find the 'libreoffice' command
-    libreoffice_path = shutil.which("libreoffice")
     return jsonify({
         "status": "ok",
-        "libreoffice_available": bool(libreoffice_path),
-        "libreoffice_path": libreoffice_path or "Not found in PATH",
+        "platform": sys.platform,
+        "powerpoint_com_available": powerpoint_available(),
+        "libreoffice_available": bool(which_libreoffice()),
+        "libreoffice_path": which_libreoffice() or "Not Found",
     })
 
 
 @app.route("/convert", methods=["POST"])
 def convert():
-    """
-    Handles both conversion directions: PPT2PDF and PDF2PPT.
-    """
+    """Handles both conversion directions: PPT2PDF and PDF2PPT."""
     mode = (request.form.get("mode") or "PPT2PDF").upper()
 
     if "file" not in request.files:
@@ -172,9 +234,8 @@ def convert():
             if ext not in PPT_EXTS:
                 abort(400, "Please upload a .ppt or .pptx file for PPT2PDF.")
             
-            tmp_out_dir = tempfile.mkdtemp(prefix="ppt2pdf_out_")
-            output_path = convert_with_libreoffice(src_path, tmp_out_dir)
-            out_name = f"{Path(src_path).stem}.pdf"
+            output_path, engine_used = ppt_to_pdf(src_path)
+            out_name = f"{Path(src_path).stem}_({engine_used}).pdf"
             mime_type = "application/pdf"
 
         elif mode == "PDF2PPT":
@@ -187,12 +248,10 @@ def convert():
         else:
             abort(400, "Unknown mode. Use PPT2PDF or PDF2PPT.")
 
-        # Prepare the file to be sent
         resp = send_file(output_path, as_attachment=True, download_name=out_name, mimetype=mime_type)
 
         @resp.call_on_close
         def _cleanup():
-            # This function will be called after the response is sent
             try:
                 shutil.rmtree(tmp_in, ignore_errors=True)
                 if output_path:
@@ -203,12 +262,10 @@ def convert():
         return resp
 
     except Exception as e:
-        # Clean up input files on any conversion error
         shutil.rmtree(tmp_in, ignore_errors=True)
         logging.error(f"Conversion failed: {e}", exc_info=True)
         abort(500, f"Conversion failed: {e}")
 
 
 if __name__ == "__main__":
-    # This is for local development only. Gunicorn is used in production.
     app.run(host="127.0.0.1", port=5000, debug=True)
