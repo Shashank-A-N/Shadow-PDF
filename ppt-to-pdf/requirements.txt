@@ -1,8 +1,12 @@
+# Flask web framework and server
 Flask>=3.0.0
-# Windows-only (optional, for native PPT->PDF):
-pywin32; platform_system == "Windows"
+gunicorn
 
-# PDF -> PPT (image-based):
+# For PDF to PPT conversion (cross-platform)
 PyMuPDF>=1.24.0
 python-pptx>=0.6.23
-gunicorn
+
+# For PPT to PDF conversion on Windows ONLY
+# This line tells pip to only install pywin32 if the OS is Windows.
+# It will be skipped on Linux/macOS and in the Docker container.
+pywin32; platform_system == "Windows"
