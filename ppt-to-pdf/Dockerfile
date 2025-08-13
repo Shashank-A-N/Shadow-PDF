@@ -3,11 +3,11 @@
 FROM python:3.10-slim
 
 # --- Install System Dependencies ---
-# Update the package list and install LibreOffice.
-# LibreOffice is required for the app to convert PPT to PDF on Linux.
+# Update the package list and install the specific LibreOffice component for conversion.
+# 'libreoffice-writer' is more reliable for providing the command-line tools.
 # --no-install-recommends keeps the image size smaller.
 RUN apt-get update && apt-get install -y \
-    libreoffice \
+    libreoffice-writer \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
