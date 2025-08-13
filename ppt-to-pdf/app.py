@@ -11,16 +11,16 @@
 # import win32com.client
 
 # from flask import Flask, render_template, request, send_file, jsonify, abort
-
-
 import os
 import sys
-import tempfile
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from datetime import datetime
 from flask import Flask, render_template, request, send_file, jsonify, abort
+
+IS_WINDOWS = sys.platform.startswith("win")
 
 # PDF -> PPT deps
 import fitz  # PyMuPDF
@@ -45,125 +45,68 @@ PDF_EXTS = {".pdf"}
 # Engine detection (PPT->PDF)
 # ---------------------------
 
+def powerpoint_available():
+    if not IS_WINDOWS:
+        return False
+    try:
+        import win32com.client
+        return True
+    except ImportError:
+        return False
+
+
+def convert_with_powerpoint(input_file, out_dir):
+    import pythoncom
+    import win32com.client
+
+    pythoncom.CoInitialize()
+    powerpoint = win32com.client.Dispatch("PowerPoint.Application")
+    powerpoint.Visible = True
+    deck = powerpoint.Presentations.Open(input_file, WithWindow=False)
+    pdf_path = os.path.join(out_dir, Path(input_file).stem + ".pdf")
+    deck.SaveAs(pdf_path, 32)  # 32 = PDF
+    deck.Close()
+    powerpoint.Quit()
+    return pdf_path
+
+
 def which_libreoffice():
     for cand in ("soffice", "libreoffice"):
         p = shutil.which(cand)
         if p:
             return p
-
-    if os.name == "nt":
-        for c in (
-            r"C:\Program Files\LibreOffice\program\soffice.exe",
-            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-        ):
-            if os.path.exists(c):
-                return c
-
-    if sys.platform == "darwin":
-        c = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
-        if os.path.exists(c):
-            return c
-
-    env = os.environ.get("LIBREOFFICE_PATH", "").strip()
-    if env and os.path.exists(env):
-        return env
     return None
 
 
-def powerpoint_available():
-    if os.name != "nt":
-        return False
-    try:
-        import win32com.client  # noqa
-        return True
-    except Exception:
-        return False
-
-
-# ---------------------------
-# PPT -> PDF engines
-# ---------------------------
-
-def convert_with_libreoffice(soffice_path, input_file, out_dir):
-    input_file = str(Path(input_file).resolve())
-    out_dir = str(Path(out_dir).resolve())
-    os.makedirs(out_dir, exist_ok=True)
-
-    cmd = [
-        soffice_path,
-        "--headless", "--nologo", "--nodefault", "--invisible", "--nofirststartwizard",
+def convert_with_libreoffice(lo_path, input_file, out_dir):
+    subprocess.run([
+        lo_path,
+        "--headless",
         "--convert-to", "pdf",
-        input_file,
         "--outdir", out_dir,
-    ]
-    subprocess.run(cmd, check=True)
-
-    stem = Path(input_file).with_suffix("").name
-    expected = Path(out_dir) / f"{stem}.pdf"
-    if expected.exists():
-        return str(expected)
-    candidates = sorted(Path(out_dir).glob(f"{stem}*.pdf"), key=lambda p: p.stat().st_mtime)
-    if candidates:
-        return str(candidates[-1])
-    raise FileNotFoundError("LibreOffice reported success but PDF not found.")
+        input_file
+    ], check=True)
+    return os.path.join(out_dir, Path(input_file).stem + ".pdf")
 
 
-def convert_with_powerpoint(input_file, out_dir):
-    # Initialize COM for this thread, crucial for use in web servers like Flask
-    pythoncom.CoInitialize()
-
-    input_file = str(Path(input_file).resolve())
-    out_dir = Path(out_dir).resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    stem = Path(input_file).with_suffix("").name
-    out_pdf = out_dir / f"{stem}.pdf"
-
-    pp = None
-    pres = None
-    try:
-        pp = win32com.client.Dispatch("PowerPoint.Application")
-        # Keep PowerPoint invisible during the conversion
-        pres = pp.Presentations.Open(input_file, WithWindow=False)
-        pres.SaveAs(str(out_pdf), 32)  # 32 = PDF format
-
-    finally:
-        # IMPORTANT: Always close and quit to avoid orphaned PowerPoint processes
-        if pres is not None:
-            pres.Close()
-        if pp is not None:
-            pp.Quit()
-        # Uninitialize COM for this thread
-        pythoncom.CoUninitialize()
-
-    if not out_pdf.exists():
-        raise FileNotFoundError(f"PowerPoint did not create the PDF file: {out_pdf}")
-    return str(out_pdf)
-
-
-def ppt_to_pdf(input_file, prefer="AUTO"):
+def ppt_to_pdf(input_file):
     tmp_out = tempfile.mkdtemp(prefix="ppt2pdf_out_")
+
+    # Windows path
+    if IS_WINDOWS and powerpoint_available():
+        try:
+            return convert_with_powerpoint(input_file, tmp_out)
+        except Exception as e:
+            print(f"[WARN] PowerPoint failed: {e}")
+
+    # Fallback: LibreOffice
     lo = which_libreoffice()
-    pp_ok = powerpoint_available()
-
-    if prefer == "LIBREOFFICE":
-        if not lo:
-            raise RuntimeError("LibreOffice not found.")
-        return convert_with_libreoffice(lo, input_file, tmp_out), "LibreOffice"
-
-    if prefer == "POWERPOINT":
-        if not pp_ok:
-            raise RuntimeError("PowerPoint COM not available (install PowerPoint + pywin32).")
-        return convert_with_powerpoint(input_file, tmp_out), "PowerPoint"
-
-    # AUTO logic: Prefer PowerPoint on Windows if available, otherwise use LibreOffice
-    if pp_ok:
-        return convert_with_powerpoint(input_file, tmp_out), "PowerPoint"
     if lo:
-        return convert_with_libreoffice(lo, input_file, tmp_out), "LibreOffice"
+        return convert_with_libreoffice(lo, input_file, tmp_out)
 
-    raise RuntimeError("No conversion engine found. Install LibreOffice or (on Windows) PowerPoint+pywin32.")
-
+    raise RuntimeError(
+        "No conversion engine found. Install LibreOffice or (on Windows) PowerPoint+pywin32."
+    )
 
 # ---------------------------
 # PDF -> PPT (image-based)
@@ -308,5 +251,6 @@ def which_libreoffice():
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
+
 
 
