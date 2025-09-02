@@ -1,18 +1,14 @@
-# FastAPI for the server
-fastapi
-python-multipart
-uvicorn[standard]
+fastapi==0.116.1
+uvicorn[standard]==0.30.6
+python-multipart==0.0.20
+numpy==1.26.4
+Pillow==10.4.0
+opencv-contrib-python-headless==4.9.0.80
 
-# Core Image & AI Libraries
-numpy
-Pillow
-opencv-python-headless
-torch
-torchvision
-gfpgan
-
-# Specific versions to solve library-specific build logic errors
-basicsr
-realesrgan
-onnxruntime-gpu
-onnxruntime
+# Full feature deps (work on Python 3.10/3.11, not 3.13)
+torch==2.3.1
+torchvision==0.18.1
+realesrgan==0.3.0
+basicsr==1.4.2
+onnxruntime==1.18.0
+onnxruntime-gpu==1.18.0
