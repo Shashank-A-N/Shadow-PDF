@@ -2,6 +2,7 @@ services:
   - type: web
     name: superres-server
     env: python
+    plan: free             # change if you need more resources
     buildCommand: |
       pip install -r requirements.txt
       bash download_models.sh
