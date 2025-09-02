@@ -46,9 +46,26 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from fastapi import FastAPI, File, UploadFile, Query, HTTPException
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response, JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 # Optional heavy deps — load lazily to keep import cost low.
+app = FastAPI(title="Super-Resolution Server (GAN / SwinIR)", version="1.0.0")
+
+# Serve index.html at root
+@app.get("/", response_class=HTMLResponse)
+def index():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+# (your existing endpoints: /health, /models, /super-resolve remain unchanged)
+
+
+
+
+
+
+
 TORCH_AVAILABLE = False
 try:
     import torch  # type: ignore
@@ -403,3 +420,4 @@ def index():
             },
         }
     )
+
