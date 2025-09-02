@@ -3,424 +3,338 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Q&A with Document</title>
+    <title>AI Image Enhancer - Ultimate Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            background-image: radial-gradient(circle at 1px 1px, #34d39933 1px, transparent 0);
+            background-size: 20px 20px;
+            color: #e0e0e0;
+            overscroll-behavior: none;
         }
-        /* Custom scrollbar for answer box */
-        #answer-box::-webkit-scrollbar {
-            width: 8px;
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
-        #answer-box::-webkit-scrollbar-track {
-            background: #f1f5f9;
+
+        .lime-accent { background-color: #6ee7b7; color: #1a1a1a; }
+        .lime-accent-hover:hover { background-color: #34d399; }
+        .lime-border { border-color: #6ee7b7; }
+        .lime-text { color: #6ee7b7; }
+
+        .loader-container {
+            display: none; /* Initially hidden */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
         }
-        #answer-box::-webkit-scrollbar-thumb {
-            background-color: #94a3b8;
-            border-radius: 10px;
-            border: 3px solid #f1f5f9;
+
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-left-color: #6ee7b7;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
         }
-        .gemini-button {
-            transition: all 0.2s ease-in-out;
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .drag-over { background-color: rgba(110, 231, 183, 0.1); }
+        
+        #comparison-wrapper { touch-action: none; }
+        .comparison-slider {
+            position: absolute; top: 0; left: 50%; width: 4px; height: 100%;
+            background-color: #ffffff; cursor: ew-resize; transform: translateX(-2px); z-index: 20;
         }
-        .gemini-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        .comparison-handle {
+            position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
+            border: 2px solid white; border-radius: 50%; background-color: #6ee7b7;
+            transform: translate(-50%, -50%); display: flex; align-items: center;
+            justify-content: space-evenly; color: black; font-size: 14px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5); pointer-events: none;
+        }
+        .comparison-handle::before { content: '◀'; }
+        .comparison-handle::after { content: '▶'; }
+        #original-comparison { z-index: 10; }
+        #enhanced-image { z-index: 5; }
+
+        .glass-input {
+            background: rgb(81 166 210 / 8%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #42c789;
+        }
+        .glass-input:focus {
+            outline: none; border-color: #6ee7b7; box-shadow: 0 0 0 2px rgba(110, 231, 183, 0.5);
+        }
+        #enhance-btn {
+            background: #6ee7b7; color: #1a1a1a; border: 1px solid #6ee7b7;
+        }
+        #enhance-btn:hover {
+            background: #34d399; box-shadow: 0 0 20px rgba(110, 231, 183, 0.7);
+        }
+        #enhance-btn:disabled {
+            background-color: #4a5568;
+            cursor: not-allowed;
+            color: #a0aec0;
         }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen">
+<body>
 
-    <div class="w-full max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div class="bg-white shadow-2xl rounded-2xl p-6 sm:p-8">
+    <div class="min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-5xl mx-auto">
+            
             <header class="text-center mb-8">
-                <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Q&A with Document</h1>
-                <p class="mt-2 text-slate-500">Upload a PDF and get intelligent answers, summaries, and suggested questions instantly.</p>
+                <h1 class="text-4xl md:text-5xl font-bold text-white mb-2">AI Super-Resolution <span class="lime-text">Client</span></h1>
+                <p class="text-lg text-gray-300">A web interface for your powerful AI upscaling server.</p>
             </header>
 
-            <!-- Step 1: PDF Upload -->
-            <div class="mb-6">
-                <label for="pdf-upload" class="block text-lg font-semibold text-slate-700 mb-2">1. Upload your PDF</label>
-                <div class="flex items-center justify-center w-full">
-                    <label for="pdf-upload-input" class="flex flex-col items-center justify-center w-full h-40 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
-                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                            <svg class="w-10 h-10 mb-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h10a4 4 0 014 4v6a4 4 0 01-4 4H7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 16v2a2 2 0 01-2 2H10a2 2 0 01-2-2v-2m-4-4h16"></path></svg>
-                            <p id="upload-text" class="mb-2 text-sm text-slate-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-                            <p class="text-xs text-slate-500">PDF (MAX. 5MB)</p>
-                        </div>
-                        <input id="pdf-upload-input" type="file" class="hidden" accept="application/pdf" />
-                    </label>
-                </div>
-                 <p id="file-status" class="mt-2 text-sm text-center text-slate-600 h-5"></p>
-            </div>
+            <div id="app-container" class="glass-panel p-6 md:p-8">
 
-            <!-- Gemini Features -->
-            <div id="gemini-features" class="mb-6 space-y-3 sm:space-y-0 sm:flex sm:space-x-4 hidden">
-                <button id="summarize-button" class="gemini-button w-full sm:w-1/2 flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:bg-slate-400 disabled:cursor-not-allowed">
-                    ✨ Summarize Document
-                </button>
-                <button id="suggest-questions-button" class="gemini-button w-full sm:w-1/2 flex items-center justify-center px-4 py-2.5 bg-teal-500 text-white font-semibold rounded-lg shadow-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-slate-400 disabled:cursor-not-allowed">
-                    ✨ Suggest Questions
-                </button>
-            </div>
-
-            <!-- Suggested Questions Display -->
-            <div id="suggested-questions-container" class="mb-6 hidden">
-                 <h3 class="text-md font-semibold text-slate-600 mb-2">Suggested Questions:</h3>
-                 <div id="suggested-questions-list" class="flex flex-wrap gap-2"></div>
-            </div>
-
-            <!-- Step 2: Ask Question -->
-            <div class="mb-6">
-                <label for="question-input" class="block text-lg font-semibold text-slate-700 mb-2">2. Ask a question</label>
-                <div class="relative">
-                    <input type="text" id="question-input" class="w-full p-4 pr-12 text-slate-700 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g., What is the main conclusion?">
-                    <button id="ask-button" class="absolute inset-y-0 right-0 flex items-center px-4 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors">
-                        Ask
-                    </button>
-                </div>
-            </div>
-
-            <!-- Step 3: Get Answer -->
-            <div>
-                <label for="answer-box" class="block text-lg font-semibold text-slate-700 mb-2">3. Answer</label>
-                <div id="answer-container" class="relative w-full p-4 bg-slate-50 border border-slate-200 rounded-lg min-h-[150px]">
-                    <div id="answer-box" class="prose prose-slate max-w-none h-full max-h-60 overflow-y-auto text-slate-600">
-                        <p id="answer-placeholder">Your answer will appear here...</p>
-                    </div>
-                    <div id="loader" class="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center rounded-lg hidden">
-                        <div class="flex items-center space-x-2">
-                            <div class="w-4 h-4 rounded-full bg-blue-600 animate-bounce" style="animation-delay: -0.3s;"></div>
-                            <div class="w-4 h-4 rounded-full bg-blue-600 animate-bounce" style="animation-delay: -0.15s;"></div>
-                            <div class="w-4 h-4 rounded-full bg-blue-600 animate-bounce"></div>
-                            <span class="ml-2 text-slate-600">Analyzing document...</span>
-                        </div>
+                <div id="upload-section">
+                    <div id="drop-zone" class="border-2 border-dashed lime-border rounded-lg p-8 text-center cursor-pointer hover:bg-lime-400/[0.1] transition-colors duration-300">
+                        <svg class="mx-auto h-12 w-12 lime-text" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                        <p class="mt-2 text-gray-300"><span class="font-semibold lime-text">Click to upload</span> or drag and drop</p>
+                        <input type="file" id="file-input" class="hidden" accept="image/png, image/jpeg, image/webp">
                     </div>
                 </div>
+
+                <div id="editor-section" class="hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-1 flex flex-col gap-4">
+                            <!-- Controls Section -->
+                            <div class="space-y-2">
+                                <h3 class="text-lg font-semibold text-white">Original Image</h3>
+                                <div class="glass-panel p-2"><img id="original-preview" src="#" alt="Original Image" class="w-full h-auto rounded-md object-contain max-h-64"></div>
+                                <button id="change-image-btn" class="w-full text-center bg-white/10 hover:bg-white/20 border border-white/20 py-2 px-4 rounded-lg transition">Change Image</button>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="resolution-select" class="block text-sm font-medium text-gray-300 mb-1">Target Resolution</label>
+                                    <select id="resolution-select" class="w-full glass-input rounded-lg p-2 transition"><option value="1280x720">720p (HD)</option><option value="1920x1080" selected>1080p (Full HD)</option><option value="3840x2160">4K (UHD)</option><option value="7680x4320">8K</option></select>
+                                </div>
+                                <!-- NEW: Engine Selection -->
+                                <div>
+                                    <label for="engine-select" class="block text-sm font-medium text-gray-300 mb-1">AI Engine</label>
+                                    <select id="engine-select" class="w-full glass-input rounded-lg p-2 transition">
+                                        <option value="realesrgan" selected>Real-ESRGAN (Default)</option>
+                                        <option value="swinir">SwinIR</option>
+                                        <option value="opencv">OpenCV (Fallback)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="format-select" class="block text-sm font-medium text-gray-300 mb-1">Output Format</label>
+                                    <select id="format-select" class="w-full glass-input rounded-lg p-2 transition"><option value="png" selected>PNG (Lossless)</option><option value="webp">WebP (Lossless)</option><option value="tiff">TIFF</option></select>
+                                </div>
+                                <button id="enhance-btn" class="w-full text-center font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2">Enhance Image</button>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2">
+                             <!-- Output Section -->
+                            <h3 class="text-lg font-semibold text-white mb-2">Enhanced Result</h3>
+                            <div id="output-placeholder" class="glass-panel aspect-video flex items-center justify-center text-gray-400"><p>Your enhanced image will appear here</p></div>
+                            <div id="output-loading" class="glass-panel aspect-video loader-container">
+                                <div class="loader"></div>
+                                <p id="loading-text">Contacting AI server...</p>
+                            </div>
+                            <div id="output-container" class="hidden relative w-full aspect-video glass-panel overflow-hidden">
+                                <div id="comparison-wrapper" class="relative w-full h-full cursor-ew-resize">
+                                    <img id="enhanced-image" src="#" alt="Enhanced Image" class="absolute inset-0 w-full h-full object-contain">
+                                    <div id="original-comparison" class="absolute inset-0 w-1/2 h-full overflow-hidden">
+                                        <img id="original-image-for-comparison" src="#" alt="Original Image" class="absolute inset-0 w-full h-full object-contain" style="max-width: none;">
+                                    </div>
+                                    <div id="comparison-slider" class="comparison-slider"><div class="comparison-handle"></div></div>
+                                </div>
+                            </div>
+                            <div id="output-actions" class="mt-4 flex flex-col items-center justify-center gap-4 hidden">
+                                 <button id="download-btn" class="lime-accent lime-accent-hover text-gray-900 font-bold py-2 px-4 rounded-lg transition flex items-center gap-2 w-full max-w-xs">Download Image</button>
+                                <p id="error-message" class="text-sm text-red-400 text-center hidden"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-             <div id="error-message" class="mt-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-lg hidden"></div>
+            
+            <footer class="text-center mt-8"><p class="text-sm text-gray-500">&copy; 2025 AI Super-Resolution Client. All Rights Reserved.</p></footer>
         </div>
     </div>
 
-    <script type="module">
-        // Set the workerSrc for pdf.js
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- IMPORTANT: CONFIGURE YOUR SERVER ADDRESS HERE ---
+    const API_ENDPOINT = 'http://localhost:8000'; 
+    // ---
 
-        // --- DOM Elements ---
-        const fileInput = document.getElementById('pdf-upload-input');
-        const uploadText = document.getElementById('upload-text');
-        const fileStatus = document.getElementById('file-status');
-        const questionInput = document.getElementById('question-input');
-        const askButton = document.getElementById('ask-button');
-        const answerBox = document.getElementById('answer-box');
-        const answerPlaceholder = document.getElementById('answer-placeholder');
-        const loader = document.getElementById('loader');
-        const errorMessage = document.getElementById('error-message');
-        const geminiFeatures = document.getElementById('gemini-features');
-        const summarizeButton = document.getElementById('summarize-button');
-        const suggestQuestionsButton = document.getElementById('suggest-questions-button');
-        const suggestedQuestionsContainer = document.getElementById('suggested-questions-container');
-        const suggestedQuestionsList = document.getElementById('suggested-questions-list');
+    const elements = {
+        dropZone: document.getElementById('drop-zone'),
+        fileInput: document.getElementById('file-input'),
+        uploadSection: document.getElementById('upload-section'),
+        editorSection: document.getElementById('editor-section'),
+        originalPreview: document.getElementById('original-preview'),
+        changeImageBtn: document.getElementById('change-image-btn'),
+        enhanceBtn: document.getElementById('enhance-btn'),
+        resolutionSelect: document.getElementById('resolution-select'),
+        engineSelect: document.getElementById('engine-select'),
+        formatSelect: document.getElementById('format-select'),
+        outputPlaceholder: document.getElementById('output-placeholder'),
+        outputLoading: document.getElementById('output-loading'),
+        loadingText: document.getElementById('loading-text'),
+        outputContainer: document.getElementById('output-container'),
+        outputActions: document.getElementById('output-actions'),
+        errorMessage: document.getElementById('error-message'),
+        enhancedImage: document.getElementById('enhanced-image'),
+        downloadBtn: document.getElementById('download-btn'),
+        comparisonWrapper: document.getElementById('comparison-wrapper'),
+        originalComparison: document.getElementById('original-comparison'),
+        originalImageForComparison: document.getElementById('original-image-for-comparison'),
+        comparisonSlider: document.getElementById('comparison-slider'),
+    };
+    let originalFile = null;
+    let enhancedImageBlobUrl = null;
 
-        let documentText = '';
-
-        // --- Event Listeners ---
-        fileInput.addEventListener('change', handleFileSelect);
-        askButton.addEventListener('click', handleQuestionSubmit);
-        summarizeButton.addEventListener('click', handleSummaryClick);
-        suggestQuestionsButton.addEventListener('click', handleSuggestQuestionsClick);
-        questionInput.addEventListener('keyup', (event) => {
-            if (event.key === 'Enter') {
-                handleQuestionSubmit();
+    const handleFile = (file) => {
+        if (!file || !file.type.startsWith('image/')) return;
+        originalFile = file;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const imgSrc = e.target.result;
+            elements.originalPreview.src = imgSrc;
+            elements.originalImageForComparison.src = imgSrc;
+            const imgForSize = new Image();
+            imgForSize.onload = () => {
+                const wrapperRect = elements.comparisonWrapper.getBoundingClientRect();
+                elements.originalImageForComparison.style.width = `${wrapperRect.width}px`;
             }
-        });
+            imgForSize.src = imgSrc;
+            elements.uploadSection.classList.add('hidden');
+            elements.editorSection.classList.remove('hidden');
+            resetOutput();
+        };
+        reader.readAsDataURL(file);
+    };
 
-        // --- Functions ---
-
-        /**
-         * Handles the selection of a PDF file.
-         * Reads the file, extracts text, and updates the UI to enable features.
-         */
-        async function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file || file.type !== 'application/pdf') {
-                showError('Please select a valid PDF file.');
-                return;
-            }
-            if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                showError('File size exceeds 5MB. Please upload a smaller PDF.');
-                return;
-            }
-
-            hideError();
-            resetUI();
-            fileStatus.textContent = `Processing "${file.name}"...`;
-            uploadText.textContent = `"${file.name}"`;
-            
-            try {
-                const pdfText = await extractTextFromPdf(file);
-                documentText = pdfText;
-                fileStatus.textContent = `✅ Ready to analyze "${file.name}"`;
-                geminiFeatures.classList.remove('hidden');
-            } catch (error) {
-                console.error('Error parsing PDF:', error);
-                showError('Could not read the document. It might be corrupted or image-based.');
-                fileStatus.textContent = 'Processing failed.';
-                uploadText.textContent = 'Click to upload';
-            }
+    const resetOutput = () => {
+        elements.outputPlaceholder.style.display = 'flex';
+        elements.outputLoading.style.display = 'none';
+        elements.outputContainer.classList.add('hidden');
+        elements.outputActions.classList.add('hidden');
+        elements.errorMessage.classList.add('hidden');
+        elements.errorMessage.textContent = '';
+        if (enhancedImageBlobUrl) {
+            URL.revokeObjectURL(enhancedImageBlobUrl);
+            enhancedImageBlobUrl = null;
         }
+    };
+    
+    elements.dropZone.addEventListener('click', () => elements.fileInput.click());
+    elements.fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      elements.dropZone.addEventListener(eventName, e => e.preventDefault());
+      document.body.addEventListener(eventName, e => e.preventDefault());
+    });
+    elements.dropZone.addEventListener('dragover', () => elements.dropZone.classList.add('drag-over'));
+    elements.dropZone.addEventListener('dragleave', () => elements.dropZone.classList.remove('drag-over'));
+    elements.dropZone.addEventListener('drop', (e) => {
+        elements.dropZone.classList.remove('drag-over');
+        handleFile(e.dataTransfer.files[0]);
+    });
+    elements.changeImageBtn.addEventListener('click', () => {
+        elements.uploadSection.classList.remove('hidden');
+        elements.editorSection.classList.add('hidden');
+        elements.fileInput.value = '';
+        originalFile = null;
+    });
 
-        /**
-         * Extracts text content from a PDF file using pdf.js.
-         * @param {File} file - The PDF file object.
-         * @returns {Promise<string>} A promise that resolves with the extracted text.
-         */
-        async function extractTextFromPdf(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            let fullText = '';
+    /**
+     * NEW: API Call to the Super-Resolution Server
+     */
+    elements.enhanceBtn.addEventListener('click', async () => {
+        if (!originalFile) return;
 
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(' ');
-                fullText += pageText + '\n\n';
-            }
-            return fullText;
-        }
+        resetOutput();
+        elements.outputPlaceholder.style.display = 'none';
+        elements.outputLoading.style.display = 'flex';
+        elements.loadingText.textContent = 'Uploading and processing on AI server...';
+        elements.enhanceBtn.disabled = true;
 
-        /**
-         * Handles the submission of a user's question.
-         */
-        async function handleQuestionSubmit() {
-            const question = questionInput.value.trim();
-            if (!validateInputs(question)) return;
+        const [target_w, target_h] = elements.resolutionSelect.value.split('x').map(Number);
+        const engine = elements.engineSelect.value;
+        const output_format = elements.formatSelect.value;
 
-            const prompt = `Based on the following document, please provide a clear and concise answer to the question. If the answer is not found in the document, state that the information is not available.
+        const formData = new FormData();
+        formData.append('image', originalFile);
 
-            Document:
-            ---
-            ${documentText}
-            ---
+        const url = `${API_ENDPOINT}/super-resolve?target_w=${target_w}&target_h=${target_h}&engine=${engine}&output_format=${output_format}`;
 
-            Question: ${question}`;
-            
-            await generateResponse(prompt);
-        }
-
-        /**
-         * Handles the "Summarize Document" button click.
-         */
-        async function handleSummaryClick() {
-            if (!validateInputs()) return;
-
-            const prompt = `Please provide a concise summary of the following document. Focus on the key points, main arguments, and conclusions.
-
-            Document:
-            ---
-            ${documentText}
-            ---
-            
-            Summary:`;
-            
-            await generateResponse(prompt);
-        }
-
-        /**
-         * Handles the "Suggest Questions" button click.
-         */
-        async function handleSuggestQuestionsClick() {
-            if (!validateInputs()) return;
-
-            const prompt = `Based on the following document, generate 3-4 insightful questions that a user might want to ask to understand the core topics.
-
-            Document:
-            ---
-            ${documentText}
-            ---`;
-
-            await generateSuggestedQuestions(prompt);
-        }
-        
-        /**
-         * Generic function to generate a text response from Gemini.
-         * @param {string} prompt - The prompt for the Gemini API.
-         */
-        async function generateResponse(prompt) {
-            startLoading('Analyzing document...');
-            try {
-                const answer = await callGemini(prompt);
-                displayAnswer(answer);
-            } catch (error) {
-                handleApiError(error, 'Sorry, an error occurred while generating the response.');
-            } finally {
-                stopLoading();
-            }
-        }
-        
-        /**
-         * Generates and displays suggested questions from Gemini.
-         * @param {string} prompt - The prompt for the Gemini API.
-         */
-        async function generateSuggestedQuestions(prompt) {
-            startLoading('Generating questions...');
-            suggestedQuestionsContainer.classList.add('hidden');
-            suggestedQuestionsList.innerHTML = '';
-
-            try {
-                const schema = {
-                    type: "OBJECT",
-                    properties: {
-                        "questions": {
-                            "type": "ARRAY",
-                            "items": { "type": "STRING" }
-                        }
-                    },
-                    required: ["questions"]
-                };
-                const result = await callGemini(prompt, schema);
-                const questions = JSON.parse(result).questions;
-
-                if (questions && questions.length > 0) {
-                    displaySuggestedQuestions(questions);
-                } else {
-                    showError("Could not generate suggested questions.");
-                }
-
-            } catch (error) {
-                handleApiError(error, 'Sorry, an error occurred while generating questions.');
-            } finally {
-                stopLoading();
-            }
-        }
-
-        /**
-         * Calls the Gemini API with a given prompt and optional schema.
-         * @param {string} prompt - The prompt to send.
-         * @param {object|null} schema - The JSON schema for structured output.
-         * @returns {Promise<string>} The text part of the model's response.
-         */
-        async function callGemini(prompt, schema = null) {
-            const apiKey = "AIzaSyA-FfPzdQSAoWF40GaGQyhhU4X9QKDraKU"; // API key is handled by the environment
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-            
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }]
-            };
-
-            if (schema) {
-                payload.generationConfig = {
-                    responseMimeType: "application/json",
-                    responseSchema: schema
-                };
-            }
-
-            const response = await fetch(apiUrl, {
+        try {
+            const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: formData,
             });
 
             if (!response.ok) {
-                throw new Error(`API request failed with status ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Server error: ${response.status}`);
             }
 
-            const result = await response.json();
+            const imageBlob = await response.blob();
+            enhancedImageBlobUrl = URL.createObjectURL(imageBlob);
 
-            if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
-                return result.candidates[0].content.parts[0].text;
-            } else {
-                 console.error("Unexpected API response structure:", result);
-                 if (result.promptFeedback?.blockReason) {
-                     throw new Error(`Request blocked: ${result.promptFeedback.blockReason}`);
-                 }
-                 throw new Error("Could not generate a valid response from the API.");
-            }
-        }
+            elements.enhancedImage.src = enhancedImageBlobUrl;
+            elements.outputLoading.style.display = 'none';
+            elements.outputContainer.classList.remove('hidden');
+            elements.outputActions.classList.remove('hidden');
 
-        // --- UI Update Functions ---
+        } catch (error) {
+            console.error('Enhancement failed:', error);
+            elements.outputLoading.style.display = 'none';
+            elements.outputPlaceholder.style.display = 'flex'; // Show placeholder again on error
+            elements.outputActions.classList.remove('hidden');
+            elements.errorMessage.textContent = `Error: ${error.message}. Is the server running at ${API_ENDPOINT}?`;
+            elements.errorMessage.classList.remove('hidden');
+        } finally {
+            elements.enhanceBtn.disabled = false;
+        }
+    });
 
-        function displayAnswer(text) {
-            answerPlaceholder.classList.add('hidden');
-            answerBox.innerHTML = `<p>${text.replace(/\n/g, '<br>')}</p>`;
-        }
+    elements.downloadBtn.addEventListener('click', () => {
+        if (!enhancedImageBlobUrl) return;
+        const link = document.createElement('a');
+        const extension = elements.formatSelect.value;
+        const resolution = elements.resolutionSelect.options[elements.resolutionSelect.selectedIndex].text.split(' ')[0];
+        link.download = `enhanced-${resolution}.${extension}`;
+        link.href = enhancedImageBlobUrl;
+        link.click();
+    });
 
-        function displaySuggestedQuestions(questions) {
-            suggestedQuestionsList.innerHTML = '';
-            questions.forEach(q => {
-                const button = document.createElement('button');
-                button.textContent = q;
-                button.className = 'bg-slate-200 text-slate-700 text-sm px-3 py-1 rounded-full hover:bg-slate-300 transition-colors';
-                button.onclick = () => {
-                    questionInput.value = q;
-                    handleQuestionSubmit();
-                };
-                suggestedQuestionsList.appendChild(button);
-            });
-            suggestedQuestionsContainer.classList.remove('hidden');
-        }
+    let isDragging = false;
+    const moveSlider = (clientX) => {
+        const rect = elements.comparisonWrapper.getBoundingClientRect();
+        let x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+        elements.originalComparison.style.width = `${x}px`;
+        elements.comparisonSlider.style.left = `${x}px`;
+    };
 
-        function startLoading(message) {
-            loader.querySelector('span').textContent = message;
-            loader.classList.remove('hidden');
-            answerPlaceholder.classList.add('hidden');
-            answerBox.innerHTML = '';
-            askButton.disabled = true;
-            summarizeButton.disabled = true;
-            suggestQuestionsButton.disabled = true;
-            hideError();
-        }
-
-        function stopLoading() {
-            loader.classList.add('hidden');
-            askButton.disabled = false;
-            summarizeButton.disabled = false;
-            suggestQuestionsButton.disabled = false;
-        }
-        
-        function handleApiError(error, defaultMessage) {
-            console.error('API Error:', error);
-            showError(error.message || defaultMessage);
-            answerPlaceholder.classList.remove('hidden');
-            answerPlaceholder.textContent = 'Failed to get a response.';
-        }
-        
-        function validateInputs(question = null) {
-            if (!documentText) {
-                showError('Please upload a PDF document first.');
-                return false;
-            }
-            if (question !== null && !question) {
-                showError('Please enter a question.');
-                return false;
-            }
-            hideError();
-            return true;
-        }
-
-        function resetUI() {
-            documentText = '';
-            geminiFeatures.classList.add('hidden');
-            suggestedQuestionsContainer.classList.add('hidden');
-            suggestedQuestionsList.innerHTML = '';
-            answerBox.innerHTML = '';
-            answerPlaceholder.classList.remove('hidden');
-            answerPlaceholder.textContent = 'Your answer will appear here...';
-            questionInput.value = '';
-        }
-
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.classList.remove('hidden');
-        }
-
-        function hideError() {
-            errorMessage.classList.add('hidden');
-        }
-
-    </script>
+    elements.comparisonWrapper.addEventListener('mousedown', (e) => { isDragging = true; e.preventDefault(); });
+    elements.comparisonWrapper.addEventListener('touchstart', (e) => { isDragging = true; e.preventDefault(); }, { passive: false });
+    window.addEventListener('mouseup', () => isDragging = false);
+    window.addEventListener('touchend', () => isDragging = false);
+    window.addEventListener('mousemove', (e) => { if (isDragging) moveSlider(e.clientX); });
+    window.addEventListener('touchmove', (e) => { if (isDragging) moveSlider(e.touches[0].clientX); }, { passive: false });
+});
+</script>
 </body>
 </html>
+
