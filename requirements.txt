@@ -1,0 +1,16 @@
+# FastAPI for the server
+fastapi
+python-multipart
+uvicorn
+
+# Core Image & AI Libraries
+numpy
+Pillow
+opencv-python-headless
+torch
+torchvision
+gfpgan
+
+# Specific versions to solve library-specific build logic errors
+basicsr==1.3.5
+realesrgan==0.2.5.0
