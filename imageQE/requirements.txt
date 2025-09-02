@@ -1,7 +1,7 @@
 # FastAPI for the server
 fastapi
 python-multipart
-uvicorn
+uvicorn[standard]
 
 # Core Image & AI Libraries
 numpy
@@ -12,5 +12,7 @@ torchvision
 gfpgan
 
 # Specific versions to solve library-specific build logic errors
-basicsr==1.3.5
-realesrgan==0.2.5.0
+basicsr
+realesrgan
+onnxruntime-gpu
+onnxruntime
