@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced PDF Toolkit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior-y: none;
+        }
+        .drag-ghost {
+            opacity: 0.4;
+            background: #c8ebfb;
+        }
+        .page-item {
+            position: relative;
+            transition: transform 0.2s ease-in-out;
+            border-radius: 0.5rem;
+        }
+        .page-item:hover {
+            transform: translateY(-4px);
+            z-index: 10;
+        }
+        .page-item.selected .canvas-wrapper {
+             border-color: #3b82f6;
+             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+        .page-action-btn {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            transform: scale(0.8);
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .page-item:hover .page-action-btn {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .delete-page-btn {
+            top: -12px;
+            right: -12px;
+        }
+        .rotate-btn {
+            bottom: -12px;
+            left: -12px;
+        }
+        .copy-btn {
+            bottom: -12px;
+            right: -12px;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .file-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-radius: 6px;
+            transition: background-color 0.2s, color 0.2s;
+            word-break: break-all;
+            border: 1px solid #e5e7eb;
+        }
+        .file-name {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-right: 8px;
+            cursor: pointer;
+        }
+        .file-list-item:hover {
+            background-color: #f3f4f6;
+        }
+        .file-list-item.active {
+            background-color: #e0e7ff;
+            color: #4338ca;
+            font-weight: 600;
+            border-color: #c7d2fe;
+        }
+        .delete-file-btn {
+            flex-shrink: 0;
+            padding: 4px;
+            border-radius: 50%;
+            color: #9ca3af;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .delete-file-btn:hover {
+            background-color: #fee2e2;
+            color: #ef4444;
+        }
+        .canvas-wrapper {
+            transition: transform 0.3s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            border: 2px solid transparent;
+            border-radius: 0.375rem;
+        }
+        .button-text-label {
+            display: none;
+        }
+        @media (min-width: 930px) {
+            .button-text-label {
+                display: inline;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden">
+
+    <!-- Initial Centered Upload View -->
+    <div id="initial-view" class="flex h-full items-center justify-center p-4">
+        <div class="text-center w-full max-w-lg">
+            <header class="mb-8">
+                 <h1 class="text-4xl font-bold text-gray-900">PDF Organizer</h1>
+                 <p class="text-lg text-gray-600 mt-2">Manage and edit your documents.</p>
+            </header>
+            <div id="initial-upload-container">
+                 <div id="initial-drop-zone" class="border-2 border-dashed border-gray-400 rounded-lg p-8 bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input type="file" id="file-input" class="hidden" accept=".pdf" multiple>
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                    <p class="mt-4 text-lg text-gray-600">
+                        <span class="font-semibold text-blue-600">Click to upload</span> or drag and drop PDFs here
+                    </p>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App View -->
+    <div id="main-view" class="flex h-screen hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="absolute z-30 inset-y-0 left-0 w-80 sm:w-96 bg-white p-6 shadow-lg flex flex-col transform -translate-x-full sm:relative sm:translate-x-0 transition-transform duration-300 ease-in-out">
+            <header class="text-center mb-6">
+                 <h1 class="text-3xl font-bold text-gray-900">PDF Organizer</h1>
+            </header>
+
+            <div id="sidebar-upload-container" class="mb-4">
+                <div id="sidebar-drop-zone" class="border-2 border-dashed border-gray-400 rounded-lg p-4 text-center bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                    <p class="text-md text-gray-600"><span class="font-semibold text-blue-600">Add more files</span></p>
+                </div>
+            </div>
+
+            <div class="flex-grow flex flex-col overflow-hidden min-h-0">
+                <h2 class="text-xl font-bold text-gray-800 mb-2 flex-shrink-0">Your Files</h2>
+                <div id="file-list-container" class="space-y-2 overflow-y-auto flex-grow">
+                    <!-- File list is dynamically populated here -->
+                </div>
+            </div>
+            
+            <div id="global-controls" class="pt-4 mt-auto flex-shrink-0">
+                 <button id="reset-btn" class="w-full bg-red-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-red-700 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed">Reset All</button>
+            </div>
+        </aside>
+
+        <!-- Sidebar Overlay -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden sm:hidden"></div>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col p-4 sm:p-8 overflow-hidden">
+            <button id="menu-btn" class="sm:hidden p-2 rounded-md bg-white shadow-md fixed top-4 left-4 z-40">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div id="main-content-area" class="h-full flex flex-col">
+                <div id="editing-area" class="hidden h-full flex flex-col">
+                     <div id="editing-header" class="p-4 bg-white rounded-t-lg border-2 border-b-0 border-blue-500 flex flex-col gap-4 flex-shrink-0">
+                        <!-- Editing header content populated by JS -->
+                    </div>
+                    <div id="editing-pages-container" class="p-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-4 sm:gap-6 bg-white rounded-b-lg border-2 border-t-0 border-blue-500 overflow-y-auto flex-grow">
+                        <!-- Pages of the selected file populated by JS -->
+                    </div>
+                </div>
+                 <div id="editing-placeholder" class="text-center p-10 border-2 border-dashed rounded-lg h-full flex flex-col justify-center items-center">
+                    <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    <p class="mt-4 text-lg text-gray-500">Select a file from the list to start editing its pages.</p>
+                </div>
+             </div>
+        </main>
+    </div>
+
+    <!-- Loader (covers everything) -->
+    <div id="loader" class="hidden fixed inset-0 bg-white bg-opacity-80 z-50 flex-col items-center justify-center">
+        <div class="loader"></div>
+        <p class="mt-4 text-gray-600">Processing your PDFs...</p>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        const { degrees, PageSizes } = PDFLib;
+
+        // --- DOM Elements ---
+        const initialView = document.getElementById('initial-view');
+        const mainView = document.getElementById('main-view');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const menuBtn = document.getElementById('menu-btn');
+        const initialDropZone = document.getElementById('initial-drop-zone');
+        const sidebarDropZone = document.getElementById('sidebar-drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileListContainer = document.getElementById('file-list-container');
+        const mainContentArea = document.getElementById('main-content-area');
+        const editingArea = document.getElementById('editing-area');
+        const editingPlaceholder = document.getElementById('editing-placeholder');
+        const editingHeader = document.getElementById('editing-header');
+        const editingPagesContainer = document.getElementById('editing-pages-container');
+        const resetBtn = document.getElementById('reset-btn');
+        const loader = document.getElementById('loader');
+
+        // --- App State ---
+        let filesData = [];
+        let activeFileIndex = -1;
+        let sortableInstance = null;
+        let copiedPageData = null;
+
+        const ICONS = {
+            add: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`,
+            paste: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h4M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M8 7h8m0 0v8a2 2 0 01-2 2h-4" /></svg>`,
+            download: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>`,
+            selectAll: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>`,
+            deselectAll: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>`,
+            select: `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`,
+        };
+
+        // --- Event Listeners ---
+        initialDropZone.addEventListener('click', () => fileInput.click());
+        sidebarDropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        
+        [initialDropZone, sidebarDropZone].forEach(zone => {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => zone.addEventListener(eventName, e => e.preventDefault()));
+            zone.addEventListener('dragenter', () => zone.classList.add('border-blue-500', 'bg-blue-50'));
+            zone.addEventListener('dragleave', () => zone.classList.remove('border-blue-500', 'bg-blue-50'));
+            zone.addEventListener('drop', (e) => {
+                zone.classList.remove('border-blue-500', 'bg-blue-50');
+                handleFiles(e.dataTransfer.files);
+            });
+        });
+        
+        resetBtn.addEventListener('click', resetApp);
+        menuBtn.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', toggleSidebar);
+
+        // --- Main Functions ---
+        async function handleFiles(files) {
+            const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+            if (pdfFiles.length === 0) return;
+
+            const isFirstUpload = filesData.length === 0;
+            showLoader(true, isFirstUpload);
+            
+            for (const file of pdfFiles) {
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdfjsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                    const pdfLibDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                    
+                    const filePages = [];
+                    for (let i = 0; i < pdfjsDoc.numPages; i++) {
+                        filePages.push({
+                            pageId: `page-${Date.now()}-${Math.random()}`,
+                            originalPageIndex: i,
+                            rotation: 0,
+                            type: 'original',
+                            selected: false
+                        });
+                    }
+                    filesData.push({ name: file.name, pdfLibDoc, pdfjsDoc, pages: filePages });
+                } catch (error) {
+                    console.error("Error processing file:", file.name, error);
+                    alert(`Could not process ${file.name}.`);
+                }
+            }
+            
+            if (activeFileIndex === -1 && filesData.length > 0) {
+                activeFileIndex = filesData.length - pdfFiles.length;
+            }
+            
+            if (isFirstUpload) {
+                initialView.classList.add('hidden');
+                mainView.classList.remove('hidden');
+            }
+            await updateUI();
+            showLoader(false);
+        }
+
+        async function updateUI() {
+            updateFileListUI();
+            await renderEditor();
+            resetBtn.disabled = filesData.length === 0;
+            if(filesData.length > 0) mainContentArea.classList.remove('hidden');
+        }
+
+        function updateFileListUI() {
+            fileListContainer.innerHTML = '';
+            if (filesData.length === 0) {
+                fileListContainer.innerHTML = `<p class="text-gray-500 text-center p-4">No files uploaded yet.</p>`;
+                return;
+            }
+            
+            filesData.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-list-item';
+                if (index === activeFileIndex) fileItem.classList.add('active');
+
+                const fileNameEl = document.createElement('span');
+                fileNameEl.className = 'file-name';
+                fileNameEl.textContent = file.name;
+                fileNameEl.title = file.name;
+                fileNameEl.addEventListener('click', () => switchActiveFile(index));
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-file-btn';
+                deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6l12 12"></path></svg>`;
+                deleteBtn.addEventListener('click', () => deleteFile(index));
+
+                fileItem.appendChild(fileNameEl);
+                fileItem.appendChild(deleteBtn);
+                fileListContainer.appendChild(fileItem);
+            });
+        }
+
+        async function renderEditor() {
+            if (activeFileIndex === -1 || !filesData[activeFileIndex]) {
+                editingArea.classList.add('hidden');
+                editingPlaceholder.classList.remove('hidden');
+                if (sortableInstance) {
+                    sortableInstance.destroy();
+                    sortableInstance = null;
+                }
+                return;
+            }
+
+            editingArea.classList.remove('hidden');
+            editingPlaceholder.classList.add('hidden');
+            
+            renderEditorHeader();
+
+            if (sortableInstance) {
+                sortableInstance.destroy();
+                sortableInstance = null;
+            }
+            editingPagesContainer.innerHTML = '';
+            
+            const activeFile = filesData[activeFileIndex];
+            for (const [index, pageData] of activeFile.pages.entries()) {
+                await renderPageThumbnail(pageData, editingPagesContainer, index + 1);
+            }
+            
+            sortableInstance = new Sortable(editingPagesContainer, {
+                animation: 150,
+                ghostClass: 'drag-ghost',
+                onEnd: handleEditorDragEnd,
+            });
+        }
+
+        function renderEditorHeader() {
+            editingHeader.innerHTML = '';
+            const fileInfo = filesData[activeFileIndex];
+
+            const topRow = document.createElement('div');
+            topRow.className = 'flex justify-between items-center flex-wrap gap-4 w-full';
+            
+            const fileNameEl = document.createElement('p');
+            fileNameEl.className = 'font-bold text-lg md:text-xl text-gray-800 truncate mr-auto';
+            fileNameEl.textContent = fileInfo.name;
+
+            const mainActionsWrapper = document.createElement('div');
+            mainActionsWrapper.className = 'flex items-center gap-2 flex-shrink-0';
+
+            const addBlankBtn = createHeaderButton('Add Blank', ICONS.add, addBlankPage);
+            const pasteBtn = createHeaderButton('Paste', ICONS.paste, pastePage, 'paste-btn');
+            pasteBtn.style.display = copiedPageData ? 'flex' : 'none';
+            const downloadSelectedBtn = createHeaderButton('Download Selected', ICONS.download, generateSelectedPagesPdf, 'download-selected-btn', 'bg-green-600 text-white');
+            const downloadBtn = createHeaderButton('Download All', ICONS.download, () => generatePdfForCurrentFile(), null, 'bg-blue-600 text-white');
+            mainActionsWrapper.append(addBlankBtn, pasteBtn, downloadSelectedBtn, downloadBtn);
+            topRow.append(fileNameEl, mainActionsWrapper);
+
+            const bottomRow = document.createElement('div');
+            bottomRow.className = 'flex flex-row items-center flex-wrap gap-x-6 gap-y-4 w-full border-t pt-4 mt-2';
+            
+            const selectionLabel = document.createElement('h3');
+            selectionLabel.className = 'font-semibold text-gray-700 hidden md:block';
+            selectionLabel.textContent = 'Selection Tools:';
+
+            const bulkSelectWrapper = document.createElement('div');
+            bulkSelectWrapper.className = 'flex items-center gap-2';
+            const selectAllBtn = createHeaderButton('Select All', ICONS.selectAll, () => selectAllPages(true));
+            const deselectAllBtn = createHeaderButton('Deselect All', ICONS.deselectAll, () => selectAllPages(false));
+            bulkSelectWrapper.append(selectAllBtn, deselectAllBtn);
+
+            const rangeSelectWrapper = document.createElement('div');
+            rangeSelectWrapper.className = 'flex items-center gap-2';
+            const pageInput = document.createElement('input');
+            pageInput.type = 'text';
+            pageInput.id = 'page-range-input';
+            pageInput.placeholder = 'e.g., 1-3, 5';
+            pageInput.className = 'border-gray-300 rounded-md shadow-sm text-sm p-2 w-full sm:w-32';
+            const selectRangeBtn = createHeaderButton('Select', ICONS.select, selectPagesByInput, null, 'bg-gray-600 text-white');
+            rangeSelectWrapper.append(pageInput, selectRangeBtn);
+            
+            bottomRow.append(selectionLabel, bulkSelectWrapper, rangeSelectWrapper);
+
+            editingHeader.append(topRow, bottomRow);
+            updateHeaderButtonsState();
+        }
+
+        function createHeaderButton(text, icon, onClick, id = null, extraClasses = 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100') {
+            const btn = document.createElement('button');
+            if (id) btn.id = id;
+            btn.className = `flex items-center justify-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg transition-all whitespace-nowrap disabled:bg-gray-400 disabled:cursor-not-allowed ${extraClasses}`;
+            btn.title = text;
+            btn.innerHTML = `${icon || ''} <span class="button-text-label">${text}</span>`;
+            btn.onclick = onClick;
+            return btn;
+        }
+
+        async function renderPageThumbnail(pageData, container, localPageNum) {
+            const pageItem = document.createElement('div');
+            pageItem.className = 'page-item bg-white p-2 rounded-lg shadow-md flex flex-col items-center';
+            if (pageData.selected) pageItem.classList.add('selected');
+            pageItem.dataset.id = pageData.pageId;
+
+            const canvasWrapper = document.createElement('div');
+            canvasWrapper.className = 'canvas-wrapper w-full rounded-md overflow-hidden border border-gray-200';
+            canvasWrapper.style.transform = `rotate(${pageData.rotation}deg)`;
+            
+            const canvas = document.createElement('canvas');
+            canvasWrapper.appendChild(canvas);
+            
+            if (pageData.type === 'original') {
+                const sourceFileIndex = pageData.sourceFileIndex ?? activeFileIndex;
+                const sourceDoc = filesData[sourceFileIndex];
+
+                if (!sourceDoc) {
+                    console.error("Source document for this page is missing.", pageData);
+                } else {
+                    const page = await sourceDoc.pdfjsDoc.getPage(pageData.originalPageIndex + 1);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                }
+            } else { // Blank page
+                canvas.width = 300;
+                canvas.height = 300 * 1.414;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = "white"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            canvas.style.cssText = 'width: 100%; height: auto;';
+
+            const footer = document.createElement('div');
+            footer.className = 'flex items-center justify-between w-full mt-2 px-1';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = pageData.selected;
+            checkbox.className = 'h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500';
+            checkbox.onchange = () => togglePageSelection(pageData.pageId);
+            const pageNumEl = document.createElement('p');
+            pageNumEl.className = 'page-number font-medium text-sm text-gray-700';
+            pageNumEl.textContent = `Page ${localPageNum}`;
+            footer.append(checkbox, pageNumEl);
+            pageItem.prepend(canvasWrapper);
+            pageItem.append(footer);
+            
+            const deleteBtn = createActionButton('delete-page-btn', '&#x2715;', () => deletePage(pageData.pageId));
+            const rotateBtn = createActionButton('rotate-btn', '&#x21bb;', () => rotatePage(pageData.pageId));
+            const copyBtn = createActionButton('copy-btn', '&#128203;', () => copyPage(pageData.pageId));
+            pageItem.append(deleteBtn, rotateBtn, copyBtn);
+
+            container.appendChild(pageItem);
+        }
+        
+        function createActionButton(className, innerHTML, onClick) {
+            const btn = document.createElement('button');
+            btn.className = `page-action-btn ${className}`;
+            btn.innerHTML = innerHTML;
+            btn.onclick = (e) => { e.stopPropagation(); onClick(); };
+            return btn;
+        }
+
+        // --- Page & File Actions ---
+        function toggleSidebar() {
+            sidebar.classList.toggle('-translate-x-full');
+            sidebarOverlay.classList.toggle('hidden');
+        }
+
+        function switchActiveFile(index) {
+            if (index === activeFileIndex) return;
+            activeFileIndex = index;
+            if (window.innerWidth < 640) { // sm breakpoint
+                toggleSidebar();
+            }
+            updateUI();
+        }
+
+        function deleteFile(index) {
+            filesData.splice(index, 1);
+            if (activeFileIndex >= index) {
+                activeFileIndex = Math.max(0, activeFileIndex - 1);
+            }
+            if (filesData.length === 0) resetApp();
+            else updateUI();
+        }
+
+        function deletePage(pageId) {
+            const activeFile = filesData[activeFileIndex];
+            activeFile.pages = activeFile.pages.filter(p => p.pageId !== pageId);
+            if(activeFile.pages.length === 0) deleteFile(activeFileIndex);
+            else renderEditor();
+        }
+
+        function rotatePage(pageId) {
+            const page = filesData[activeFileIndex].pages.find(p => p.pageId === pageId);
+            page.rotation = (page.rotation + 90) % 360;
+            document.querySelector(`[data-id="${pageId}"] .canvas-wrapper`).style.transform = `rotate(${page.rotation}deg)`;
+        }
+
+        function copyPage(pageId) {
+            const pageToCopy = filesData[activeFileIndex].pages.find(p => p.pageId === pageId);
+            copiedPageData = { ...pageToCopy, sourceFileIndex: activeFileIndex };
+            document.getElementById('paste-btn').style.display = 'flex';
+        }
+
+        function addBlankPage() {
+            const newPage = { pageId: `page-${Date.now()}`, originalPageIndex: -1, rotation: 0, type: 'blank', selected: false };
+            filesData[activeFileIndex].pages.push(newPage);
+            renderEditor();
+        }
+
+        function pastePage() {
+            if (!copiedPageData) return;
+            const newPage = { ...copiedPageData, pageId: `page-${Date.now()}`, selected: false };
+            filesData[activeFileIndex].pages.push(newPage);
+            renderEditor();
+        }
+        
+        function togglePageSelection(pageId) {
+            const page = filesData[activeFileIndex].pages.find(p => p.pageId === pageId);
+            page.selected = !page.selected;
+            document.querySelector(`[data-id="${pageId}"]`).classList.toggle('selected', page.selected);
+            updateHeaderButtonsState();
+        }
+
+        function selectAllPages(select) {
+            if (activeFileIndex < 0) return;
+            filesData[activeFileIndex].pages.forEach(p => p.selected = select);
+            renderEditor();
+        }
+        
+        function selectPagesByInput() {
+            const input = document.getElementById('page-range-input');
+            if (!input || !input.value.trim() || activeFileIndex < 0) return;
+            
+            const activeFile = filesData[activeFileIndex];
+            const maxPage = activeFile.pages.length;
+            const pagesToSelect = new Set();
+            
+            const parts = input.value.split(',');
+            for (const part of parts) {
+                const trimmedPart = part.trim();
+                if (trimmedPart.includes('-')) {
+                    const [startStr, endStr] = trimmedPart.split('-');
+                    const start = parseInt(startStr, 10);
+                    const end = parseInt(endStr, 10);
+                    if (!isNaN(start) && !isNaN(end) && start <= end && start > 0 && end <= maxPage) {
+                        for (let i = start; i <= end; i++) pagesToSelect.add(i);
+                    }
+                } else {
+                    const pageNum = parseInt(trimmedPart, 10);
+                    if (!isNaN(pageNum) && pageNum > 0 && pageNum <= maxPage) pagesToSelect.add(pageNum);
+                }
+            }
+            
+            activeFile.pages.forEach((page, index) => {
+                page.selected = pagesToSelect.has(index + 1);
+            });
+            input.value = '';
+            renderEditor();
+        }
+
+        function updateHeaderButtonsState() {
+            if (activeFileIndex < 0 || !filesData[activeFileIndex]) return;
+            const selectedCount = filesData[activeFileIndex].pages.filter(p => p.selected).length || 0;
+            const downloadSelectedBtn = document.getElementById('download-selected-btn');
+            if(downloadSelectedBtn) {
+                 downloadSelectedBtn.disabled = selectedCount === 0;
+                 const textSpan = downloadSelectedBtn.querySelector('span');
+                 if(textSpan) {
+                    textSpan.textContent = selectedCount > 0 ? `Download Selected (${selectedCount})` : 'Download Selected';
+                 }
+                 downloadSelectedBtn.title = selectedCount > 0 ? `Download Selected (${selectedCount})` : 'Download Selected';
+            }
+        }
+
+        function handleEditorDragEnd(event) {
+            const { oldIndex, newIndex } = event;
+            const activeFile = filesData[activeFileIndex];
+            const [movedPage] = activeFile.pages.splice(oldIndex, 1);
+            activeFile.pages.splice(newIndex, 0, movedPage);
+            renderEditor();
+        }
+        
+        async function generatePdfForCurrentFile() {
+             await generatePdf(false);
+        }
+
+        async function generateSelectedPagesPdf() {
+            await generatePdf(true);
+        }
+
+        async function generatePdf(onlySelected) {
+            if(activeFileIndex < 0) return;
+            const fileToProcess = filesData[activeFileIndex];
+            
+            const pagesToProcess = onlySelected 
+                ? fileToProcess.pages.filter(p => p.selected)
+                : fileToProcess.pages;
+            
+            if(pagesToProcess.length === 0) {
+                alert(`There are no ${onlySelected ? 'selected' : ''} pages to download.`);
+                return;
+            }
+
+            showLoader(true);
+            try {
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+                for (const pageData of pagesToProcess) {
+                    let newPage;
+                    if(pageData.type === 'original') {
+                        const sourceFileIndex = pageData.sourceFileIndex ?? activeFileIndex;
+                        const sourcePdf = filesData[sourceFileIndex].pdfLibDoc;
+                        const [copiedPage] = await newPdfDoc.copyPages(sourcePdf, [pageData.originalPageIndex]);
+                        newPage = newPdfDoc.addPage(copiedPage);
+                    } else {
+                        newPage = newPdfDoc.addPage(PageSizes.A4);
+                    }
+                    newPage.setRotation(degrees(pageData.rotation));
+                }
+                const pdfBytes = await newPdfDoc.save();
+                const filename = fileToProcess.name.replace('.pdf', `_${onlySelected ? 'selected' : 'modified'}.pdf`);
+                downloadFile(pdfBytes, filename, 'application/pdf');
+            } catch (error) {
+                console.error("Failed to generate PDF:", error);
+                alert("An error occurred while generating the PDF.");
+            } finally {
+                showLoader(false);
+            }
+        }
+        
+        function downloadFile(data, filename, type) {
+            const blob = new Blob([data], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+        
+        function resetApp() {
+            filesData = [];
+            activeFileIndex = -1;
+            copiedPageData = null;
+            mainView.classList.add('hidden');
+            initialView.classList.remove('hidden');
+            fileInput.value = '';
+            if (sortableInstance) {
+                sortableInstance.destroy();
+                sortableInstance = null;
+            }
+            updateUI();
+        }
+
+        function showLoader(isLoading, isFirstLoad = false) {
+             if (isLoading) {
+                if (isFirstLoad) {
+                    initialView.classList.add('hidden');
+                }
+                loader.classList.remove('hidden');
+                loader.classList.add('flex');
+            } else {
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+            }
+        }
+        
+        // Initial call
+        updateUI();
+    </script>
+</body>
+</html>
+

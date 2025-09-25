@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML to PDF Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #messageBox {
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(-20px);
+        }
+        #messageBox.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6">
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">HTML to PDF Converter</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">A reliable converter using a custom PDF generation engine.</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-between items-center">
+             <label for="fileUpload" class="w-full sm:w-auto cursor-pointer bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 duration-300 ease-in-out flex items-center justify-center">
+                <i class="fas fa-upload mr-2"></i>
+                <span>Upload HTML File</span>
+            </label>
+            <input type="file" id="fileUpload" class="hidden" accept=".html,.htm">
+            <p id="fileName" class="text-sm text-gray-500 dark:text-gray-400 truncate flex-grow text-center sm:text-left mx-4"></p>
+            <button id="clearBtn" class="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 duration-300 ease-in-out flex items-center justify-center">
+                <i class="fas fa-trash-alt mr-2"></i>
+                Clear Content
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="htmlInput" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">HTML Content</label>
+                <textarea id="htmlInput" rows="15" class="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="<h1>Hello World</h1><p>This is a test.</p><ul><li>One</li><li>Two</li></ul>"></textarea>
+                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><b>New Reliable Engine:</b> Converts text, headings, lists, and basic tables. Inline styles and external images are not supported in this mode.</p>
+            </div>
+            <div>
+                <label for="previewFrame" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Live Preview</label>
+                <iframe id="previewFrame" class="w-full h-full min-h-[340px] border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700" sandbox="allow-same-origin"></iframe>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <div>
+                <label for="filename" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filename</label>
+                <input type="text" id="filename" value="converted-document" class="mt-1 block w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label for="orientation" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Orientation</label>
+                <select id="orientation" class="mt-1 block w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="portrait" selected>Portrait</option>
+                    <option value="landscape">Landscape</option>
+                </select>
+            </div>
+            <div>
+                <label for="margin" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Margin (inches)</label>
+                <input type="number" id="margin" value="0.5" step="0.1" min="0" class="mt-1 block w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+        </div>
+
+        <div class="text-center pt-4">
+            <button id="convertBtn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-transform transform hover:scale-105 duration-300 ease-in-out flex items-center justify-center mx-auto disabled:opacity-75 disabled:cursor-not-allowed">
+                <i class="fas fa-file-pdf mr-2"></i>
+                <span id="btn-text">Generate PDF</span>
+                <div id="loader" class="loader ml-3 hidden"></div>
+            </button>
+        </div>
+    </div>
+
+    <div id="messageBox" class="fixed top-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg opacity-0">
+        <span id="messageText"></span>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        const htmlInput = document.getElementById('htmlInput');
+        const convertBtn = document.getElementById('convertBtn');
+        const fileUpload = document.getElementById('fileUpload');
+        const clearBtn = document.getElementById('clearBtn');
+        const fileNameDisplay = document.getElementById('fileName');
+        const btnText = document.getElementById('btn-text');
+        const loader = document.getElementById('loader');
+        const filenameInput = document.getElementById('filename');
+        const orientationInput = document.getElementById('orientation');
+        const marginInput = document.getElementById('margin');
+        const previewFrame = document.getElementById('previewFrame'); // <-- NEW
+
+        // --- NEW PREVIEW FUNCTION ---
+        function updatePreview() {
+            const htmlContent = htmlInput.value;
+            const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+            previewDoc.open();
+            previewDoc.write(htmlContent);
+            previewDoc.close();
+            // Basic dark mode support for preview text
+            if (document.body.classList.contains('dark:bg-gray-900')) { // A simple check
+                 previewDoc.body.style.color = '#e5e7eb'; // gray-200
+            }
+        }
+
+        function showMessage(message, isError = true) {
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+            messageBox.className = 'fixed top-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg opacity-0';
+            messageBox.classList.add(isError ? 'bg-red-500' : 'bg-green-500');
+            messageText.textContent = message;
+            messageBox.classList.add('show');
+            setTimeout(() => { messageBox.classList.remove('show'); }, 5000);
+        }
+        
+        // --- EVENT LISTENERS (Updated) ---
+        htmlInput.addEventListener('input', updatePreview); // Update preview on typing
+
+        fileUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file && file.type.match('text/html')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    htmlInput.value = e.target.result;
+                    fileNameDisplay.textContent = `File: ${file.name}`;
+                    filenameInput.value = file.name.replace(/\.[^/.]+$/, "");
+                    showMessage('File loaded successfully!', false);
+                    updatePreview(); // <-- UPDATE PREVIEW
+                };
+                reader.readAsText(file);
+            } else {
+                showMessage('Please select a valid HTML file.');
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            htmlInput.value = '';
+            fileUpload.value = ''; 
+            fileNameDisplay.textContent = '';
+            filenameInput.value = 'converted-document';
+            showMessage('Content cleared.', false);
+            updatePreview(); // <-- UPDATE PREVIEW
+        });
+
+        // Initialize preview on page load
+        document.addEventListener('DOMContentLoaded', updatePreview);
+
+
+        // --- REWRITTEN RELIABLE PDF ENGINE (with your bug fixes) ---
+        
+        async function exportToPdf() {
+            const { jsPDF } = window.jspdf;
+            const options = {
+                orientation: orientationInput.value,
+                margin: parseFloat(marginInput.value) || 0.5,
+                filename: (filenameInput.value.trim() || 'converted-document') + '.pdf'
+            };
+
+            const pdf = new jsPDF({ orientation: options.orientation, unit: 'in', format: 'a4' });
+            const pageInfo = { width: pdf.internal.pageSize.getWidth(), height: pdf.internal.pageSize.getHeight() };
+            const context = { pdf, x: options.margin, y: options.margin, pageInfo, options };
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlInput.value, 'text/html');
+            
+            await parseNodes(doc.body.childNodes, context);
+            pdf.save(options.filename);
+        }
+
+        function checkPageBreak(context, elementHeight) {
+            if (context.y + elementHeight > context.pageInfo.height - context.options.margin) {
+                context.pdf.addPage();
+                context.y = context.options.margin;
+            }
+        }
+        
+        function renderHeading(node, context) {
+            const { pdf, options } = context;
+            const sizes = { H1: 24, H2: 20, H3: 18, H4: 16, H5: 14, H6: 12 };
+            const fontSize = sizes[node.nodeName] || 12;
+            const text = node.textContent.trim();
+            if (!text) return;
+
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(fontSize);
+            
+            const lines = pdf.splitTextToSize(text, context.pageInfo.width - options.margin * 2);
+            const elementHeight = (lines.length * fontSize) / 72;
+            
+            checkPageBreak(context, elementHeight);
+            pdf.text(lines, context.x, context.y);
+            context.y += elementHeight + 0.1;
+            pdf.setFont('helvetica', 'normal');
+        }
+        
+        function renderParagraph(node, context) {
+            const { pdf, options } = context;
+            const text = node.textContent.trim();
+            if (!text) return;
+
+            pdf.setFont('helvetica', 'normal'); // <-- FIX from previous answer
+            pdf.setFontSize(11);
+            const lines = pdf.splitTextToSize(text, context.pageInfo.width - options.margin * 2);
+            const elementHeight = (lines.length * 11) / 72;
+            
+            checkPageBreak(context, elementHeight);
+            pdf.text(lines, context.x, context.y);
+            context.y += elementHeight + 0.1;
+        }
+
+        function renderListItem(node, context) {
+             const { pdf, options } = context;
+             const text = node.textContent.trim();
+             if (!text) return;
+             
+             pdf.setFont('helvetica', 'normal'); // <-- FIX from previous answer
+             pdf.setFontSize(11);
+             const lines = pdf.splitTextToSize(text, context.pageInfo.width - options.margin * 2 - context.x);
+             const elementHeight = (lines.length * 11) / 72;
+             
+             checkPageBreak(context, elementHeight);
+             
+             const bulletX = context.x - 0.15;
+             if (context.listType === 'OL') {
+                 pdf.text(`${context.listCounter}.`, bulletX, context.y);
+                 context.listCounter++;
+             } else {
+                 pdf.circle(bulletX + 0.03, context.y - 0.03, 0.02, 'F');
+             }
+
+             pdf.text(lines, context.x, context.y);
+             context.y += elementHeight + 0.05;
+        }
+
+        async function renderList(node, context) {
+            const listContext = {
+                ...context,
+                x: context.x + 0.25,
+                inList: true,
+                listType: node.nodeName.toUpperCase(),
+                listCounter: 1
+            };
+            await parseNodes(node.childNodes, listContext);
+            context.y = listContext.y + 0.1;
+        }
+
+        function renderTable(node, context) {
+             const { pdf, options } = context;
+             const rows = Array.from(node.querySelectorAll('tr'));
+             if (rows.length === 0) return;
+             
+             const headRows = Array.from(node.querySelectorAll('thead tr'));
+             const bodyRows = Array.from(node.querySelectorAll('tbody tr, tr'));
+             const allRows = headRows.length > 0 ? [...headRows, ...bodyRows.filter(r => !headRows.includes(r))] : bodyRows;
+
+             const colCount = allRows.length > 0 ? Array.from(allRows[0].querySelectorAll('th, td')).length : 0;
+             if (colCount === 0) return;
+
+             const colWidth = (context.pageInfo.width - options.margin * 2) / colCount;
+             const lineHeight = 0.2;
+
+             allRows.forEach((row, rowIndex) => {
+                 const isHeader = headRows.includes(row);
+                 pdf.setFont('helvetica', isHeader ? 'bold' : 'normal');
+                 
+                 let maxHeight = 0;
+                 const cells = Array.from(row.querySelectorAll('th, td'));
+                 const cellData = cells.map(cell => {
+                     const lines = pdf.splitTextToSize(cell.textContent.trim(), colWidth - 0.1);
+                     maxHeight = Math.max(maxHeight, lines.length * lineHeight + 0.1);
+                     return lines;
+                 });
+                 
+                 checkPageBreak(context, maxHeight);
+                 
+                 cells.forEach((cell, i) => {
+                     pdf.rect(context.x + i * colWidth, context.y, colWidth, maxHeight, 'S');
+                     pdf.text(cellData[i], context.x + i * colWidth + 0.05, context.y + 0.15);
+                 });
+                 context.y += maxHeight;
+             });
+             
+             context.y += 0.2;
+        }
+        
+        async function parseNodes(nodes, context) {
+            for (const node of nodes) {
+                if (context.inList && node.nodeName.toUpperCase() === 'LI') {
+                    renderListItem(node, context);
+                    continue;
+                }
+                
+                switch (node.nodeName.toUpperCase()) {
+                    case '#TEXT': break;
+                    case 'H1': case 'H2': case 'H3': case 'H4': case 'H5': case 'H6':
+                        renderHeading(node, context);
+                        break;
+                    case 'P':
+                        renderParagraph(node, context);
+                        break;
+                    case 'UL': case 'OL':
+                        await renderList(node, context);
+                        break;
+                    case 'TABLE':
+                        renderTable(node, context);
+                        break;
+                    case 'BR':
+                        context.y += 0.2;
+                        break;
+                    case 'DIV': case 'MAIN': case 'HEADER': case 'FOOTER':
+                        await parseNodes(node.childNodes, context);
+                        break;
+                }
+            }
+        }
+
+        convertBtn.addEventListener('click', async () => {
+            if (!htmlInput.value.trim()) {
+                showMessage('Please enter or upload some HTML content.');
+                return;
+            }
+
+            convertBtn.disabled = true;
+            btnText.textContent = 'Converting...';
+            loader.classList.remove('hidden');
+            
+            try {
+                await exportToPdf();
+            } catch (e) {
+                showMessage('An unexpected error occurred. Could not generate PDF.');
+                console.error(e);
+            }
+            
+            convertBtn.disabled = false;
+            btnText.textContent = 'Generate PDF';
+            loader.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
+
