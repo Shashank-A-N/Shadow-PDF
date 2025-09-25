@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced PDF to PPT Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .drop-zone { border: 2px dashed #4a5568; transition: all 0.3s ease; }
+        .drop-zone.dragover { border-color: #4299e1; background-color: #2c5282; }
+        .file-item:hover { background-color: #4a5568; }
+        .btn { transition: all 0.2s ease; }
+        .btn:hover { transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+        #spinner { border-top-color: #3498db; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-2xl text-center">
+
+        <!-- Step 1: Landing / Upload Page -->
+        <div id="landing-section">
+            <h1 class="text-3xl font-bold mb-2">PDF to PPT Power Converter</h1>
+            <p class="text-gray-400 mb-6">Drag & drop or select your first PDF file to begin.</p>
+            <input type="file" id="initial-file-input" class="hidden" accept=".pdf" multiple>
+            <label for="initial-file-input" id="drop-zone" class="drop-zone bg-gray-900/50 rounded-lg p-10 cursor-pointer flex flex-col items-center justify-center">
+                <i class="fas fa-file-upload text-4xl text-gray-500 mb-4"></i>
+                <span class="font-semibold text-lg">Click to select files</span>
+                <span class="text-gray-500">or drag and drop here</span>
+            </label>
+        </div>
+
+        <!-- Step 2: Workspace / File Management Page -->
+        <div id="workspace-section" class="hidden">
+            <h2 class="text-2xl font-bold mb-4 text-left">Your Files</h2>
+            <div id="workspace-file-list" class="space-y-2 text-left mb-4 max-h-64 overflow-y-auto pr-2">
+                <!-- File list will be populated here -->
+            </div>
+            <div class="flex items-center justify-between bg-gray-900/50 p-3 rounded-lg mb-6">
+                <div class="flex items-center">
+                    <input type="checkbox" id="select-all-checkbox" class="h-4 w-4 rounded bg-gray-700 border-gray-600 text-indigo-500 focus:ring-indigo-600">
+                    <label for="select-all-checkbox" class="ml-2 text-sm text-gray-300">Select All</label>
+                </div>
+                 <label for="add-more-files-input" class="btn bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer">
+                    <i class="fas fa-plus mr-2"></i> Add More Files
+                </label>
+                <input type="file" id="add-more-files-input" class="hidden" accept=".pdf" multiple>
+            </div>
+            <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <button id="convert-selected-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-check-square mr-2"></i> Convert Selected
+                </button>
+                <button id="convert-all-btn" class="btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-sync-alt mr-2"></i> Convert All
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="hidden">
+            <div id="spinner" class="w-12 h-12 border-4 rounded-full mx-auto"></div>
+            <p class="mt-4 text-lg text-gray-300">Converting your files...</p>
+        </div>
+
+        <!-- Results Page -->
+        <div id="results-section" class="hidden">
+            <h2 class="text-2xl font-bold mb-4">Conversion Complete!</h2>
+            <div id="converted-files-list" class="space-y-3 text-left mb-6 max-h-64 overflow-y-auto"></div>
+            <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <button id="download-zip-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">
+                    <i class="fas fa-file-archive mr-2"></i> Download All (.zip)
+                </button>
+                <button id="start-over-btn" class="btn w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg">
+                    <i class="fas fa-redo mr-2"></i> Start Over
+                </button>
+            </div>
+        </div>
+        
+        <!-- Error Message -->
+        <div id="error-message" class="hidden mt-4 text-red-400 p-3 bg-red-900/50 rounded-lg"></div>
+
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const landingSection = document.getElementById('landing-section');
+        const workspaceSection = document.getElementById('workspace-section');
+        const loadingState = document.getElementById('loading-state');
+        const resultsSection = document.getElementById('results-section');
+        const errorMessage = document.getElementById('error-message');
+
+        const initialFileInput = document.getElementById('initial-file-input');
+        const addMoreFilesInput = document.getElementById('add-more-files-input');
+        const dropZone = document.getElementById('drop-zone');
+        
+        const workspaceFileList = document.getElementById('workspace-file-list');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const convertSelectedBtn = document.getElementById('convert-selected-btn');
+        const convertAllBtn = document.getElementById('convert-all-btn');
+
+        const convertedFilesList = document.getElementById('converted-files-list');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+        const startOverBtn = document.getElementById('start-over-btn');
+
+        // --- State ---
+        let fileStore = [];
+
+        // --- Functions ---
+        const renderFileList = () => {
+            workspaceFileList.innerHTML = '';
+            if (fileStore.length === 0) {
+                workspaceFileList.innerHTML = '<p class="text-gray-500 text-center">No files uploaded. Add some files to get started.</p>';
+                convertAllBtn.disabled = true;
+                convertSelectedBtn.disabled = true;
+                selectAllCheckbox.checked = false;
+                return;
+            }
+
+            fileStore.forEach((file, index) => {
+                const fileElement = document.createElement('div');
+                fileElement.className = 'file-item bg-gray-700 p-2 rounded-lg flex items-center justify-between';
+                fileElement.innerHTML = `
+                    <div class="flex items-center truncate">
+                        <input type="checkbox" data-index="${index}" class="file-checkbox h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-500 focus:ring-indigo-600">
+                        <i class="fas fa-file-pdf text-red-400 mx-3"></i>
+                        <span class="truncate text-sm">${file.name}</span>
+                    </div>
+                    <button data-index="${index}" class="remove-btn text-gray-400 hover:text-white px-2">&times;</button>
+                `;
+                workspaceFileList.appendChild(fileElement);
+            });
+
+            updateConvertButtons();
+        };
+
+        const updateConvertButtons = () => {
+            const anySelected = fileStore.length > 0 && Array.from(document.querySelectorAll('.file-checkbox')).some(cb => cb.checked);
+            convertAllBtn.disabled = fileStore.length === 0;
+            convertSelectedBtn.disabled = !anySelected;
+        };
+
+        const handleFiles = (newFiles) => {
+            const pdfFiles = Array.from(newFiles).filter(file => file.type === 'application/pdf');
+            fileStore.push(...pdfFiles);
+            
+            if (fileStore.length > 0) {
+                landingSection.classList.add('hidden');
+                workspaceSection.classList.remove('hidden');
+                renderFileList();
+            }
+        };
+
+        const performConversion = async (formData) => {
+            workspaceSection.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+
+            try {
+                const response = await fetch('/convert', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Conversion failed.');
+                displayResults(result);
+            } catch (error) {
+                errorMessage.textContent = `Error: ${error.message}`;
+                errorMessage.classList.remove('hidden');
+                workspaceSection.classList.remove('hidden'); // Go back to workspace on error
+            } finally {
+                loadingState.classList.add('hidden');
+            }
+        };
+
+        const displayResults = (result) => {
+            convertedFilesList.innerHTML = '';
+            result.files.forEach(file => {
+                const fileElement = document.createElement('div');
+                fileElement.className = 'bg-gray-700 p-3 rounded-lg flex items-center justify-between';
+                fileElement.innerHTML = `
+                    <span class="truncate pr-2">${file.converted}</span>
+                    <a href="/download/${result.batch_id}/${file.converted}" class="btn ml-4 flex-shrink-0 px-3 py-1 bg-green-600 hover:bg-green-700 rounded-md text-sm font-semibold">
+                        <i class="fas fa-download mr-1"></i> Download
+                    </a>
+                `;
+                convertedFilesList.appendChild(fileElement);
+            });
+            downloadZipBtn.onclick = () => window.location.href = `/download-zip/${result.batch_id}`;
+            resultsSection.classList.remove('hidden');
+        };
+
+        const resetApp = () => {
+            fileStore = [];
+            initialFileInput.value = '';
+            addMoreFilesInput.value = '';
+            workspaceSection.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            loadingState.classList.add('hidden');
+            landingSection.classList.remove('hidden');
+        };
+
+        // --- Event Listeners ---
+        initialFileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        addMoreFilesInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        // Drag and Drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        // Workspace Clicks (Event Delegation)
+        workspaceFileList.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-btn')) {
+                const index = parseInt(e.target.dataset.index);
+                fileStore.splice(index, 1);
+                renderFileList();
+            }
+            if (e.target.classList.contains('file-checkbox')) {
+                updateConvertButtons();
+            }
+        });
+        
+        selectAllCheckbox.addEventListener('change', (e) => {
+            document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+                checkbox.checked = e.target.checked;
+            });
+            updateConvertButtons();
+        });
+
+        convertSelectedBtn.addEventListener('click', () => {
+            const formData = new FormData();
+            document.querySelectorAll('.file-checkbox:checked').forEach(checkbox => {
+                const index = parseInt(checkbox.dataset.index);
+                formData.append('pdfFiles', fileStore[index]);
+            });
+            if (formData.has('pdfFiles')) performConversion(formData);
+        });
+
+        convertAllBtn.addEventListener('click', () => {
+            const formData = new FormData();
+            fileStore.forEach(file => formData.append('pdfFiles', file));
+            if (formData.has('pdfFiles')) performConversion(formData);
+        });
+
+        startOverBtn.addEventListener('click', resetApp);
+    </script>
+</body>
+</html>
+

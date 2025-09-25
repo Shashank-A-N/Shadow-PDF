@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Word Converter with Preview</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PDF.js library from Mozilla -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- docx library for creating Word documents -->
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <!-- FileSaver.js for saving the generated file -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for the file input */
+        .file-input-label {
+            transition: all 0.2s ease-in-out;
+        }
+        .file-input-label:hover {
+            background-color: #f0f4ff; /* A lighter shade of the primary blue */
+            border-color: #4f46e5;
+        }
+        #file-upload-input:focus + .file-input-label {
+            outline: 2px solid #4f46e5;
+            outline-offset: 2px;
+        }
+        /* Spinner animation */
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Preview Modal Styles */
+        #preview-modal {
+            transition: opacity 0.3s ease;
+        }
+        #preview-content canvas {
+            border: 1px solid #e5e7eb;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-2xl mx-auto p-4 md:p-8">
+        <div class="bg-white rounded-2xl shadow-lg p-8">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">PDF to Word Converter</h1>
+                <p class="text-gray-500 mt-2">Upload a PDF, preview it, and convert it to a Word document.</p>
+            </div>
+
+            <!-- File Upload Section -->
+            <div id="upload-section">
+                <div class="mb-6">
+                    <label for="file-upload-input" class="file-input-label cursor-pointer w-full flex flex-col items-center px-4 py-10 bg-white text-blue-600 rounded-lg border-2 border-dashed border-gray-300">
+                        <svg class="w-12 h-12" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <path d="M16.88 9.1A4 4 0 0 1 16 17H5a5 5 0 0 1-1-9.9V7a3 3 0 0 1 4.52-2.59A4.98 4.98 0 0 1 17 8c0 .38-.04.74-.12 1.1zM11 11h3l-4 4-4-4h3V7h2v4z" />
+                        </svg>
+                        <span id="file-name" class="mt-2 text-base leading-normal font-medium">Select a PDF file</span>
+                        <span class="text-sm text-gray-500">or drag and drop it here</span>
+                    </label>
+                    <input id="file-upload-input" type="file" class="hidden" accept=".pdf" />
+                </div>
+            </div>
+
+            <!-- Status/Result Section -->
+            <div id="status-container" class="text-center mt-6 h-12 flex items-center justify-center">
+                <!-- This is where status messages or loader will appear -->
+            </div>
+            
+             <!-- Preview and Convert Section (hidden by default) -->
+            <div id="preview-and-convert-section" class="hidden">
+                 <div class="text-center mb-4">
+                    <h2 class="text-2xl font-bold text-gray-700">Document Preview</h2>
+                    <p class="text-gray-500 text-sm">Scroll to see all pages.</p>
+                 </div>
+                 <div id="preview-content" class="max-h-[60vh] overflow-y-auto bg-gray-100 p-4 rounded-lg border">
+                    <!-- Canvases will be inserted here -->
+                 </div>
+                 <div class="text-center mt-6">
+                    <button id="convert-btn" class="w-full sm:w-auto bg-indigo-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                        Convert & Download
+                    </button>
+                    <button id="cancel-btn" class="w-full sm:w-auto mt-2 sm:mt-0 sm:ml-2 bg-gray-200 text-gray-800 font-bold py-3 px-12 rounded-lg hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-all duration-300">
+                        Cancel
+                    </button>
+                 </div>
+            </div>
+
+            <!-- Disclaimer -->
+            <div class="text-center mt-8">
+                <p class="text-xs text-gray-400">Note: This tool attempts to preserve text layout. Complex formatting, images, and tables may not be perfectly retained.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set the workerSrc for pdf.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        const fileInput = document.getElementById('file-upload-input');
+        const convertBtn = document.getElementById('convert-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const fileNameDisplay = document.getElementById('file-name');
+        const statusContainer = document.getElementById('status-container');
+        const uploadSection = document.getElementById('upload-section');
+        const previewSection = document.getElementById('preview-and-convert-section');
+        const previewContent = document.getElementById('preview-content');
+        
+        let selectedFile = null;
+
+        // --- Event Listeners ---
+        
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                fileNameDisplay.textContent = selectedFile.name;
+                await generatePreview(selectedFile);
+            }
+        });
+        
+        const dropArea = fileInput.parentElement;
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => dropArea.addEventListener(eventName, preventDefaults, false));
+        ['dragenter', 'dragover'].forEach(eventName => dropArea.addEventListener(eventName, () => dropArea.classList.add('bg-gray-100', 'border-indigo-500'), false));
+        ['dragleave', 'drop'].forEach(eventName => dropArea.addEventListener(eventName, () => dropArea.classList.remove('bg-gray-100', 'border-indigo-500'), false));
+        dropArea.addEventListener('drop', (e) => {
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+        }, false);
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return showStatus('Please select a PDF file first.', 'error');
+            
+            disableControls();
+            showStatus('loading', 'Analyzing PDF layout...');
+
+            try {
+                const structuredContent = await extractFormattedTextFromPdf(selectedFile);
+                showStatus('loading', 'Reconstructing document...');
+                const docxBlob = await createWordDocument(structuredContent, selectedFile.name);
+                
+                const outputFileName = selectedFile.name.replace(/\.pdf$/i, '.docx');
+                saveAs(docxBlob, outputFileName);
+
+                showStatus('success', outputFileName);
+            } catch (error) {
+                console.error("Conversion failed:", error);
+                showStatus(`Conversion failed: ${error.message}`, 'error');
+            } finally {
+                convertBtn.disabled = false;
+                cancelBtn.disabled = false;
+            }
+        });
+        
+        cancelBtn.addEventListener('click', resetUI);
+
+        // --- Core Functions ---
+
+        async function generatePreview(file) {
+            disableControls();
+            showStatus('loading', 'Generating preview...');
+            uploadSection.classList.add('hidden');
+            try {
+                const fileReader = new FileReader();
+                fileReader.onload = async (event) => {
+                    try {
+                        const typedarray = new Uint8Array(event.target.result);
+                        const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                        previewContent.innerHTML = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const viewport = page.getViewport({ scale: 1.5 });
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d');
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+                            canvas.style.width = "100%";
+                            canvas.style.height = "auto";
+                            previewContent.appendChild(canvas);
+                            await page.render({ canvasContext: context, viewport: viewport }).promise;
+                        }
+                        previewSection.classList.remove('hidden');
+                        statusContainer.innerHTML = '';
+                        enableControls();
+                    } catch (error) {
+                        console.error(error);
+                        showStatus('Could not generate preview. The PDF might be corrupted.', 'error');
+                        resetUI();
+                    }
+                };
+                fileReader.readAsArrayBuffer(file);
+            } catch (error) {
+                showStatus('Failed to read file.', 'error');
+                resetUI();
+            }
+        }
+
+        /**
+         * NEW: Extracts structured content (paragraphs, runs, styles) from a PDF.
+         * This is a more advanced implementation to preserve layout.
+         * @param {File} file - The PDF file to process.
+         * @returns {Promise<Array<object>>} A promise that resolves with structured page data.
+         */
+        async function extractFormattedTextFromPdf(file) {
+            const reader = new FileReader();
+            const fileReadPromise = new Promise((resolve, reject) => {
+                reader.onload = resolve;
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+
+            const event = await fileReadPromise;
+            const typedarray = new Uint8Array(event.target.result);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+            
+            const allPages = [];
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const styles = textContent.styles;
+                
+                if (textContent.items.length === 0) continue;
+
+                // Group text items into lines based on vertical position
+                let lines = [];
+                let currentLine = [];
+                let lastY = textContent.items[0].transform[5];
+
+                for (const item of textContent.items) {
+                    if (Math.abs(item.transform[5] - lastY) > 5) { // Threshold for new line
+                        if (currentLine.length > 0) {
+                            lines.push(currentLine.sort((a, b) => a.transform[4] - b.transform[4]));
+                        }
+                        currentLine = [];
+                    }
+                    currentLine.push(item);
+                    lastY = item.transform[5];
+                }
+                lines.push(currentLine.sort((a, b) => a.transform[4] - b.transform[4]));
+                lines = lines.sort((a,b) => b[0].transform[5] - a[0].transform[5]);
+
+                // Group lines into paragraphs
+                const pageParagraphs = [];
+                let currentParagraph = [];
+                for(let j = 0; j < lines.length; j++) {
+                    const line = lines[j];
+                    if (line.length > 0) {
+                        currentParagraph.push(line);
+                    }
+
+                    // Detect paragraph break by checking vertical distance between lines
+                    const isLastLine = j === lines.length - 1;
+                    const verticalGap = isLastLine ? Infinity : lines[j][0].transform[5] - lines[j+1][0].transform[5];
+                    const avgLineHeight = line[0].height;
+                    
+                    if (verticalGap > avgLineHeight * 1.5 || isLastLine) {
+                        pageParagraphs.push(currentParagraph);
+                        currentParagraph = [];
+                    }
+                }
+                allPages.push(pageParagraphs);
+            }
+            return allPages;
+        }
+
+        /**
+         * NEW: Creates a .docx file from structured content.
+         * @param {Array<object>} pages - The structured page data.
+         * @param {string} originalFileName - The name of the source PDF.
+         * @returns {Promise<Blob>} A promise that resolves with the generated docx file as a Blob.
+         */
+        async function createWordDocument(pages, originalFileName) {
+            const docx_paragraphs = [];
+            
+            for (const page of pages) {
+                for (const paragraph of page) {
+                    const paragraphRuns = [];
+                    // Determine indentation from the first item of the first line
+                    const firstItemX = paragraph[0][0].transform[4];
+                    
+                    for (const line of paragraph) {
+                        for (const item of line) {
+                            const fontName = item.fontName;
+                            // Basic font style detection
+                            const isBold = fontName.toLowerCase().includes('bold');
+                            const isItalic = fontName.toLowerCase().includes('italic') || fontName.toLowerCase().includes('oblique');
+                            
+                            paragraphRuns.push(new docx.TextRun({
+                                text: item.str,
+                                bold: isBold,
+                                italics: isItalic,
+                                size: item.height * 2, // Convert PDF points to half-points
+                            }));
+                        }
+                        // Add a space at the end of each line within a paragraph
+                        paragraphRuns.push(new docx.TextRun({ text: " " }));
+                    }
+                    
+                    docx_paragraphs.push(new docx.Paragraph({
+                        children: paragraphRuns,
+                        indent: { left: firstItemX * 20 }, // Convert PDF units to twentieths of a point
+                        spacing: { after: 100 },
+                    }));
+                }
+                // Add a page break (optional, can be configured)
+                // docx_paragraphs.push(new docx.Paragraph({ children: [new docx.PageBreak()] }));
+            }
+
+            const doc = new docx.Document({
+                sections: [{
+                    properties: {},
+                    children: docx_paragraphs,
+                }],
+                creator: "PDF to Word Converter",
+                title: `Converted from ${originalFileName}`,
+            });
+
+            return docx.Packer.toBlob(doc);
+        }
+
+        // --- UI Helper Functions ---
+
+        function resetUI() {
+            selectedFile = null;
+            fileInput.value = '';
+            fileNameDisplay.textContent = 'Select a PDF file';
+            uploadSection.classList.remove('hidden');
+            previewSection.classList.add('hidden');
+            previewContent.innerHTML = '';
+            statusContainer.innerHTML = '';
+            enableControls();
+        }
+
+        function disableControls() {
+            convertBtn.disabled = true;
+            cancelBtn.disabled = true;
+            fileInput.disabled = true;
+        }
+
+        function enableControls() {
+            convertBtn.disabled = false;
+            cancelBtn.disabled = false;
+            fileInput.disabled = false;
+        }
+
+        function showStatus(type, message = '') {
+            statusContainer.innerHTML = '';
+            switch (type) {
+                case 'loading':
+                    const loader = document.createElement('div');
+                    loader.className = 'loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-8 w-8';
+                    const loadingText = document.createElement('span');
+                    loadingText.className = 'ml-3 text-gray-600';
+                    loadingText.textContent = message || 'Processing...';
+                    statusContainer.appendChild(loader);
+                    statusContainer.appendChild(loadingText);
+                    break;
+                case 'success':
+                    const successText = document.createElement('p');
+                    successText.className = 'text-green-600 font-medium';
+                    successText.innerHTML = `✅ Success! Your download for <span class="font-bold">${message}</span> has started.`;
+                    statusContainer.appendChild(successText);
+                    break;
+                case 'error':
+                    const errorText = document.createElement('p');
+                    errorText.className = 'text-red-600 font-medium';
+                    errorText.textContent = `❌ ${message}`;
+                    statusContainer.appendChild(errorText);
+                    break;
+            }
+        }
+        
+    </script>
+</body>
+</html>

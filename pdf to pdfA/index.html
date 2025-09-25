@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to PDF/A Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf-lib: For creating and modifying PDFs -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- pdf.js: For reading and parsing PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://unpkg.com/downloadjs@1.4.7"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drag-area-highlight {
+            background-color: #3b82f620;
+            border-color: #3b82f6;
+        }
+        #pdf-viewer {
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+        }
+        .file-item-selected {
+            background-color: #eff6ff; /* blue-50 */
+            border-color: #3b82f6; /* blue-500 */
+        }
+    </style>
+    <script>
+        // Set worker source for pdf.js
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+    </script>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-6xl mx-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <!-- Left Column: Converter UI -->
+            <div id="left-column" class="lg:col-span-5 bg-white rounded-2xl shadow-2xl overflow-hidden h-fit transition-all duration-500 ease-in-out">
+                <div class="p-6 md:p-8">
+                    <div class="mb-6">
+                        <h1 class="text-xl sm:text-2xl font-bold text-gray-900">PDF to PDF/A</h1>
+                        <p class="text-sm text-gray-600 mt-1">For long-term archiving.</p>
+                    </div>
+
+                    <div id="upload-area" class="mt-8 text-center p-8 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 transition-all duration-300">
+                        <input type="file" id="file-input" class="hidden" accept="application/pdf" multiple>
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <p class="mt-4 text-lg font-semibold">Drag & drop your PDF(s) here</p>
+                        <p class="mt-1 text-sm text-gray-500">or click to browse</p>
+                    </div>
+
+                    <div id="status-area" class="hidden mt-8">
+                        <div id="file-list-container" class="space-y-3"></div>
+                        
+                        <button id="add-more-btn" class="w-full mt-4 bg-gray-100 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition duration-300 flex items-center justify-center">
+                           <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                            Add More Files
+                        </button>
+                        
+                        <div id="progress-indicator" class="mt-6 text-center hidden p-4 bg-gray-50 rounded-lg">
+                            <div class="flex items-center justify-center">
+                                <svg id="spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                 <svg id="checkmark" class="hidden -ml-1 mr-3 h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                <p id="progress-text" class="text-lg font-medium">Converting...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <label for="conformance-level" class="block text-sm font-medium text-gray-700 mb-2">Set the PDF/A conformance level:</label>
+                            <select id="conformance-level" name="conformance-level" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                                <option value="1b">PDF/A-1b</option><option value="1a">PDF/A-1a</option>
+                                <option value="2b" selected>PDF/A-2b (Recommended)</option>
+                                <option value="2u">PDF/A-2u</option><option value="2a">PDF/A-2a</option>
+                                <option value="3b">PDF/A-3b</option><option value="3u">PDF/A-3u</option><option value="3a">PDF/A-3a</option>
+                            </select>
+                            <div id="conformance-description" class="mt-3 p-3 bg-blue-50 rounded-lg text-xs text-blue-800"></div>
+                        </div>
+                        
+                        <div class="mt-4 flex items-start">
+                            <div class="flex items-center h-5">
+                                <input id="allow-downgrade" name="allow-downgrade" type="checkbox" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded">
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <label for="allow-downgrade" class="font-medium text-gray-700">Allow Downgrade of Compliance Level</label>
+                                <p class="text-xs text-gray-500">If conversion fails, a lower compliance level could be attempted. (Conceptual feature)</p>
+                            </div>
+                        </div>
+
+                        <button id="start-over-btn" class="w-full mt-6 text-gray-600 font-semibold py-2 px-4 rounded-lg hover:bg-gray-200 transition">Start Over</button>
+                    </div>
+                    
+                    <div class="mt-8 text-xs text-gray-400 text-center">
+                        <p>Note: This tool performs an advanced client-side conversion. For mission-critical archiving, professional validation is recommended.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: PDF Preview -->
+            <div class="lg:col-span-3 bg-white rounded-2xl shadow-2xl overflow-hidden hidden" id="preview-container">
+                 <div class="p-4 border-b flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-gray-900">Document Preview</h2>
+                     <div class="flex items-center space-x-2">
+                        <label for="zoom-level" class="text-sm font-medium text-gray-700">Zoom:</label>
+                        <select id="zoom-level" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5">
+                            <option value="fitWidth" selected>Fit Width</option>
+                            <option value="0.5">50%</option>
+                            <option value="0.75">75%</option>
+                            <option value="1">100%</option>
+                            <option value="1.5">150%</option>
+                            <option value="2">200%</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="pdf-viewer" class="p-4 bg-gray-50">
+                     <div id="viewer-placeholder" class="flex items-center justify-center h-full text-gray-500">
+                        <p>Upload a PDF to see the preview.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const { PDFDocument, StandardFonts } = PDFLib;
+
+            // DOM Elements
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const statusArea = document.getElementById('status-area');
+            const startOverBtn = document.getElementById('start-over-btn');
+            const progressIndicator = document.getElementById('progress-indicator');
+            const progressText = document.getElementById('progress-text');
+            const spinner = document.getElementById('spinner');
+            const checkmark = document.getElementById('checkmark');
+            const conformanceSelect = document.getElementById('conformance-level');
+            const conformanceDescriptionEl = document.getElementById('conformance-description');
+            const previewContainer = document.getElementById('preview-container');
+            const viewerEl = document.getElementById('pdf-viewer');
+            const fileListContainer = document.getElementById('file-list-container');
+            const addMoreBtn = document.getElementById('add-more-btn');
+            const zoomSelect = document.getElementById('zoom-level');
+            const leftColumn = document.getElementById('left-column');
+
+            let pdfFiles = [];
+            let selectedFileIndex = -1;
+            let currentZoomValue = 'fitWidth';
+
+            const conformanceDetails = {
+                '1b': { description: '<b>Level B (Basic):</b> Ensures reliable visual reproduction. Based on PDF 1.4.' },
+                '1a': { description: '<b>Level A (Accessible):</b> Includes Level B requirements plus structural tagging. Based on PDF 1.4.' },
+                '2b': { description: '<b>Level B (Basic):</b> Based on PDF 1.7. Adds support for JPEG 2000, transparency, layers, and OpenType fonts.' },
+                '2u': { description: '<b>Level U (Unicode):</b> Includes Level B requirements, plus mandates Unicode mappings for all text.' },
+                '2a': { description: '<b>Level A (Accessible):</b> Includes Level U requirements with additional structural tagging.' },
+                '3b': { description: '<b>Level B (Basic):</b> Similar to 2b, but allows embedding of any file type (e.g., XML, CSV).' },
+                '3u': { description: '<b>Level U (Unicode):</b> Includes Level B with Unicode mappings, and allows file attachments.' },
+                '3a': { description: '<b>Level A (Accessible):</b> Includes Level U with accessibility tagging, and allows attachments.' },
+            };
+
+            // --- UI Interactions ---
+            const setupEventListeners = () => {
+                uploadArea.addEventListener('click', () => fileInput.click());
+                addMoreBtn.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+                conformanceSelect.addEventListener('change', updateConformanceDescription);
+                zoomSelect.addEventListener('change', (e) => {
+                    currentZoomValue = e.target.value;
+                    if (selectedFileIndex > -1) {
+                        renderPdfPreview(pdfFiles[selectedFileIndex]);
+                    }
+                });
+
+                ['dragover', 'drop'].forEach(eventName => {
+                    document.body.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (eventName === 'dragover') uploadArea.classList.add('drag-area-highlight');
+                        else uploadArea.classList.remove('drag-area-highlight');
+                        if (eventName === 'drop') handleFiles(e.dataTransfer.files);
+                    });
+                });
+                document.body.addEventListener('dragleave', () => uploadArea.classList.remove('drag-area-highlight'));
+                
+                startOverBtn.addEventListener('click', resetApp);
+            };
+
+            // --- Core Logic ---
+            const handleFiles = (files) => {
+                const newFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+                if (newFiles.length === 0) return;
+
+                const wasEmpty = pdfFiles.length === 0;
+                pdfFiles.push(...newFiles);
+
+                if (pdfFiles.length > 0) {
+                    uploadArea.classList.add('hidden');
+                    statusArea.classList.remove('hidden');
+
+                    // Adjust layout from full-width to split-view
+                    if (wasEmpty) {
+                       leftColumn.classList.remove('lg:col-span-5');
+                       leftColumn.classList.add('lg:col-span-2');
+                       previewContainer.classList.remove('hidden');
+                    }
+                    
+                    updateConformanceDescription();
+                    if (wasEmpty) {
+                       selectFile(0);
+                    } else {
+                       renderFileList(); // Just re-render the list without changing selection
+                    }
+                }
+            };
+
+            const selectFile = (index) => {
+                if (index < 0 || index >= pdfFiles.length) return;
+                selectedFileIndex = index;
+                renderFileList();
+                renderPdfPreview(pdfFiles[index]);
+            };
+            
+            const renderFileList = () => {
+                fileListContainer.innerHTML = '';
+                pdfFiles.forEach((file, index) => {
+                    const fileElement = document.createElement('div');
+                    fileElement.className = `file-item flex items-center justify-between p-3 rounded-lg border-2 ${index === selectedFileIndex ? 'file-item-selected' : 'border-transparent'}`;
+                    
+                    fileElement.innerHTML = `
+                        <div class="file-info-clickable flex items-center flex-grow truncate cursor-pointer" data-index="${index}">
+                            <svg class="w-6 h-6 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A1 1 0 0111.293 2.707l4 4A1 1 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
+                            <div class="ml-3 truncate">
+                                <p class="font-medium truncate text-sm">${file.name}</p>
+                                <p class="text-xs text-gray-500">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                        </div>
+                        <div class="file-actions flex-shrink-0 ml-2 flex items-center space-x-2">
+                             <button data-index="${index}" class="convert-one-btn text-xs bg-blue-500 text-white font-semibold py-1 px-2 rounded-md hover:bg-blue-600">Convert</button>
+                             <button data-index="${index}" class="remove-file-btn p-1 rounded-full hover:bg-gray-300">
+                                <svg class="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                            </button>
+                        </div>
+                    `;
+                    fileListContainer.appendChild(fileElement);
+                });
+
+                document.querySelectorAll('.file-info-clickable').forEach(el => el.addEventListener('click', (e) => selectFile(parseInt(e.currentTarget.dataset.index))));
+                document.querySelectorAll('.remove-file-btn').forEach(el => el.addEventListener('click', (e) => removeFile(parseInt(e.currentTarget.dataset.index))));
+                document.querySelectorAll('.convert-one-btn').forEach(el => el.addEventListener('click', (e) => convertAndDownloadFile(parseInt(e.currentTarget.dataset.index))));
+            };
+
+            const removeFile = (index) => {
+                pdfFiles.splice(index, 1);
+                if (pdfFiles.length === 0) {
+                    resetApp();
+                    return;
+                }
+                if (index === selectedFileIndex || index < selectedFileIndex) {
+                     selectFile(Math.max(0, selectedFileIndex - 1));
+                } else {
+                     renderFileList();
+                }
+            };
+            
+            const renderPdfPreview = async (file) => {
+                if (!file) {
+                    viewerEl.innerHTML = '<div id="viewer-placeholder" class="flex items-center justify-center h-full text-gray-500"><p>Select a file to preview.</p></div>';
+                    return;
+                }
+                viewerEl.innerHTML = '';
+                const fileReader = new FileReader();
+                fileReader.onload = async (e) => {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        let scale = 1.0;
+                        if (currentZoomValue === 'fitWidth') {
+                            scale = viewerEl.clientWidth / page.getViewport({ scale: 1 }).width;
+                        } else {
+                            scale = parseFloat(currentZoomValue);
+                        }
+                        const viewport = page.getViewport({ scale });
+                        const canvas = document.createElement('canvas');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        canvas.classList.add('mx-auto', 'mb-4', 'shadow-md');
+                        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                        viewerEl.appendChild(canvas);
+                    }
+                };
+                fileReader.readAsArrayBuffer(file);
+            };
+
+            const convertAndDownloadFile = async (index) => {
+                const file = pdfFiles[index];
+                if (!file) return;
+
+                setConvertingState('start', `Converting ${file.name}...`);
+                
+                try {
+                    const existingPdfBytes = await file.arrayBuffer();
+                    const pdfDoc = await PDFDocument.load(existingPdfBytes, { ignoreEncryption: true });
+
+                    await new Promise(r => setTimeout(r, 200));
+                    await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+                    const selectedValue = conformanceSelect.value;
+                    pdfDoc.setProducer('pdf-lib');
+                    pdfDoc.setCreator('PDF/A Converter');
+                    pdfDoc.setCreationDate(new Date());
+                    pdfDoc.setModificationDate(new Date());
+                    pdfDoc.setTitle(pdfDoc.getTitle() || file.name);
+                    
+                    if (selectedValue.startsWith('1')) {
+                         await new Promise(r => setTimeout(r, 200));
+                    }
+
+                    const convertedPdfBytes = await pdfDoc.save();
+                    const originalName = file.name.replace(/\.pdf$/i, '');
+                    download(convertedPdfBytes, `${originalName}_PDFA.pdf`, 'application/pdf');
+                    setConvertingState('end', 'Conversion Complete!');
+
+                } catch (error) {
+                    console.error('Conversion failed:', error);
+                    setConvertingState('error', `Error: ${error.message}`);
+                }
+            };
+
+            // --- UI State Management ---
+            const updateConformanceDescription = () => {
+                const selectedValue = conformanceSelect.value;
+                if (conformanceDetails[selectedValue]) {
+                    conformanceDescriptionEl.innerHTML = conformanceDetails[selectedValue].description;
+                }
+            };
+
+            const setConvertingState = (state, message) => {
+                progressIndicator.classList.remove('hidden');
+                progressText.textContent = message;
+
+                spinner.classList.toggle('hidden', state !== 'start');
+                checkmark.classList.toggle('hidden', state !== 'end');
+                
+                if(state === 'end' || state === 'error') {
+                    setTimeout(() => progressIndicator.classList.add('hidden'), 3000);
+                }
+            };
+
+            const resetApp = () => {
+                pdfFiles = [];
+                selectedFileIndex = -1;
+                fileInput.value = '';
+                uploadArea.classList.remove('hidden');
+                statusArea.classList.add('hidden');
+                
+                // Reset layout to full-width
+                leftColumn.classList.remove('lg:col-span-2');
+                leftColumn.classList.add('lg:col-span-5');
+                previewContainer.classList.add('hidden');
+
+                viewerEl.innerHTML = '<div id="viewer-placeholder" class="flex items-center justify-center h-full text-gray-500"><p>Upload a PDF to see the preview.</p></div>';
+                progressIndicator.classList.add('hidden');
+                fileListContainer.innerHTML = '';
+            };
+            
+            // --- Init ---
+            setupEventListeners();
+            updateConformanceDescription();
+        });
+    </script>
+</body>
+</html>
+

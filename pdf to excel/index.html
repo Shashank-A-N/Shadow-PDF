@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Excel Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf.js library from Mozilla -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- xlsx.js (SheetJS) library for creating Excel files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .file-input-button {
+            cursor: pointer;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background-color: #4f46e5;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .file-input-button:hover {
+            background-color: #4338ca;
+        }
+        #pdfFile {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8 md:p-12">
+        <div class="text-center">
+            <div class="inline-block bg-indigo-100 p-3 rounded-xl mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 1v4m0 0h-4m4 0l-5-5" />
+                </svg>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">PDF to Excel Converter</h1>
+            <p class="text-gray-500 mt-3">Extract tables from your PDF files and convert them into an editable Excel spreadsheet.</p>
+            <p class="text-sm text-gray-400 mt-1">All processing is done in your browser. Your files are not uploaded to any server.</p>
+        </div>
+
+        <div class="mt-10">
+            <!-- File Upload Section -->
+            <div id="upload-section" class="text-center">
+                <label for="pdfFile" class="file-input-button font-semibold">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Select PDF File
+                </label>
+                <input type="file" id="pdfFile" accept=".pdf">
+                <p id="file-name" class="mt-4 text-gray-600 truncate"></p>
+            </div>
+            
+            <!-- Conversion Button -->
+            <div class="mt-6 text-center">
+                <button id="convertBtn" class="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    Convert to Excel
+                </button>
+            </div>
+
+            <!-- Status and Download Section -->
+            <div id="status-section" class="mt-8 text-center hidden">
+                <div id="loader" class="flex items-center justify-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <p id="status-text" class="ml-3 text-lg font-medium text-gray-700">Processing...</p>
+                </div>
+                <div id="download-section" class="hidden">
+                     <a id="downloadLink" class="inline-block bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-blue-700 transition-all duration-200" download="converted_data.xlsx">
+                        Download Excel File
+                    </a>
+                </div>
+            </div>
+             <!-- Disclaimer -->
+            <div class="mt-8 text-center text-xs text-gray-400">
+                <p><strong>Note:</strong> This tool works best with text-based PDFs that have simple, clearly defined tables. Scanned PDFs or complex layouts may not be extracted correctly.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pdfFileInput = document.getElementById('pdfFile');
+        const fileNameDisplay = document.getElementById('file-name');
+        const convertBtn = document.getElementById('convertBtn');
+        const statusSection = document.getElementById('status-section');
+        const loader = document.getElementById('loader');
+        const statusText = document.getElementById('status-text');
+        const downloadSection = document.getElementById('download-section');
+        const downloadLink = document.getElementById('downloadLink');
+
+        // Configure pdf.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        let selectedFile = null;
+
+        pdfFileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                fileNameDisplay.textContent = `Selected: ${selectedFile.name}`;
+                convertBtn.disabled = false;
+                 // Reset previous results
+                statusSection.classList.add('hidden');
+                downloadSection.classList.add('hidden');
+            } else {
+                fileNameDisplay.textContent = '';
+                convertBtn.disabled = true;
+            }
+        });
+
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // Reset UI
+            convertBtn.disabled = true;
+            statusSection.classList.remove('hidden');
+            loader.classList.remove('hidden');
+            downloadSection.classList.add('hidden');
+            statusText.textContent = 'Reading PDF...';
+            
+            try {
+                const fileReader = new FileReader();
+                fileReader.onload = async function() {
+                    const typedarray = new Uint8Array(this.result);
+                    
+                    statusText.textContent = 'Extracting text from PDF...';
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let allTextItems = [];
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        statusText.textContent = `Processing page ${i} of ${pdf.numPages}...`;
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        // Filter out empty or whitespace-only items
+                        const filteredItems = textContent.items.filter(item => item.str.trim().length > 0);
+                        allTextItems = allTextItems.concat(filteredItems);
+                    }
+                    
+                    statusText.textContent = 'Analyzing PDF structure...';
+                    // --- ADVANCED TABLE DETECTION LOGIC ---
+                    // 1. Group text items into lines based on Y-coordinate with a tolerance.
+                    // 2. Identify column boundaries by clustering the X-coordinates of where text begins.
+                    // 3. Map each text item into a grid cell based on its detected line and column.
+
+                    if (allTextItems.length === 0) {
+                        throw new Error("PDF contains no readable text.");
+                    }
+
+                    // Sort all text items primarily by their Y coordinate, then by X.
+                    // This arranges text from top-to-bottom, then left-to-right.
+                    allTextItems.sort((a, b) => {
+                        const y1 = a.transform[5];
+                        const y2 = b.transform[5];
+                        const x1 = a.transform[4];
+                        const x2 = b.transform[4];
+                        if (Math.abs(y1 - y2) > 3) { // Y-tolerance for same line
+                            return y2 - y1;
+                        }
+                        return x1 - x2;
+                    });
+
+                    // Group text items into rows
+                    const rows = [];
+                    if (allTextItems.length > 0) {
+                        let currentRow = [allTextItems[0]];
+                        let lastY = allTextItems[0].transform[5];
+
+                        for (let i = 1; i < allTextItems.length; i++) {
+                            const item = allTextItems[i];
+                            if (Math.abs(item.transform[5] - lastY) > 5) { // Vertical distance threshold for a new line
+                                rows.push(currentRow.sort((a,b) => a.transform[4] - b.transform[4])); // Sort items in row by X
+                                currentRow = [item];
+                                lastY = item.transform[5];
+                            } else {
+                                currentRow.push(item);
+                            }
+                        }
+                        rows.push(currentRow.sort((a,b) => a.transform[4] - b.transform[4])); // Push the last row
+                    }
+
+                    statusText.textContent = 'Detecting column boundaries...';
+
+                    // Identify potential column boundaries by clustering X-coordinates
+                    const xCoords = allTextItems.map(item => Math.round(item.transform[4]));
+                    const xCoordCounts = xCoords.reduce((acc, x) => { acc[x] = (acc[x] || 0) + 1; return acc; }, {});
+                    
+                    // Filter for significant column starts (appearing more than once, typically)
+                    const potentialBoundaries = Object.keys(xCoordCounts).filter(x => xCoordCounts[x] > 1).map(Number).sort((a, b) => a - b);
+                    
+                    const columnBoundaries = [];
+                    if (potentialBoundaries.length > 0) {
+                        columnBoundaries.push(potentialBoundaries[0]);
+                        let lastBoundary = potentialBoundaries[0];
+                        for(let i = 1; i < potentialBoundaries.length; i++) {
+                             // If a coordinate is far enough from the last one, it's a new column
+                            if(potentialBoundaries[i] - lastBoundary > 10) { // Min pixel distance for new column
+                                columnBoundaries.push(potentialBoundaries[i]);
+                                lastBoundary = potentialBoundaries[i];
+                            }
+                        }
+                    }
+
+                    // Build the data grid using the detected rows and columns
+                    const data = rows.map(rowItems => {
+                        const rowData = Array(columnBoundaries.length).fill('');
+                        rowItems.forEach(item => {
+                            const itemX = Math.round(item.transform[4]);
+                            // Find the correct column for this item
+                            let colIndex = -1;
+                            for (let i = columnBoundaries.length - 1; i >= 0; i--) {
+                                if (itemX >= columnBoundaries[i] - 5) { // Allow 5px tolerance
+                                    colIndex = i;
+                                    break;
+                                }
+                            }
+                            if (colIndex !== -1) {
+                                rowData[colIndex] = (rowData[colIndex] + ' ' + item.str).trim();
+                            }
+                        });
+                        return rowData;
+                    });
+
+                    // Filter out any completely empty rows that might have been created
+                    const filteredData = data.filter(row => row.some(cell => cell !== ''));
+
+                    if (filteredData.length === 0) {
+                        throw new Error("Could not detect a valid table structure in the PDF.");
+                    }
+                    
+                    statusText.textContent = 'Generating Excel file...';
+                    // Create Excel file using SheetJS
+                    const worksheet = XLSX.utils.aoa_to_sheet(filteredData);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+                    
+                    // Trigger download
+                    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+                    
+                    downloadLink.href = URL.createObjectURL(blob);
+                    
+                    // Show download button
+                    loader.classList.add('hidden');
+                    statusText.textContent = 'Conversion Complete!';
+                    downloadSection.classList.remove('hidden');
+                };
+                fileReader.readAsArrayBuffer(selectedFile);
+            } catch (error) {
+                console.error('Error:', error);
+                statusText.textContent = `Error: ${error.message}`;
+                loader.classList.add('hidden');
+            } finally {
+                 pdfFileInput.value = ''; // Reset file input to allow re-uploading the same file
+                 convertBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
+

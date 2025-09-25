@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPT/PPTX to PDF Batch Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .spinner { border-top-color: transparent; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* Hide checkbox in file list header when no files are present */
+        #file-list:empty ~ #file-list-header { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 space-y-6">
+            <div class="text-center">
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Batch PPT/PPTX to PDF Converter</h1>
+                <p class="mt-2 text-gray-600 dark:text-gray-400">Upload, select, convert, and download multiple files with ease.</p>
+            </div>
+
+            <div id="upload-container">
+                <label for="file-upload" class="relative cursor-pointer bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center p-12 text-center transition-colors">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                    <span id="upload-text" class="mt-2 block text-sm font-medium text-gray-900 dark:text-gray-200">Click to upload files</span>
+                    <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">or drag and drop .ppt/.pptx files</span>
+                </label>
+                <input id="file-upload" type="file" class="sr-only" accept=".ppt,.pptx" multiple>
+            </div>
+
+            <div id="file-list-area" class="hidden space-y-3">
+                 <div id="file-list-header" class="flex items-center justify-between bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg">
+                     <div class="flex items-center">
+                         <input id="select-all-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                         <label for="select-all-checkbox" class="ml-3 min-w-0 flex-1 text-sm font-medium text-gray-900 dark:text-gray-200">Select All</label>
+                     </div>
+                 </div>
+                <div id="file-list" class="space-y-2 max-h-60 overflow-y-auto pr-2"></div>
+            </div>
+
+            <div id="action-buttons" class="hidden pt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                 <button id="add-files-btn" class="w-full bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Add Files</button>
+                 <button id="convert-selected-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg" disabled>Convert Selected</button>
+                 <button id="download-selected-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg" disabled>Download Selected</button>
+                 <button id="clear-all-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg">Clear All</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM Elements
+        const fileUpload = document.getElementById('file-upload');
+        const uploadLabel = fileUpload.parentElement;
+        const uploadText = document.getElementById('upload-text');
+        const fileListArea = document.getElementById('file-list-area');
+        const fileListDiv = document.getElementById('file-list');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        
+        const actionButtons = document.getElementById('action-buttons');
+        const addFilesBtn = document.getElementById('add-files-btn');
+        const convertSelectedBtn = document.getElementById('convert-selected-btn');
+        const downloadSelectedBtn = document.getElementById('download-selected-btn');
+        const clearAllBtn = document.getElementById('clear-all-btn');
+
+        // State Management
+        const filesMap = new Map(); // Stores { file, status, selected, job_id, output_filename }
+
+        // --- Event Listeners ---
+        fileUpload.addEventListener('change', handleFileSelection);
+        addFilesBtn.addEventListener('click', () => fileUpload.click());
+        clearAllBtn.addEventListener('click', () => {
+            filesMap.clear();
+            updateUI();
+        });
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadLabel.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
+            if (['dragenter', 'dragover'].includes(eventName)) {
+                uploadLabel.addEventListener(eventName, () => uploadLabel.classList.add('bg-gray-100', 'dark:bg-gray-600'));
+            } else {
+                uploadLabel.addEventListener(eventName, () => uploadLabel.classList.remove('bg-gray-100', 'dark:bg-gray-600'));
+            }
+        });
+        uploadLabel.addEventListener('drop', handleFileSelection);
+
+        selectAllCheckbox.addEventListener('change', (e) => {
+            filesMap.forEach(data => data.selected = e.target.checked);
+            updateUI();
+        });
+
+        fileListDiv.addEventListener('click', (e) => {
+            const target = e.target;
+            const fileItem = target.closest('[data-id]');
+            if (!fileItem) return;
+            const fileId = fileItem.dataset.id;
+            
+            if (target.type === 'checkbox') {
+                const fileData = filesMap.get(fileId);
+                fileData.selected = target.checked;
+                updateUI();
+            } else if (target.closest('.convert-btn')) {
+                requestConversion(fileId);
+            } else if (target.closest('.download-btn')) {
+                downloadConvertedFile(fileId);
+            }
+        });
+
+        convertSelectedBtn.addEventListener('click', () => {
+            const selectedFiles = [...filesMap.entries()].filter(([, data]) => data.selected && data.status === 'ready');
+            selectedFiles.forEach(([id]) => requestConversion(id));
+        });
+
+        downloadSelectedBtn.addEventListener('click', downloadSelectedFiles);
+
+        // --- Core Functions ---
+        function handleFileSelection(event) {
+            const files = event.dataTransfer ? event.dataTransfer.files : event.target.files;
+            let added = false;
+            for (const file of files) {
+                if ((file.name.endsWith('.ppt') || file.name.endsWith('.pptx')) && !isFileAlreadyAdded(file)) {
+                    const fileId = `file-${Date.now()}-${Math.random()}`;
+                    filesMap.set(fileId, { file, status: 'ready', selected: true });
+                    added = true;
+                }
+            }
+            if (added) updateUI();
+            fileUpload.value = '';
+        }
+
+        function isFileAlreadyAdded(file) {
+            return [...filesMap.values()].some(data => data.file.name === file.name && data.file.size === file.size);
+        }
+
+        function updateUI() {
+            fileListDiv.innerHTML = '';
+            const hasFiles = filesMap.size > 0;
+
+            fileListArea.classList.toggle('hidden', !hasFiles);
+            actionButtons.classList.toggle('hidden', !hasFiles);
+
+            if (!hasFiles) {
+                uploadText.textContent = 'Click to upload files';
+                return;
+            }
+            
+            uploadText.textContent = `Total Files: ${filesMap.size}`;
+            
+            let allSelected = hasFiles;
+            let selectedToConvert = 0;
+            let selectedToDownload = 0;
+
+            filesMap.forEach((data, id) => {
+                const { file, status, selected } = data;
+                if (!selected) allSelected = false;
+                if (selected && status === 'ready') selectedToConvert++;
+                if (selected && status === 'converted') selectedToDownload++;
+
+                const fileItem = document.createElement('div');
+                fileItem.dataset.id = id;
+                fileItem.className = 'flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-3 rounded-lg';
+                
+                let statusHTML = '';
+                switch(status) {
+                    case 'ready': statusHTML = '<span class="text-xs text-gray-500 dark:text-gray-400">Ready</span>'; break;
+                    case 'converting': statusHTML = '<span class="text-xs text-blue-500">Converting...</span>'; break;
+                    case 'converted': statusHTML = '<span class="text-xs text-green-500">Converted</span>'; break;
+                    case 'failed': statusHTML = `<span class="text-xs text-red-500" title="${data.error || ''}">Failed</span>`; break;
+                }
+
+                let actionHTML = '';
+                 switch (status) {
+                     case 'ready':
+                         actionHTML = `<button class="convert-btn text-sm text-blue-600 hover:text-blue-800">Convert</button>`;
+                         break;
+                     case 'converting':
+                         actionHTML = `<div class="w-5 h-5 border-2 border-blue-500 rounded-full spinner"></div>`;
+                         break;
+                     case 'converted':
+                         actionHTML = `<button class="download-btn text-sm text-green-600 hover:text-green-800">Download</button>`;
+                         break;
+                     case 'failed':
+                         actionHTML = `<button class="convert-btn text-sm text-gray-500 hover:text-gray-700">Retry</button>`;
+                         break;
+                 }
+
+                fileItem.innerHTML = `
+                    <div class="flex items-center min-w-0">
+                        <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" ${selected ? 'checked' : ''}>
+                        <div class="ml-3 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 dark:text-gray-200 truncate" title="${file.name}">${file.name}</p>
+                            ${statusHTML}
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-shrink-0 w-20 text-right">${actionHTML}</div>
+                `;
+                fileListDiv.appendChild(fileItem);
+            });
+
+            selectAllCheckbox.checked = allSelected;
+            convertSelectedBtn.disabled = selectedToConvert === 0;
+            downloadSelectedBtn.disabled = selectedToDownload === 0;
+            convertSelectedBtn.textContent = `Convert Selected (${selectedToConvert})`;
+            downloadSelectedBtn.textContent = `Download Selected (${selectedToDownload})`;
+        }
+        
+        async function requestConversion(fileId) {
+            const fileData = filesMap.get(fileId);
+            if (!fileData || fileData.status === 'converting') return;
+
+            fileData.status = 'converting';
+            updateUI();
+
+            const formData = new FormData();
+            formData.append('file', fileData.file);
+
+            try {
+                const response = await fetch('/convert-single', { method: 'POST', body: formData });
+                const contentType = response.headers.get("content-type");
+
+                if (contentType && contentType.includes("application/json")) {
+                    const result = await response.json();
+                    if (response.ok) {
+                        fileData.status = 'converted';
+                        fileData.job_id = result.job_id;
+                        fileData.output_filename = result.output_filename;
+                    } else {
+                        throw new Error(result.error || 'Unknown server error');
+                    }
+                } else {
+                    throw new Error('Server returned an unexpected response. Please check server logs.');
+                }
+            } catch (error) {
+                fileData.status = 'failed';
+                fileData.error = error.message;
+            }
+            updateUI();
+        }
+
+        function downloadConvertedFile(fileId) {
+            const { job_id, output_filename } = filesMap.get(fileId);
+            if (job_id && output_filename) {
+                // This triggers the download and the server-side cleanup
+                window.location.href = `/download/${job_id}/${output_filename}`;
+            }
+        }
+
+        async function downloadSelectedFiles() {
+            const filesToZip = [...filesMap.values()]
+                .filter(data => data.selected && data.status === 'converted')
+                .map(data => ({ job_id: data.job_id, output_filename: data.output_filename }));
+
+            if (filesToZip.length === 0) return;
+            
+            // Show loading state on the button
+            downloadSelectedBtn.disabled = true;
+            downloadSelectedBtn.innerHTML = `<div class="w-5 h-5 mx-auto border-2 border-white rounded-full spinner"></div>`;
+
+            try {
+                const response = await fetch('/create-zip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_ids: filesToZip })
+                });
+
+                if (response.ok) {
+                    // The server sends the file directly, so we handle it as a blob
+                    const blob = await response.blob();
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                    link.download = `converted-files-${timestamp}.zip`;
+
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(link.href);
+
+                    // After download, maybe clear the converted files or mark them as downloaded
+                    filesToZip.forEach(info => {
+                        const fileEntry = [...filesMap.entries()].find(([,data]) => data.job_id === info.job_id);
+                        if(fileEntry) {
+                           // The server will clean up the files automatically. 
+                           // We can remove them from the list or change their state.
+                           // For simplicity, we'll leave them, as they are now expired on the server.
+                           const fileData = filesMap.get(fileEntry[0]);
+                           fileData.status = 'ready'; // Reset to allow re-conversion if needed
+                           delete fileData.job_id;
+                           delete fileData.output_filename;
+                        }
+                    });
+
+                } else {
+                    // Try to parse error from JSON response
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to download ZIP file.');
+                }
+            } catch (error) {
+                // Use a more user-friendly alert
+                const modal = document.createElement('div');
+                modal.innerHTML = `<div style="position: fixed; top: 20px; right: 20px; background-color: #f8d7da; color: #721c24; padding: 1rem; border-radius: 0.5rem; z-index: 1000;">${error.message}</div>`;
+                document.body.appendChild(modal);
+                setTimeout(() => modal.remove(), 4000);
+            } finally {
+                // Restore the UI
+                updateUI();
+            }
+        }
+    </script>
+</body>
+</html>
+
