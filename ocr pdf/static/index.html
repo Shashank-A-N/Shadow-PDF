@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch PDF OCR Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        #file-list::-webkit-scrollbar { width: 8px; }
+        #file-list::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.1); }
+        #file-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 4px; }
+        #file-list::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
+
+        .spinner {
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Liquid Glass Loader */
+        .liquid-loader {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            overflow: hidden;
+            border: 4px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+        .liquid-loader::before {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-color: #fff;
+            border-radius: 40%;
+            animation: wave 5s linear infinite;
+        }
+        @keyframes wave { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #progress-bar-inner { transition: width 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen text-gray-100">
+    <div class="container mx-auto p-4 md:p-8 w-full">
+        <div class="glass-panel p-4 sm:p-8 rounded-2xl">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-white">Batch PDF OCR Converter</h1>
+                <p class="text-gray-200 mt-2">Convert scanned PDFs into searchable documents.</p>
+            </div>
+
+            <div id="global-error-message" class="hidden bg-red-500 bg-opacity-50 border border-red-400 text-white px-4 py-3 rounded-lg relative mb-6" role="alert"></div>
+
+            <div id="upload-section" class="mb-6 text-center">
+                <h2 class="text-lg font-semibold text-white mb-3">1. Upload your PDF files</h2>
+                <div class="flex items-center justify-center">
+                    <label for="file-input" class="cursor-pointer bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        Choose Files
+                    </label>
+                    <input type="file" id="file-input" multiple accept=".pdf" class="hidden">
+                </div>
+            </div>
+            
+            <div id="processing-area" class="hidden text-center">
+                 <div class="w-full max-w-md mx-auto">
+                    <div class="flex items-center justify-center space-x-4">
+                        <div class="liquid-loader"></div>
+                        <div>
+                            <p id="status-text" class="text-lg font-semibold text-white">Processing...</p>
+                        </div>
+                    </div>
+                    <div class="w-full bg-black bg-opacity-20 rounded-full h-2.5 mt-6"><div id="progress-bar-inner" class="bg-white h-2.5 rounded-full" style="width: 0%"></div></div>
+                    <p id="overall-progress-text" class="text-sm text-gray-200 mt-2">Overall Progress: 0%</p>
+                </div>
+            </div>
+
+            <div id="review-section" class="hidden">
+                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                    <h2 class="text-lg font-semibold text-white">2. Review and Convert</h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <input id="select-all-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-400 bg-transparent text-indigo-400 focus:ring-indigo-500">
+                            <label for="select-all-checkbox" class="ml-2 block text-sm text-gray-200">Select All</label>
+                        </div>
+                        <button id="add-more-files-btn" class="flex items-center bg-white bg-opacity-10 hover:bg-opacity-20 text-white font-semibold p-2 sm:py-2 sm:px-4 rounded-lg text-sm transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            <span class="hidden sm:inline">Add More Files</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="bulk-actions-bar" class="hidden items-center flex-wrap gap-3 bg-black bg-opacity-20 p-2 rounded-lg mb-4">
+                    <span class="text-sm font-medium text-gray-200">For selected files:</span>
+                    <div id="master-language-container"></div>
+                    <button id="apply-language-btn" class="text-sm bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-semibold py-1 px-3 rounded-lg border border-white border-opacity-20">Apply</button>
+                </div>
+                
+                <div id="file-list" class="space-y-3 mb-6 max-h-96 overflow-y-auto pr-2"></div>
+
+                <div class="flex flex-col sm:flex-row items-center mt-6 gap-4">
+                    <button id="convert-selected-btn" class="w-full sm:w-auto sm:flex-grow bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:bg-indigo-400 disabled:bg-opacity-50 disabled:cursor-not-allowed">
+                        Convert Selected
+                    </button>
+                    <button id="download-selected-btn" class="hidden w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors whitespace-nowrap disabled:bg-green-400 disabled:bg-opacity-50 disabled:cursor-not-allowed">
+                        Download Selected
+                    </button>
+                    <button id="clear-all-btn" class="w-full sm:w-auto bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-semibold py-3 px-6 rounded-lg border border-white border-opacity-20 transition-colors">
+                        Clear All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// --- STATE MANAGEMENT ---
+let fileStore = new Map();
+let languages = null;
+let languageFetchStatus = 'idle';
+
+// --- DOM ELEMENT REFERENCES ---
+const fileInput = document.getElementById('file-input');
+const uploadSection = document.getElementById('upload-section');
+const addMoreFilesBtn = document.getElementById('add-more-files-btn');
+const reviewSection = document.getElementById('review-section');
+const fileListContainer = document.getElementById('file-list');
+const convertSelectedBtn = document.getElementById('convert-selected-btn');
+const downloadSelectedBtn = document.getElementById('download-selected-btn');
+const clearAllBtn = document.getElementById('clear-all-btn');
+const globalError = document.getElementById('global-error-message');
+const selectAllCheckbox = document.getElementById('select-all-checkbox');
+const bulkActionsBar = document.getElementById('bulk-actions-bar');
+const masterLanguageContainer = document.getElementById('master-language-container');
+const applyLanguageBtn = document.getElementById('apply-language-btn');
+const processingArea = document.getElementById('processing-area');
+const statusText = document.getElementById('status-text');
+const progressBarInner = document.getElementById('progress-bar-inner');
+const overallProgressText = document.getElementById('overall-progress-text');
+
+
+// --- EVENT LISTENERS ---
+fileInput.addEventListener('change', handleFileSelect);
+addMoreFilesBtn.addEventListener('click', () => fileInput.click());
+convertSelectedBtn.addEventListener('click', handleConvertSelected);
+downloadSelectedBtn.addEventListener('click', handleDownloadSelected);
+clearAllBtn.addEventListener('click', handleClearAll);
+fileListContainer.addEventListener('click', handleFileListClick);
+fileListContainer.addEventListener('change', handleIndividualSelect);
+selectAllCheckbox.addEventListener('change', handleSelectAll);
+applyLanguageBtn.addEventListener('click', handleApplyMasterLanguage);
+
+// --- CORE FUNCTIONS ---
+
+function handleFileSelect(event) {
+    const newFiles = Array.from(event.target.files);
+    if (newFiles.length === 0) return;
+
+    newFiles.forEach(file => {
+        if (!fileStore.has(file.name)) {
+            fileStore.set(file.name, {
+                file: file,
+                status: 'pending', // pending, processing, success, error
+                selected: true,
+                id: `file-${Date.now()}-${Math.random()}`
+            });
+        }
+    });
+
+    renderFileList();
+    if (languageFetchStatus !== 'success') {
+       fetchLanguages();
+    }
+    event.target.value = null; 
+}
+
+async function fetchLanguages() {
+    languageFetchStatus = 'loading';
+    renderFileList();
+    hideGlobalError();
+
+    try {
+        const response = await fetch('/languages', { signal: AbortSignal.timeout(15000) });
+        
+        if (!response.ok) {
+            const rawText = await response.text(); // Read body once
+            let errorText;
+            try {
+                // Try to parse the text as JSON
+                const errorResult = JSON.parse(rawText);
+                errorText = errorResult.error || JSON.stringify(errorResult);
+            } catch (e) {
+                // If parsing fails, use the raw text
+                errorText = rawText.slice(0, 200) || `Server responded with status: ${response.status}`;
+            }
+            throw new Error(errorText);
+        }
+        
+        const data = await response.json(); 
+        languages = data;
+        languageFetchStatus = 'success';
+        populateMasterLanguageSelector();
+
+    } catch (error) {
+        console.error("Error fetching languages:", error);
+        languageFetchStatus = 'failed';
+        
+        let userMessage = `<strong>Could not load languages.</strong> ${error.message}`;
+        if (error.message.includes("Unexpected token '<'")) {
+            userMessage = `<strong>Could not load languages.</strong> The server sent an invalid response (HTML instead of JSON). Please check the server logs for errors.`;
+        }
+        showGlobalError(`${userMessage} <button onclick="fetchLanguages()" class="font-bold underline ml-2">Retry</button>`);
+
+    } finally {
+        renderFileList();
+    }
+}
+
+
+function populateMasterLanguageSelector() {
+    if (languageFetchStatus !== 'success') {
+        masterLanguageContainer.innerHTML = '';
+        return;
+    }
+    const options = Object.entries(languages).map(([code, name]) => `<option value="${code}" class="text-black" ${code === 'eng' ? 'selected' : ''}>${name}</option>`).join('');
+    masterLanguageContainer.innerHTML = `<select id="master-language-select" class="bg-white bg-opacity-20 border border-white border-opacity-20 rounded-md py-1 px-2 text-sm text-white">${options}</select>`;
+}
+
+
+function renderFileList() {
+    fileListContainer.innerHTML = '';
+    if (fileStore.size === 0) {
+        updateUIState();
+        return;
+    }
+
+    fileStore.forEach(item => {
+        const fileItemHTML = `
+            <div id="${item.id}" class="file-item bg-black bg-opacity-20 p-4 rounded-lg border border-white border-opacity-20">
+                <div class="flex flex-wrap items-center justify-between gap-y-3">
+                    <div class="flex items-center flex-grow min-w-0 pr-4">
+                        <input type="checkbox" class="file-checkbox h-4 w-4 rounded border-gray-400 bg-transparent text-indigo-400 focus:ring-indigo-500 mr-4 flex-shrink-0" data-filename="${item.file.name}" ${item.selected ? 'checked' : ''}>
+                        <div class="flex-grow min-w-0">
+                            <p class="font-medium text-white truncate">${item.file.name}</p>
+                            <p class="text-sm text-gray-300">${(item.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center flex-shrink-0 gap-2">
+                        ${renderLanguageSelector(item)}
+                        <button class="remove-file-btn text-gray-400 hover:text-red-400" data-filename="${item.file.name}">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </div>
+                </div>
+                ${renderStatusSection(item)}
+            </div>
+        `;
+        fileListContainer.insertAdjacentHTML('beforeend', fileItemHTML);
+    });
+    updateUIState();
+}
+
+function renderLanguageSelector() {
+    switch (languageFetchStatus) {
+        case 'loading': return `<div class="flex items-center text-sm text-gray-300"><div class="spinner mr-2"></div>Loading...</div>`;
+        case 'failed': return `<button class="retry-lang-btn text-sm bg-yellow-500 bg-opacity-50 text-white py-1 px-2 rounded hover:bg-opacity-70">Retry</button>`;
+        case 'success':
+            const options = Object.entries(languages).map(([code, name]) => `<option value="${code}" class="text-black" ${code === 'eng' ? 'selected' : ''}>${name}</option>`).join('');
+            return `<select class="language-select bg-white bg-opacity-20 border border-white border-opacity-20 rounded-md py-1 px-2 text-sm text-white max-w-[150px]">${options}</select>`;
+        default: return `<div class="text-sm text-gray-400">Initializing...</div>`;
+    }
+}
+
+function renderStatusSection(item) {
+     switch(item.status) {
+        case 'processing': return `<div class="mt-3 flex items-center text-sm text-blue-300"><div class="spinner mr-2"></div>Processing...</div>`;
+        case 'success':
+            return `
+                <div class="mt-3 p-3 bg-green-500 bg-opacity-30 rounded-md flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-sm font-medium text-white">Conversion successful!</p>
+                    <a href="${item.downloadUrl}" download="${item.downloadName}" class="download-btn text-sm bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg transition-colors flex-shrink-0">
+                        Download PDF
+                    </a>
+                </div>`;
+        case 'error':
+             return `<div class="mt-3 p-3 bg-red-500 bg-opacity-40 text-white text-sm rounded-md"><strong>Error:</strong> ${item.error || 'An unknown error occurred.'}</div>`;
+        default: return '';
+    }
+}
+
+
+function updateOverallProgress(processed, total) {
+    const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+    progressBarInner.style.width = `${percentage}%`;
+    overallProgressText.textContent = `Overall Progress: ${percentage}% (${processed}/${total} files)`;
+    if (processed < total) {
+        statusText.textContent = `Processing file ${processed + 1} of ${total}...`;
+    } else {
+        statusText.textContent = `All conversions attempted.`;
+    }
+}
+
+
+function handleFileListClick(e) {
+    if (e.target.classList.contains('retry-lang-btn')) {
+        fetchLanguages();
+    }
+    if (e.target.closest('.remove-file-btn')) {
+        const filename = e.target.closest('.remove-file-btn').getAttribute('data-filename');
+        fileStore.delete(filename);
+        renderFileList();
+    }
+}
+
+function handleIndividualSelect(e) {
+    if (e.target.classList.contains('file-checkbox')) {
+        const filename = e.target.getAttribute('data-filename');
+        const item = fileStore.get(filename);
+        if (item) {
+            item.selected = e.target.checked;
+        }
+        updateUIState();
+    }
+}
+
+function handleSelectAll(e) {
+    const isChecked = e.target.checked;
+    fileStore.forEach(item => {
+        item.selected = isChecked;
+    });
+    renderFileList();
+}
+
+function handleApplyMasterLanguage() {
+    const masterSelect = document.getElementById('master-language-select');
+    if (!masterSelect) return;
+
+    const newLang = masterSelect.value;
+    const selectedItems = Array.from(fileStore.values()).filter(item => item.selected);
+
+    selectedItems.forEach(item => {
+        const fileElement = document.getElementById(item.id);
+        if (fileElement) {
+            const langSelect = fileElement.querySelector('.language-select');
+            if (langSelect) {
+                langSelect.value = newLang;
+            }
+        }
+    });
+}
+
+
+function updateUIState() {
+    const hasFiles = fileStore.size > 0;
+    uploadSection.classList.toggle('hidden', hasFiles);
+    reviewSection.classList.toggle('hidden', !hasFiles);
+    
+    const allItems = Array.from(fileStore.values());
+    const selectedCount = allItems.filter(item => item.selected).length;
+
+    if (selectedCount > 0 && languageFetchStatus === 'success') {
+        convertSelectedBtn.disabled = false;
+        convertSelectedBtn.textContent = `Convert ${selectedCount} Selected`;
+    } else {
+        convertSelectedBtn.disabled = true;
+        convertSelectedBtn.textContent = languageFetchStatus !== 'success' && hasFiles ? 'Waiting for languages...' : 'Convert Selected';
+    }
+    
+    selectAllCheckbox.checked = hasFiles && selectedCount === fileStore.size;
+
+    const successfulCount = allItems.filter(item => item.status === 'success').length;
+    const selectedSuccessfulCount = allItems.filter(item => item.selected && item.status === 'success').length;
+
+    downloadSelectedBtn.classList.toggle('hidden', successfulCount === 0);
+
+    if (selectedSuccessfulCount > 0) {
+        downloadSelectedBtn.disabled = false;
+        downloadSelectedBtn.textContent = `Download ${selectedSuccessfulCount} Selected`;
+    } else {
+        downloadSelectedBtn.disabled = true;
+        downloadSelectedBtn.textContent = 'Download Selected';
+    }
+
+    const shouldShowBulkActions = selectedCount > 0 && languageFetchStatus === 'success';
+    bulkActionsBar.classList.toggle('hidden', !shouldShowBulkActions);
+    bulkActionsBar.classList.toggle('flex', shouldShowBulkActions);
+}
+
+function showGlobalError(message) {
+    globalError.innerHTML = message;
+    globalError.classList.remove('hidden');
+}
+
+function hideGlobalError() {
+    globalError.classList.add('hidden');
+}
+
+
+function handleClearAll() {
+    fileStore.forEach(item => {
+        if (item.downloadUrl) URL.revokeObjectURL(item.downloadUrl);
+    });
+    fileStore.clear();
+    languages = null;
+    languageFetchStatus = 'idle';
+    fileInput.value = '';
+    hideGlobalError();
+    processingArea.classList.add('hidden');
+    renderFileList();
+}
+
+function handleDownloadSelected() {
+    const itemsToDownload = Array.from(fileStore.values()).filter(item => item.selected && item.status === 'success');
+    if (itemsToDownload.length === 0) return;
+
+    itemsToDownload.forEach((item, index) => {
+        setTimeout(() => {
+            const link = document.createElement('a');
+            link.href = item.downloadUrl;
+            link.download = item.downloadName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }, index * 300);
+    });
+}
+
+async function handleConvertSelected() {
+    const selectedItems = Array.from(fileStore.values()).filter(item => item.selected);
+    if (selectedItems.length === 0) return;
+
+    reviewSection.classList.add('hidden');
+    uploadSection.classList.add('hidden');
+    processingArea.classList.remove('hidden');
+    
+    let processedCount = 0;
+    const totalToProcess = selectedItems.length;
+    updateOverallProgress(processedCount, totalToProcess);
+
+    for (const item of selectedItems) {
+        if (item.status === 'success') {
+            processedCount++;
+            updateOverallProgress(processedCount, totalToProcess);
+            continue;
+        }
+
+        if (item.status === 'error') {
+            item.status = 'pending';
+        }
+        
+        if (item.status === 'pending') {
+            const fileItemElement = document.getElementById(item.id);
+            const langSelect = fileItemElement.querySelector('.language-select');
+            const language = langSelect ? langSelect.value : 'eng';
+            
+            await processFile(item, language);
+        }
+        processedCount++;
+        updateOverallProgress(processedCount, totalToProcess);
+    }
+    
+    processingArea.classList.add('hidden');
+    if (fileStore.size > 0) {
+        reviewSection.classList.remove('hidden');
+    } else {
+        uploadSection.classList.remove('hidden');
+    }
+    updateUIState();
+}
+
+async function processFile(item, language) {
+    item.status = 'processing';
+    renderFileList(); 
+
+    const formData = new FormData();
+    formData.append('file', item.file);
+    formData.append('language', language);
+    
+    try {
+        const response = await fetch('/ocr', { method: 'POST', body: formData });
+
+        if (!response.ok) {
+            const rawText = await response.text(); // Read body once
+            let errorText;
+            try {
+                // Try to parse the text as JSON
+                const errorResult = JSON.parse(rawText);
+                errorText = errorResult.error || JSON.stringify(errorResult);
+            } catch (e) {
+                // If parsing fails, use the raw text
+                errorText = rawText.slice(0, 200) || `Failed with status: ${response.status}`;
+            }
+            throw new Error(errorText);
+        }
+        
+        const blob = await response.blob();
+        item.status = 'success';
+        item.downloadUrl = URL.createObjectURL(blob);
+        const disposition = response.headers.get('content-disposition');
+        if (disposition && disposition.indexOf('attachment') !== -1) {
+            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) {
+                item.downloadName = matches[1].replace(/['"]/g, '');
+            }
+        }
+        if (!item.downloadName) {
+            item.downloadName = item.file.name.replace(/\.pdf$/i, '_searchable.pdf');
+        }
+
+    } catch (error) {
+        console.error('OCR Error:', error);
+        item.status = 'error';
+        item.error = error.message || "Failed to fetch. Check network connection or server status.";
+    } finally {
+        renderFileList();
+    }
+}
+</script>
+</body>
+</html>
+
