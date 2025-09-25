@@ -1,0 +1,9 @@
+Flask>=3.0.0
+# Windows-only (optional, for native PPT->PDF):
+pywin32; platform_system == "Windows"
+
+# PDF -> PPT (image-based):
+PyMuPDF>=1.24.0
+python-pptx>=0.6.23
+gunicorn
+pythoncom
