@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced PDF Protector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip for creating ZIP files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .file-drop-area {
+            transition: all 0.3s ease;
+        }
+        .file-drop-area.dragover {
+            background-color: #e0f2fe;
+            border-color: #0284c7;
+        }
+        /* Toast Notification Styles */
+        #toast {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            transform: translateX(120%);
+            transition: transform 0.5s ease-in-out;
+            z-index: 50;
+        }
+        #toast.show {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="bg-green-600 text-white py-3 px-5 rounded-lg shadow-xl">
+        <p id="toast-message">Files protected successfully!</p>
+    </div>
+
+    <div class="container mx-auto p-4 md:p-8">
+        <div class="bg-white rounded-2xl shadow-lg p-8 md:p-12 w-full max-w-4xl mx-auto">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-slate-800">Batch PDF Protector</h1>
+                <p class="text-slate-500 mt-2">Upload multiple files, set individual passwords, and download them all.</p>
+            </div>
+
+            <!-- File Upload Area -->
+            <div>
+                <label for="pdf-file-input" class="block text-sm font-medium text-slate-700 mb-2">Upload PDFs</label>
+                <div id="file-drop-area" class="file-drop-area border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:bg-slate-50">
+                     <svg class="mx-auto h-12 w-12 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                         <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <p class="mt-4 text-slate-500"><span class="font-semibold text-sky-600">Click to upload</span> or drag and drop</p>
+                    <p class="text-sm text-slate-400">You can select multiple files</p>
+                    <input type="file" id="pdf-file-input" name="pdf" class="hidden" accept=".pdf" multiple>
+                </div>
+            </div>
+
+            <!-- File List and Actions -->
+            <div id="file-list-container" class="mt-8 space-y-4">
+                <!-- File items will be dynamically inserted here -->
+            </div>
+
+            <!-- Batch Action Buttons -->
+            <div id="batch-actions" class="mt-8 flex flex-col sm:flex-row gap-4 hidden">
+                <button id="protect-all-btn" class="w-full sm:w-auto bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors duration-300 flex items-center justify-center disabled:bg-slate-400">
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    Protect All
+                </button>
+                 <button id="download-zip-btn" class="w-full sm:w-auto bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300 flex items-center justify-center disabled:bg-slate-400" disabled>
+                    <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
+                    Download All (.zip)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('pdf-file-input');
+        const fileDropArea = document.getElementById('file-drop-area');
+        const fileListContainer = document.getElementById('file-list-container');
+        const batchActionsContainer = document.getElementById('batch-actions');
+        const protectAllBtn = document.getElementById('protect-all-btn');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+
+        let filesData = new Map(); // Store file objects, their protected data, and status
+
+        // --- File Upload Logic ---
+        fileDropArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            handleFiles(fileInput.files);
+            fileInput.value = ''; // Reset input to allow re-uploading the same file
+        });
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, () => fileDropArea.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, () => fileDropArea.classList.remove('dragover'), false);
+        });
+
+        fileDropArea.addEventListener('drop', (e) => {
+            handleFiles(e.dataTransfer.files);
+        }, false);
+
+        function handleFiles(files) {
+            for (const file of files) {
+                if (file.type === 'application/pdf' && !filesData.has(file.name)) {
+                    filesData.set(file.name, { 
+                        file: file, 
+                        protectedBlob: null, 
+                        status: 'unprotected' // Initial status
+                    });
+                }
+            }
+            renderFileList();
+        }
+
+        function renderFileList() {
+            fileListContainer.innerHTML = '';
+            if (filesData.size > 0) {
+                batchActionsContainer.classList.remove('hidden');
+            } else {
+                batchActionsContainer.classList.add('hidden');
+            }
+
+            let allReadyForZip = filesData.size > 0;
+            let canProtectAll = false;
+            let atLeastOneProtected = false; // New variable to track download readiness
+
+            filesData.forEach(data => {
+                if (data.status !== 'protected' && data.status !== 'already_protected') {
+                    allReadyForZip = false;
+                }
+                if (data.status === 'unprotected') canProtectAll = true;
+                if (data.status === 'protected') atLeastOneProtected = true; // Check if at least one is ready
+                fileListContainer.appendChild(createFileItemElement(data));
+            });
+            
+            downloadZipBtn.disabled = !atLeastOneProtected; // Update logic here
+            protectAllBtn.disabled = !canProtectAll;
+        }
+
+        function createFileItemElement(data) {
+            const file = data.file;
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item p-4 border rounded-lg flex flex-col md:flex-row items-center gap-4';
+            fileItem.dataset.filename = file.name;
+            
+            const isAlreadyProtected = data.status === 'already_protected';
+            const isProtected = data.status === 'protected';
+            const isUnprotected = data.status === 'unprotected';
+            
+            const filenameClass = isAlreadyProtected ? 'text-red-600 font-semibold' : 'text-slate-700';
+
+            fileItem.innerHTML = `
+                <div class="flex-grow w-full md:w-auto truncate min-w-0">
+                    <p class="font-medium truncate ${filenameClass}">${file.name}</p>
+                    <p class="text-sm text-slate-500">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+                
+                ${isProtected ? `
+                    <div class="w-full md:w-48 flex items-center justify-center">
+                        <p class="text-sm text-green-700 font-medium p-2 text-center bg-green-100 rounded-md">Successfully Protected</p>
+                    </div>
+                ` : `
+                    <div class="w-full md:w-48 relative">
+                        <input type="password" class="password-input w-full px-3 py-2 pr-10 rounded-md border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 ${isAlreadyProtected ? 'bg-slate-100 cursor-not-allowed' : ''}" placeholder="${isAlreadyProtected ? 'Already Protected' : 'Set Password'}" ${isAlreadyProtected ? 'disabled' : ''}>
+                        ${isUnprotected ? `
+                        <button type="button" class="toggle-password absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-700">
+                            <svg class="eye-open h-5 w-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            <svg class="eye-closed h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.24A9 9 0 0 1 12 3a9 9 0 0 1 9.7 6.09"></path><path d="m3.3 9 1.5 1.5"></path><path d="M2.07 12.5A12.33 12.33 0 0 0 1 12a13.33 13.33 0 0 0 2.22 3.5"></path><path d="M12 18a9 9 0 0 1-8.6-4.9"></path><path d="m21 15-1.5-1.5"></path><path d="M14.1 19.76a9 9 0 0 1-2.1.24 9 9 0 0 1-9.7-6.09"></path><path d="m21.93 11.5A12.33 12.33 0 0 1 23 12a13.33 13.33 0 0 1-2.22 3.5"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>
+                        </button>
+                        ` : ''}
+                    </div>
+                `}
+
+                <div class="flex items-center gap-2 w-full md:w-auto flex-shrink-0">
+                    <button class="protect-btn w-1/2 md:w-auto flex-1 text-white font-semibold py-2 px-4 rounded-lg transition-colors ${isUnprotected ? 'bg-sky-600 hover:bg-sky-700' : 'bg-slate-300 cursor-not-allowed'}" ${!isUnprotected ? 'disabled' : ''}>Protect</button>
+                    <button class="download-btn w-1/2 md:w-auto flex-1 text-white font-semibold py-2 px-4 rounded-lg transition-colors ${isProtected ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-300 cursor-not-allowed'}" ${!isProtected ? 'disabled' : ''}>Download</button>
+                    <button class="remove-btn p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </div>
+            `;
+
+            // Add event listeners based on status
+            if (isUnprotected) {
+                fileItem.querySelector('.protect-btn').addEventListener('click', (e) => {
+                    const password = fileItem.querySelector('.password-input').value;
+                    protectFile(data, password, e.currentTarget);
+                });
+                const toggleBtn = fileItem.querySelector('.toggle-password');
+                toggleBtn.addEventListener('click', (e) => {
+                    const passwordInput = fileItem.querySelector('.password-input');
+                    const eyeOpen = toggleBtn.querySelector('.eye-open');
+                    const eyeClosed = toggleBtn.querySelector('.eye-closed');
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        eyeOpen.classList.add('hidden');
+                        eyeClosed.classList.remove('hidden');
+                    } else {
+                        passwordInput.type = 'password';
+                        eyeOpen.classList.remove('hidden');
+                        eyeClosed.classList.add('hidden');
+                    }
+                });
+            }
+            if (isProtected) {
+                 fileItem.querySelector('.download-btn').addEventListener('click', () => {
+                    downloadBlob(data.protectedBlob, `protected-${file.name}`);
+                });
+            }
+
+            // Always add the remove button listener
+            fileItem.querySelector('.remove-btn').addEventListener('click', () => {
+                removeFile(file.name);
+            });
+            
+            return fileItem;
+        }
+        
+        // --- NEW: Remove File Logic ---
+        function removeFile(filename) {
+            if (filesData.has(filename)) {
+                filesData.delete(filename);
+                renderFileList();
+                showToast(`"${filename}" was removed.`, 'info');
+            }
+        }
+
+        // --- Protection Logic ---
+        async function protectFile(data, password, buttonElement) {
+            if (!password) {
+                showToast('Password cannot be empty.', 'error');
+                return;
+            }
+            if (!data.file) return;
+
+            buttonElement.textContent = '...';
+            buttonElement.disabled = true;
+
+            const formData = new FormData();
+            formData.append('pdf', data.file);
+            formData.append('password', password);
+
+            try {
+                const response = await fetch('/protect', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    data.protectedBlob = blob;
+                    data.status = 'protected'; // Update status
+                    showToast(`"${data.file.name}" protected!`, 'success');
+                } else if (response.status === 409) { // HTTP 409: Conflict for already protected
+                    data.status = 'already_protected'; // Update status
+                    await response.json(); // Consume the json body
+                    showToast(`"${data.file.name}" is already protected.`, 'info');
+                } else {
+                    const errorData = await response.json();
+                    showToast(`Error: ${errorData.error}`, 'error');
+                    // Reset the button on generic error
+                    buttonElement.textContent = 'Protect';
+                    buttonElement.disabled = false;
+                }
+            } catch (error) {
+                showToast(`Network error protecting ${data.file.name}.`, 'error');
+                 buttonElement.textContent = 'Protect';
+                 buttonElement.disabled = false;
+            } finally {
+                renderFileList(); // Re-render the whole list to reflect status changes
+            }
+        }
+        
+        // --- Batch Actions ---
+        protectAllBtn.addEventListener('click', async () => {
+            const promises = [];
+            document.querySelectorAll('.file-item').forEach(item => {
+                const filename = item.dataset.filename;
+                const data = filesData.get(filename);
+                if (data && data.status === 'unprotected') {
+                    const password = item.querySelector('.password-input').value;
+                    const button = item.querySelector('.protect-btn');
+                    promises.push(protectFile(data, password, button));
+                }
+            });
+            await Promise.all(promises);
+        });
+
+        downloadZipBtn.addEventListener('click', async () => {
+            const zip = new JSZip();
+            filesData.forEach(data => {
+                if(data.protectedBlob) {
+                    zip.file(`protected-${data.file.name}`, data.protectedBlob);
+                }
+            });
+
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                downloadBlob(content, 'protected_pdfs.zip');
+                showToast('ZIP download started!');
+            });
+        });
+
+        // --- Helpers ---
+        function downloadBlob(blob, filename) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+        }
+
+        function showToast(message, type = 'success') {
+            toastMessage.textContent = message;
+            const colors = {
+                success: 'bg-green-600',
+                error: 'bg-red-600',
+                info: 'bg-sky-600'
+            };
+            toast.className = `text-white py-3 px-5 rounded-lg shadow-xl ${colors[type] || 'bg-slate-800'}`;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 5000); // Duration is 5 seconds
+        }
+
+    </script>
+</body>
+</html>
+
+
