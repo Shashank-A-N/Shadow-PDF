@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Page Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drag-ghost {
+            opacity: 0.4;
+            background: #c8ebfb;
+        }
+        .page-item {
+            position: relative;
+            transition: transform 0.2s ease-in-out;
+            border-radius: 0.5rem;
+        }
+        .page-item:hover {
+            transform: translateY(-4px);
+        }
+        .page-action-btn {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            transform: scale(0.8);
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+        .page-item:hover .page-action-btn {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .delete-btn {
+            top: -12px;
+            right: -12px;
+            background-color: #ef4444;
+        }
+        .rotate-btn {
+            bottom: -12px;
+            left: -12px;
+            background-color: #3b82f6;
+        }
+        .copy-btn {
+            bottom: -12px;
+            right: -12px;
+            background-color: #f59e0b;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .file-bin-item {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: 2px solid transparent;
+        }
+        .file-bin-item.selected {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            transform: scale(1.05);
+        }
+        .canvas-wrapper {
+            transition: transform 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">PDF Page Remover</h1>
+            <p class="text-base sm:text-lg text-gray-600 mt-2">Upload, copy, rotate, rearrange, delete pages, and download your new PDF.</p>
+        </header>
+
+        <main>
+            <!-- Upload Area -->
+            <div id="upload-container" class="mb-8">
+                <div id="drop-zone" class="border-2 border-dashed border-gray-400 rounded-lg p-8 text-center bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input type="file" id="file-input" class="hidden" accept=".pdf" multiple>
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <p class="mt-4 text-lg text-gray-600">
+                        <span class="font-semibold text-blue-600">Click to upload</span> or drag and drop PDFs here
+                    </p>
+                    <p class="text-sm text-gray-500 mt-1">Combine multiple files by selecting or dropping them together.</p>
+                </div>
+            </div>
+
+            <!-- Global Controls -->
+            <div id="controls" class="hidden mb-6 flex flex-wrap items-center justify-center gap-4">
+                <button id="add-files-btn" class="bg-blue-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-blue-700 transition-all">Add More Files</button>
+                <button id="download-pdf-btn" class="bg-green-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-green-700 transition-all">Download Combined PDF</button>
+                <button id="download-zip-btn" class="bg-purple-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-purple-700 transition-all">Download Combined as ZIP</button>
+                <button id="download-separate-zip-btn" class="bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-indigo-700 transition-all">Download Separate Files (ZIP)</button>
+                <button id="reset-btn" class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg shadow-md hover:bg-red-700 transition-all">Reset</button>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="loader" class="hidden justify-center items-center flex-col">
+                <div class="loader"></div>
+                <p class="mt-4 text-gray-600">Processing your PDFs...</p>
+            </div>
+
+            <!-- Main Content Area -->
+            <div id="main-content-area" class="hidden">
+                <!-- File Bin -->
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Your Files</h2>
+                    <div id="file-bin" class="flex gap-4 p-4 bg-gray-200 rounded-lg overflow-x-auto">
+                        <!-- File bin items will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Editing Area -->
+                <div id="editing-area" class="hidden">
+                     <div id="editing-header" class="p-4 bg-white rounded-t-lg border-2 border-b-0 border-blue-500 flex justify-between items-center flex-wrap gap-4">
+                        <!-- Editing header content will be inserted here -->
+                    </div>
+                    <div id="editing-pages-container" class="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6 bg-white rounded-b-lg border-2 border-t-0 border-blue-500 min-h-[200px]">
+                        <!-- Pages of the selected file will be inserted here -->
+                    </div>
+                </div>
+                 <div id="editing-placeholder" class="text-center p-10 border-2 border-dashed rounded-lg">
+                    <p class="text-gray-500">Select a file from "Your Files" to start editing its pages.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        const { degrees, PageSizes } = PDFLib;
+
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const mainContentArea = document.getElementById('main-content-area');
+        const fileBin = document.getElementById('file-bin');
+        const editingArea = document.getElementById('editing-area');
+        const editingPlaceholder = document.getElementById('editing-placeholder');
+        const editingHeader = document.getElementById('editing-header');
+        const editingPagesContainer = document.getElementById('editing-pages-container');
+        const controls = document.getElementById('controls');
+        const uploadContainer = document.getElementById('upload-container');
+        const downloadPdfBtn = document.getElementById('download-pdf-btn');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+        const downloadSeparateZipBtn = document.getElementById('download-separate-zip-btn');
+        const addFilesBtn = document.getElementById('add-files-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const loader = document.getElementById('loader');
+
+        // App State
+        let filesData = {}; 
+        let pagesOrder = []; 
+        let fileCounter = 0;
+        let currentEditingFileId = null;
+        let sortableInstance = null;
+        let copiedPageData = null;
+
+        // Event Listeners
+        dropZone.addEventListener('click', () => fileInput.click());
+        addFilesBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, e => {
+            e.preventDefault();
+            e.stopPropagation();
+        }, false));
+        dropZone.addEventListener('dragenter', () => dropZone.classList.add('border-blue-500', 'bg-blue-50'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-blue-500', 'bg-blue-50'));
+        dropZone.addEventListener('drop', (e) => {
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+            handleFiles(e.dataTransfer.files);
+        });
+        resetBtn.addEventListener('click', resetApp);
+        downloadPdfBtn.addEventListener('click', generateCombinedPdf);
+        downloadZipBtn.addEventListener('click', generateCombinedZip);
+        downloadSeparateZipBtn.addEventListener('click', generateSeparateZip);
+
+        // Core Functions
+        async function handleFiles(files) {
+            const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+            if (pdfFiles.length === 0) return;
+
+            showLoader(true);
+            uploadContainer.classList.add('hidden');
+            
+            let firstNewFileId = null;
+            for (const file of pdfFiles) {
+                try {
+                    const fileId = `file-${fileCounter++}`;
+                    if (!firstNewFileId) firstNewFileId = fileId;
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdfjsDoc = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+                    const pdfLibDoc = await PDFLib.PDFDocument.load(arrayBuffer.slice(0));
+                    
+                    filesData[fileId] = { name: file.name, pdfLibDoc, pdfjsDoc };
+                    for (let i = 0; i < pdfjsDoc.numPages; i++) {
+                        const pageId = `page-${Date.now()}-${Math.random()}`;
+                        pagesOrder.push({ pageId, fileId, sourceFileId: fileId, originalPageIndex: i, rotation: 0, type: 'original' });
+                    }
+                } catch (error) {
+                    console.error("Error processing file:", file.name, error);
+                    alert(`Could not process ${file.name}. It might be corrupted or protected.`);
+                }
+            }
+            
+            if (!currentEditingFileId && firstNewFileId) {
+                currentEditingFileId = firstNewFileId;
+            }
+            
+            await renderAppLayout();
+            showLoader(false);
+            if(pagesOrder.length > 0) {
+                controls.classList.remove('hidden');
+                controls.classList.add('flex');
+                mainContentArea.classList.remove('hidden');
+            }
+        }
+
+        async function renderAppLayout() {
+            renderFileBin();
+            await renderEditor();
+        }
+
+        function renderFileBin() {
+            fileBin.innerHTML = '';
+            for(const fileId in filesData) {
+                const fileInfo = filesData[fileId];
+                const item = document.createElement('div');
+                item.className = 'file-bin-item flex-shrink-0 p-3 bg-white rounded-lg shadow w-48 text-center';
+                if(fileId === currentEditingFileId) {
+                    item.classList.add('selected');
+                }
+                item.onclick = () => {
+                    currentEditingFileId = fileId;
+                    renderAppLayout();
+                };
+
+                const icon = `<svg class="mx-auto h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>`;
+                item.innerHTML = `${icon}<p class="font-semibold text-sm text-gray-700 truncate mt-2">${fileInfo.name}</p>`;
+                fileBin.appendChild(item);
+            }
+        }
+        
+        async function renderEditor() {
+            if (!currentEditingFileId || !filesData[currentEditingFileId]) {
+                editingArea.classList.add('hidden');
+                editingPlaceholder.classList.remove('hidden');
+                return;
+            }
+
+            editingArea.classList.remove('hidden');
+            editingPlaceholder.classList.add('hidden');
+            
+            // Render Header
+            editingHeader.innerHTML = '';
+            const fileInfo = filesData[currentEditingFileId];
+            const fileNameEl = document.createElement('p');
+            fileNameEl.className = 'font-bold text-lg md:text-xl text-gray-800 truncate mr-auto';
+            fileNameEl.textContent = `Editing: ${fileInfo.name}`;
+
+            const headerButtons = document.createElement('div');
+            headerButtons.className = 'flex items-center gap-2 flex-shrink-0';
+
+            const addBlankBtn = document.createElement('button');
+            addBlankBtn.className = 'flex items-center gap-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold py-2 px-3 rounded-lg hover:bg-gray-100 transition-all whitespace-nowrap';
+            addBlankBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> <span class="hidden sm:inline">Add Blank</span>`;
+            addBlankBtn.onclick = addBlankPage;
+            
+            const pasteBtn = document.createElement('button');
+            pasteBtn.id = 'paste-btn';
+            pasteBtn.className = 'flex items-center gap-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold py-2 px-3 rounded-lg hover:bg-gray-100 transition-all whitespace-nowrap';
+            pasteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> <span class="hidden sm:inline">Paste</span>`;
+            pasteBtn.onclick = pastePage;
+            pasteBtn.style.display = copiedPageData ? 'flex' : 'none';
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'flex items-center gap-2 bg-blue-600 border border-blue-600 text-white text-sm font-semibold py-2 px-3 rounded-lg hover:bg-blue-700 transition-all whitespace-nowrap';
+            downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> <span class="hidden sm:inline">Download</span>`;
+            downloadBtn.onclick = () => generateSingleFilePdf(currentEditingFileId);
+
+            const deleteFileBtn = document.createElement('button');
+            deleteFileBtn.className = 'flex items-center gap-2 bg-transparent border border-red-500 text-red-500 text-sm font-semibold py-2 px-3 rounded-lg hover:bg-red-500 hover:text-white transition-all whitespace-nowrap';
+            deleteFileBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> <span class="hidden sm:inline">Delete</span>`;
+            deleteFileBtn.onclick = deleteCurrentFile;
+            
+            headerButtons.appendChild(addBlankBtn);
+            headerButtons.appendChild(pasteBtn);
+            headerButtons.appendChild(downloadBtn);
+            headerButtons.appendChild(deleteFileBtn);
+            editingHeader.appendChild(fileNameEl);
+            editingHeader.appendChild(headerButtons);
+
+            // Render Pages
+            editingPagesContainer.innerHTML = '';
+            const pagesInFile = pagesOrder.filter(p => p.fileId === currentEditingFileId);
+            for (const [index, pageData] of pagesInFile.entries()) {
+                await renderPageThumbnail(pageData, editingPagesContainer, index + 1);
+            }
+            
+            if (sortableInstance) sortableInstance.destroy();
+            sortableInstance = new Sortable(editingPagesContainer, {
+                animation: 150,
+                ghostClass: 'drag-ghost',
+                onEnd: handleEditorDragEnd,
+            });
+        }
+        
+        async function renderPageThumbnail(pageData, container, localPageNum) {
+            const pageItem = document.createElement('div');
+            pageItem.className = 'page-item bg-white p-2 rounded-lg shadow-md flex flex-col items-center';
+            pageItem.dataset.id = pageData.pageId;
+
+            const canvasWrapper = document.createElement('div');
+            canvasWrapper.className = 'canvas-wrapper w-full rounded-md overflow-hidden border border-gray-200';
+            canvasWrapper.style.transform = `rotate(${pageData.rotation}deg)`;
+            
+            const canvas = document.createElement('canvas');
+            canvasWrapper.appendChild(canvas);
+            
+            if (pageData.type === 'original') {
+                const fileInfo = filesData[pageData.sourceFileId];
+                const page = await fileInfo.pdfjsDoc.getPage(pageData.originalPageIndex + 1);
+                const scale = 1.5;
+                const viewport = page.getViewport({ scale });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            } else { // Blank page
+                const a4_ratio = 1.414;
+                canvas.width = 300;
+                canvas.height = 300 * a4_ratio;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            canvas.style.width = '100%';
+            canvas.style.height = 'auto';
+
+            const pageNumberEl = document.createElement('p');
+            pageNumberEl.className = 'page-number mt-2 font-medium text-sm text-gray-700';
+            pageNumberEl.textContent = `Page ${localPageNum}`;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'page-action-btn delete-btn';
+            deleteBtn.innerHTML = '&#x2715;';
+            deleteBtn.onclick = async (event) => {
+                const pageItemToRemove = event.target.closest('.page-item');
+                pagesOrder = pagesOrder.filter(p => p.pageId !== pageData.pageId);
+                if (pageItemToRemove) pageItemToRemove.remove();
+
+                if (pagesOrder.filter(p => p.fileId === currentEditingFileId).length === 0) {
+                    await deleteCurrentFile();
+                } else {
+                    updateEditorPageNumbers();
+                }
+                if (pagesOrder.length === 0) resetApp();
+            };
+            
+            const rotateBtn = document.createElement('button');
+            rotateBtn.className = 'page-action-btn rotate-btn';
+            rotateBtn.innerHTML = '&#x21bb;';
+            rotateBtn.onclick = () => {
+                const pageState = pagesOrder.find(p => p.pageId === pageData.pageId);
+                pageState.rotation = (pageState.rotation + 90) % 360;
+                canvasWrapper.style.transform = `rotate(${pageState.rotation}deg)`;
+            };
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'page-action-btn copy-btn';
+            copyBtn.innerHTML = '&#128203;'; // Clipboard emoji
+            copyBtn.onclick = () => {
+                copiedPageData = { ...pagesOrder.find(p => p.pageId === pageData.pageId) };
+                document.getElementById('paste-btn').style.display = 'flex';
+            };
+
+            pageItem.append(deleteBtn, rotateBtn, copyBtn, canvasWrapper, pageNumberEl);
+            container.appendChild(pageItem);
+        }
+
+        function updateEditorPageNumbers() {
+            editingPagesContainer.querySelectorAll('.page-item').forEach((item, index) => {
+                const pageNumEl = item.querySelector('.page-number');
+                if (pageNumEl) pageNumEl.textContent = `Page ${index + 1}`;
+            });
+        }
+
+        function handleEditorDragEnd() {
+            const newEditorPageOrderIds = Array.from(editingPagesContainer.querySelectorAll('.page-item')).map(item => item.dataset.id);
+            const otherPages = pagesOrder.filter(p => p.fileId !== currentEditingFileId);
+            const newEditorPages = newEditorPageOrderIds.map(id => pagesOrder.find(p => p.pageId === id));
+            pagesOrder = [...otherPages, ...newEditorPages];
+            updateEditorPageNumbers();
+        }
+
+        async function addBlankPage() {
+            const newPage = {
+                pageId: `page-${Date.now()}-${Math.random()}`,
+                fileId: currentEditingFileId,
+                originalPageIndex: -1, // Indicates it's not from a source PDF
+                rotation: 0,
+                type: 'blank'
+            };
+            pagesOrder.push(newPage);
+            await renderPageThumbnail(newPage, editingPagesContainer, editingPagesContainer.children.length + 1);
+        }
+
+        async function pastePage() {
+            if (!copiedPageData) return;
+            const newPage = {
+                ...copiedPageData,
+                pageId: `page-${Date.now()}-${Math.random()}`,
+                fileId: currentEditingFileId,
+            };
+            pagesOrder.push(newPage);
+            await renderPageThumbnail(newPage, editingPagesContainer, editingPagesContainer.children.length + 1);
+        }
+
+        async function deleteCurrentFile() {
+             if (!currentEditingFileId) return;
+            delete filesData[currentEditingFileId];
+            pagesOrder = pagesOrder.filter(p => p.fileId !== currentEditingFileId);
+            
+            const remainingFileIds = Object.keys(filesData);
+            currentEditingFileId = remainingFileIds.length > 0 ? remainingFileIds[0] : null;
+
+            if (pagesOrder.length === 0) {
+                resetApp();
+            } else {
+                await renderAppLayout();
+            }
+        }
+
+        async function applyPageChanges(newPdfDoc, pageRefs) {
+            for (const pageRef of pageRefs) {
+                let newPage;
+                if (pageRef.type === 'original') {
+                    const sourcePdf = filesData[pageRef.sourceFileId].pdfLibDoc;
+                    const [copiedPage] = await newPdfDoc.copyPages(sourcePdf, [pageRef.originalPageIndex]);
+                    newPage = newPdfDoc.addPage(copiedPage);
+                } else { // 'blank'
+                    newPage = newPdfDoc.addPage(PageSizes.A4);
+                }
+                
+                if (pageRef.rotation !== 0) newPage.setRotation(degrees(pageRef.rotation));
+            }
+        }
+        
+        async function generateCombinedPdf() {
+            if (pagesOrder.length === 0) return;
+            showLoader(true);
+            try {
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+                await applyPageChanges(newPdfDoc, pagesOrder);
+                downloadFile(await newPdfDoc.save(), 'combined.pdf', 'application/pdf');
+            } catch (error) { console.error("Failed to generate combined PDF:", error); } 
+            finally { showLoader(false); }
+        }
+        
+        async function generateCombinedZip() {
+            if (pagesOrder.length === 0) return;
+            showLoader(true);
+            try {
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+                await applyPageChanges(newPdfDoc, pagesOrder);
+                const zip = new JSZip();
+                zip.file("combined_document.pdf", await newPdfDoc.save());
+                downloadFile(await zip.generateAsync({ type: "blob" }), 'combined_pdf.zip', 'application/zip');
+            } catch (error) { console.error("Failed to generate combined ZIP:", error); }
+            finally { showLoader(false); }
+        }
+
+        async function generateSingleFilePdf(fileId) {
+            const pagesInFile = pagesOrder.filter(p => p.fileId === fileId);
+            if (pagesInFile.length === 0) return;
+            showLoader(true);
+            const fileName = filesData[fileId].name.replace('.pdf', '_modified.pdf');
+            try {
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+                await applyPageChanges(newPdfDoc, pagesInFile);
+                downloadFile(await newPdfDoc.save(), fileName, 'application/pdf');
+            } catch (error) { console.error("Failed to generate single PDF:", error); }
+            finally { showLoader(false); }
+        }
+
+        async function generateSeparateZip() {
+            if (pagesOrder.length === 0) return;
+            showLoader(true);
+            try {
+                const zip = new JSZip();
+                const pagesByFile = pagesOrder.reduce((acc, page) => {
+                    if (!acc[page.fileId]) acc[page.fileId] = [];
+                    acc[page.fileId].push(page);
+                    return acc;
+                }, {});
+
+                for (const fileId in pagesByFile) {
+                    const pagesInFile = pagesByFile[fileId];
+                    if (pagesInFile.length > 0) {
+                        const newPdfDoc = await PDFLib.PDFDocument.create();
+                        await applyPageChanges(newPdfDoc, pagesInFile);
+                        const fileName = filesData[fileId].name.replace('.pdf', '_modified.pdf');
+                        zip.file(fileName, await newPdfDoc.save());
+                    }
+                }
+                downloadFile(await zip.generateAsync({ type: "blob" }), 'separate_pdfs.zip', 'application/zip');
+            } catch (error) { console.error("Failed to generate separate ZIP:", error); }
+            finally { showLoader(false); }
+        }
+
+        function downloadFile(data, filename, type) {
+            const blob = new Blob([data], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function resetApp() {
+            filesData = {};
+            pagesOrder = [];
+            currentEditingFileId = null;
+            copiedPageData = null;
+            mainContentArea.classList.add('hidden');
+            controls.classList.add('hidden');
+            uploadContainer.classList.remove('hidden');
+            fileInput.value = '';
+        }
+
+        function showLoader(isLoading) {
+            loader.style.display = isLoading ? 'flex' : 'none';
+            if(isLoading) {
+                 controls.classList.add('hidden');
+                 mainContentArea.classList.add('hidden');
+            } else if (pagesOrder.length > 0) {
+                 controls.classList.remove('hidden');
+                 mainContentArea.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
+

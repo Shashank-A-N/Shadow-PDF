@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repair PDF File</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drop-zone {
+            border: 2px dashed #e2e8f0;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .drop-zone.drag-over {
+            background-color: #f7fafc;
+            border-color: #ef4444; /* Red-500 to match button */
+        }
+        .file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl mx-auto p-4 sm:p-6 md:p-8">
+        <div id="upload-container" class="text-center bg-white p-8 sm:p-10 md:p-12 rounded-xl shadow-md">
+            <!-- Header Section -->
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-3">Repair PDF file</h1>
+            <p class="text-gray-600 mb-8 max-w-md mx-auto">
+                Upload a corrupt PDF and we will try to fix it. Depending on how much the PDF is damaged we will be able to recover it partially or completely.
+            </p>
+
+            <!-- Drop Zone and Upload Button -->
+            <div id="drop-zone" class="drop-zone rounded-lg p-8 sm:p-10 text-center">
+                <input type="file" id="file-input" class="file-input" accept=".pdf">
+                <div class="flex items-center justify-center">
+                    <label for="file-input" id="select-local-file" class="bg-red-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-red-700 transition-colors duration-300 cursor-pointer">
+                        Select PDF file
+                    </label>
+                    <div class="ml-4 flex flex-col space-y-2">
+                         <button id="google-drive-btn" title="Upload from Google Drive" class="h-10 w-10 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
+                            <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600" fill="currentColor"><title>Google Drive</title><path d="M15.57 8.43L12 15.43L8.43 8.43H15.57M17.5 5H6.5L12 15L17.5 5Z M5.5 17L8.5 11.5L12 18.5L19.5 6.5L22.5 11.5L12 22.5L5.5 17Z M2.5 11.5L5.5 6.5L12 17.5L9.5 11.5H2.5Z"/></svg>
+                         </button>
+                         <button id="dropbox-btn" title="Upload from Dropbox" class="h-10 w-10 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
+                            <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600" fill="currentColor"><title>Dropbox</title><path d="M12.038.038L6.012 4.012.038 8.038l6.025 3.975 5.975-4.026-5.975-3.975L12.038.038zm0 8.025l-6.025 3.975 6.025 3.975 5.975-3.975-5.975-3.975zm-6.025 3.975L.038 8.038l6.025 3.975 5.975 4.026-6.025 3.975-5.975-4.026zm12.05 0l5.975-3.975-5.975-3.975-5.975 4.026 5.975 3.975zm-5.975 4.026l-5.975 3.975 6.025 3.975 5.975-3.975-5.975-4.026z"/></svg>
+                         </button>
+                    </div>
+                </div>
+                <p class="mt-4 text-gray-500">or drop PDF here</p>
+            </div>
+        </div>
+
+        <!-- Status/Result Container -->
+        <div id="status-container" class="hidden mt-8 text-center bg-white p-8 sm:p-10 rounded-xl shadow-md">
+            <div id="file-info" class="text-lg text-gray-700 mb-4"></div>
+            <div id="progress-bar" class="w-full bg-gray-200 rounded-full h-2.5 mb-4 hidden">
+                <div id="progress" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div id="status-message" class="font-semibold"></div>
+            <button id="repair-button" class="mt-6 bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700 transition-colors duration-300">
+                Repair File
+            </button>
+            <button id="try-again-button" class="hidden mt-6 bg-gray-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-gray-700 transition-colors duration-300">
+                Try Another File
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const uploadContainer = document.getElementById('upload-container');
+        const statusContainer = document.getElementById('status-container');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const selectLocalFileBtn = document.getElementById('select-local-file');
+        const googleDriveBtn = document.getElementById('google-drive-btn');
+        const dropboxBtn = document.getElementById('dropbox-btn');
+        const fileInfo = document.getElementById('file-info');
+        const repairButton = document.getElementById('repair-button');
+        const tryAgainButton = document.getElementById('try-again-button');
+        const progressBar = document.getElementById('progress-bar');
+        const progress = document.getElementById('progress');
+        const statusMessage = document.getElementById('status-message');
+
+        let selectedFile = null;
+
+        // --- Event Listeners for Upload Buttons ---
+        googleDriveBtn.addEventListener('click', () => fileInput.click());
+        dropboxBtn.addEventListener('click', () => fileInput.click());
+
+        // --- Drag and Drop Event Handlers ---
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+        });
+
+        dropZone.addEventListener('drop', e => handleFile(e.dataTransfer.files[0]), false);
+        fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+        function handleFile(file) {
+            if (file && file.type === "application/pdf") {
+                selectedFile = file;
+                fileInfo.innerHTML = `<strong class="font-semibold">${file.name}</strong>`;
+                showStatusView();
+            } else {
+                alert("Please select a valid PDF file.");
+                selectedFile = null;
+            }
+        }
+        
+        // --- UI State Management ---
+        function showUploadView() {
+            uploadContainer.classList.remove('hidden');
+            statusContainer.classList.add('hidden');
+            resetStatus();
+        }
+
+        function showStatusView() {
+            uploadContainer.classList.add('hidden');
+            statusContainer.classList.remove('hidden');
+        }
+
+        function resetStatus() {
+            selectedFile = null;
+            fileInput.value = '';
+            fileInfo.innerHTML = '';
+            statusMessage.textContent = '';
+            progressBar.classList.add('hidden');
+            progress.style.width = '0%';
+            repairButton.classList.remove('hidden');
+            repairButton.disabled = false;
+            repairButton.textContent = 'Repair File';
+            tryAgainButton.classList.add('hidden');
+        }
+
+        // --- Button Click Handlers ---
+        repairButton.addEventListener('click', handleRepair);
+        tryAgainButton.addEventListener('click', showUploadView);
+
+        // --- Real Repair Process (Communicates with Backend) ---
+        async function handleRepair() {
+            if (!selectedFile) return;
+
+            // 1. --- Update UI to "in-progress" state ---
+            repairButton.disabled = true;
+            repairButton.textContent = 'Uploading...';
+            progressBar.classList.remove('hidden');
+            progress.style.width = '0%';
+            statusMessage.textContent = 'Uploading file to server...';
+
+            // 2. --- Prepare data for sending ---
+            // FormData is the standard way to send files via fetch.
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                // 3. --- Send file to the backend ---
+                // We use fetch() to make a POST request to our Python server.
+                const response = await fetch('http://127.0.0.1:5000/repair', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                // Animate progress bar during "repair"
+                progress.style.width = '50%';
+                statusMessage.textContent = 'Server is repairing the file...';
+                
+                // 4. --- Handle the server's response ---
+                if (response.ok) {
+                    // If response is OK (status 200-299), the server sent the repaired file.
+                    progress.style.width = '100%';
+                    statusMessage.innerHTML = `<span class="text-green-600 font-bold">Success!</span> Your PDF has been repaired.`;
+                    
+                    // Get the file data as a "blob".
+                    const blob = await response.blob();
+                    // Create a temporary URL for the blob.
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    
+                    // Create a hidden link to trigger the download.
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = downloadUrl;
+                    a.download = `repaired_${selectedFile.name}`; // Set the download filename
+                    document.body.appendChild(a);
+                    a.click(); // Programmatically click the link to start the download
+                    
+                    // Clean up the temporary URL and link.
+                    window.URL.revokeObjectURL(downloadUrl);
+                    a.remove();
+
+                } else {
+                    // If the server returned an error (e.g., 400 or 500).
+                    const errorData = await response.json(); // Get the error message from the server
+                    throw new Error(errorData.error || 'An unknown error occurred.');
+                }
+
+            } catch (error) {
+                // Handle network errors or errors thrown from the server response.
+                console.error('Repair failed:', error);
+                statusMessage.innerHTML = `<span class="text-red-600 font-bold">Failed.</span> ${error.message}`;
+                progress.style.width = '0%';
+            } finally {
+                // 5. --- Finalize UI state ---
+                // This block runs whether the repair succeeded or failed.
+                repairButton.classList.add('hidden');
+                tryAgainButton.classList.remove('hidden');
+            }
+        }
+        // --- Event Listeners for Cloud Upload ---
+
+        // Google Drive Button
+        googleDriveBtn.addEventListener('click', async () => {
+            try {
+                // Ask our backend for the Google authentication URL
+                const response = await fetch('http://127.0.0.1:5000/auth/google');
+                const data = await response.json();
+                if (data.auth_url) {
+                    // Redirect the user to the Google sign-in page
+                    window.location.href = data.auth_url;
+                } else {
+                    throw new Error('Could not get authentication URL from server.');
+                }
+            } catch (error) {
+                alert(`Error connecting to Google Drive: ${error.message}`);
+            }
+        });
+
+        // Dropbox Button
+        dropboxBtn.addEventListener('click', async () => {
+            try {
+                // Ask our backend for the Dropbox authentication URL
+                const response = await fetch('http://127.0.0.1:5000/auth/dropbox');
+                const data = await response.json();
+                if (data.auth_url) {
+                    // Redirect the user to the Dropbox sign-in page
+                    window.location.href = data.auth_url;
+                } else {
+                    throw new Error('Could not get authentication URL from server.');
+                }
+            } catch (error) {
+                alert(`Error connecting to Dropbox: ${error.message}`);
+            }
+        });
+    </script>
+</body>
+</html>

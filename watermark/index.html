@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Watermark Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/downloadjs@1.4.7"></script>
+    <script src="https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom spinner */
+        .loader {
+            border: 5px solid #f1f5f9;
+            border-top: 5px solid #4f46e5;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #preview-container canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+        .layer-btn.selected {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+            font-weight: 600;
+        }
+        /* Disable number input spinner */
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type='number'] {
+            -moz-appearance: textfield;
+        }
+        .position-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            width: 80px;
+            height: 80px;
+        }
+        .position-cell {
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .position-cell:hover {
+            background-color: #e2e8f0;
+        }
+        .position-cell.selected .marker {
+            width: 12px;
+            height: 12px;
+            background-color: #4f46e5;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-indigo-900">PDF Watermark Tool</h1>
+            <p class="text-lg text-slate-600 mt-2">Stamp an image or text over your PDF in seconds. Choose the typography, transparency and position.</p>
+        </header>
+
+        <main class="bg-white rounded-lg shadow-xl p-6 md:p-8 min-h-[60vh]">
+            <!-- Upload View -->
+            <div id="upload-view" class="flex flex-col items-center justify-center h-full">
+                <div class="w-full max-w-2xl text-center">
+                    <h2 class="text-2xl font-semibold mb-4 text-slate-700">Start by uploading your PDF(s)</h2>
+                    <div class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-500 hover:bg-slate-50 transition" id="pdf-drop-zone">
+                        <input type="file" id="pdf-upload" class="hidden" accept="application/pdf" multiple>
+                        <p id="pdf-upload-text">Drag & drop your PDF files here, or click to select files.</p>
+                        <p id="pdf-file-name" class="font-medium text-indigo-600 mt-2"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editor View (Initially Hidden) -->
+            <div id="editor-view" class="hidden">
+                 <div class="flex flex-col lg:flex-row lg:space-x-8">
+                    <!-- Left Column (Preview) -->
+                    <div class="w-full lg:w-5/12 lg:sticky lg:top-8 self-start">
+                        <div id="preview-section" class="mb-6 lg:mb-0">
+                            <div class="flex justify-between items-center mb-3">
+                                <h2 class="text-2xl font-semibold text-slate-700">Live Preview</h2>
+                                <div class="flex items-center space-x-2">
+                                    <button id="zoom-out-btn" class="p-1 rounded-md hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed" title="Zoom Out">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6"></path></svg>
+                                    </button>
+                                    <button id="zoom-in-btn" class="p-1 rounded-md hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed" title="Zoom In">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM7 10h6m-3-3v6"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="preview-container" class="border-2 border-slate-300 rounded-lg overflow-hidden flex justify-center items-center bg-slate-200" style="min-height: 400px;">
+                                <canvas id="pdf-preview-canvas"></canvas>
+                            </div>
+                            <div class="flex items-center justify-center mt-2 space-x-4">
+                                <button id="prev-page-btn" class="px-3 py-1 rounded-md bg-slate-200 hover:bg-slate-300 transition disabled:opacity-50 disabled:cursor-not-allowed">&lt; Prev</button>
+                                <span id="page-indicator" class="text-sm font-medium text-slate-600">Page 1 of 1</span>
+                                <button id="next-page-btn" class="px-3 py-1 rounded-md bg-slate-200 hover:bg-slate-300 transition disabled:opacity-50 disabled:cursor-not-allowed">Next &gt;</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column (Controls) -->
+                    <div class="w-full lg:w-7/12">
+                         <!-- File List -->
+                        <div id="file-list-section" class="mb-6">
+                            <div class="flex justify-between items-center mb-3">
+                                <h2 class="text-2xl font-semibold text-slate-700">Your Files</h2>
+                                <button id="add-more-files-btn" class="px-3 py-1.5 text-sm font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition">+ Add More Files</button>
+                            </div>
+                            <div class="space-y-2 max-h-48 overflow-y-auto pr-2" id="file-list-container"></div>
+                            <div class="flex items-center space-x-2 mt-2">
+                                <input type="checkbox" id="select-all-files" class="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
+                                <label for="select-all-files" class="text-sm font-medium text-slate-700">Select All</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 1: Configure Watermark -->
+                        <div id="config-section" class="mb-6">
+                            <h2 class="text-2xl font-semibold mb-3 text-slate-700">Watermark Settings</h2>
+                            <div class="flex justify-center space-x-4 mb-6">
+                                <button id="text-watermark-btn" class="px-6 py-2 rounded-md font-semibold bg-indigo-600 text-white shadow">Text Watermark</button>
+                                <button id="image-watermark-btn" class="px-6 py-2 rounded-md font-semibold bg-slate-200 text-slate-700">Image Watermark</button>
+                            </div>
+                            <!-- Text Watermark Options -->
+                            <div id="text-options" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="watermark-text" class="block text-sm font-medium text-slate-700">Watermark Text</label>
+                                        <input type="text" id="watermark-text" class="config-input mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" value="Confidential">
+                                    </div>
+                                    <div>
+                                        <label for="font-family" class="block text-sm font-medium text-slate-700">Font Family & Style</label>
+                                        <select id="font-family" class="config-input mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <option>Helvetica</option>
+                                            <option>Helvetica-Bold</option>
+                                            <option>Helvetica-Oblique</option>
+                                            <option>Helvetica-BoldOblique</option>
+                                            <option>Times-Roman</option>
+                                            <option>Times-Bold</option>
+                                            <option>Times-Italic</option>
+                                            <option>Times-BoldItalic</option>
+                                            <option>Courier</option>
+                                            <option>Courier-Bold</option>
+                                            <option>Courier-Oblique</option>
+                                            <option>Courier-BoldOblique</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                         <label for="font-size" class="block text-sm font-medium text-slate-700">Font Size</label>
+                                        <input type="number" id="font-size" class="config-input mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" value="50">
+                                    </div>
+                                    <div>
+                                        <label for="font-color" class="block text-sm font-medium text-slate-700">Font Color</label>
+                                        <input type="color" id="font-color" class="config-input mt-1 block w-full h-10 rounded-md border-slate-300 shadow-sm" value="#888888">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Position</label>
+                                    <div class="flex items-center space-x-4 mt-1">
+                                        <div id="text-position-grid" class="position-grid"></div>
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="text-mosaic" class="config-input h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500">
+                                            <label for="text-mosaic" class="ml-2 block text-sm text-slate-900">Mosaic</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     <div>
+                                        <label for="text-opacity" class="block text-sm font-medium text-slate-700">Opacity</label>
+                                        <input type="range" id="text-opacity" min="0" max="1" step="0.1" value="0.5" class="config-input w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2">
+                                    </div>
+                                    <div>
+                                        <label for="text-rotation" class="block text-sm font-medium text-slate-700">Rotation (degrees)</label>
+                                        <input type="number" id="text-rotation" class="config-input mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" value="0">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Image Watermark Options -->
+                            <div id="image-options" class="hidden space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Watermark Image</label>
+                                    <div class="mt-1">
+                                        <input type="file" id="image-upload" class="config-input block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept="image/png, image/jpeg">
+                                    </div>
+                                    <p id="image-file-name" class="font-medium text-indigo-600 mt-2 text-sm"></p>
+                                </div>
+                                 <div>
+                                    <label class="block text-sm font-medium text-slate-700">Position</label>
+                                    <div class="flex items-center space-x-4 mt-1">
+                                        <div id="image-position-grid" class="position-grid"></div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                     <div>
+                                        <label for="image-scale" class="block text-sm font-medium text-slate-700">Scale</label>
+                                        <input type="range" id="image-scale" min="0.1" max="2" step="0.1" value="0.5" class="config-input w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2">
+                                    </div>
+                                     <div>
+                                        <label for="image-rotation" class="block text-sm font-medium text-slate-700">Rotation (degrees)</label>
+                                        <input type="number" id="image-rotation" class="config-input mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" value="0">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="image-opacity" class="block text-sm font-medium text-slate-700">Opacity</label>
+                                    <input type="range" id="image-opacity" min="0" max="1" step="0.1" value="0.5" class="config-input w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Step 2: Layer Position -->
+                        <div id="layer-section" class="mb-6">
+                            <h2 class="text-2xl font-semibold mb-3 text-slate-700">Layer Position</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <button id="layer-over-btn" class="layer-btn selected flex flex-col items-center justify-center p-4 border-2 rounded-lg transition">
+                                    <svg class="w-8 h-8 mb-2" viewBox="0 0 24 24" fill="currentColor"><path d="M3,3 L21,3 L21,21 L3,21 L3,3 Z M6,6 L18,6 L18,18 L6,18 L6,6 Z"></path><path d="M9,9 L15,9 L15,15 L9,15 L9,9 Z" fill-opacity="0.5"></path></svg>
+                                    <span>Over the PDF content</span>
+                                </button>
+                                <button id="layer-under-btn" class="layer-btn flex flex-col items-center justify-center p-4 border-2 rounded-lg transition text-slate-500">
+                                     <svg class="w-8 h-8 mb-2" viewBox="0 0 24 24" fill="currentColor"><path d="M9,9 L15,9 L15,15 L9,15 L9,9 Z" fill-opacity="0.5"></path><path d="M3,3 L21,3 L21,21 L3,21 L3,3 Z M6,6 L18,6 L18,18 L6,18 L6,6 Z"></path></svg>
+                                    <span>Below the PDF content</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Page Selection -->
+                        <div id="page-section" class="mb-6">
+                            <h2 class="text-2xl font-semibold mb-3 text-slate-700">Apply to Pages</h2>
+                             <div class="flex items-center space-x-2">
+                                <div class="flex-grow">
+                                    <label for="page-selection-input" class="text-sm font-medium text-slate-700">Enter pages and/or page ranges</label>
+                                    <input type="text" id="page-selection-input" class="w-full mt-1 rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g., 1, 3, 5-8">
+                                </div>
+                                <button id="apply-pages-btn" class="self-end px-4 py-2 mt-6 rounded-md bg-slate-600 text-white font-semibold hover:bg-slate-700 transition">Apply</button>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2">Leave blank to apply to all pages. Click Apply to update the preview.</p>
+                        </div>
+
+                        <!-- Step 4: Generate -->
+                        <div>
+                            <h2 class="text-2xl font-semibold mb-3 text-slate-700" id="generate-step-title">Generate PDF(s)</h2>
+                            <div class="flex flex-col md:flex-row gap-4">
+                                <button id="download-selected-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                    Download Selected (ZIP)
+                                </button>
+                                 <button id="download-all-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                    Download All (ZIP)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                <div class="bg-white p-8 rounded-lg shadow-xl text-center">
+                    <div class="loader mx-auto mb-4"></div>
+                    <p id="loading-text" class="text-lg font-medium">Processing...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { PDFDocument, rgb, StandardFonts, degrees, BlendMode } = PDFLib;
+        // Corrected worker source loading
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@2.16.105/build/pdf.worker.min.js`;
+        
+        // DOM Elements
+        const uploadView = document.getElementById('upload-view');
+        const editorView = document.getElementById('editor-view');
+        const pdfUpload = document.getElementById('pdf-upload');
+        const pdfDropZone = document.getElementById('pdf-drop-zone');
+        const pdfUploadText = document.getElementById('pdf-upload-text');
+        const pdfFileNameEl = document.getElementById('pdf-file-name');
+        const textWatermarkBtn = document.getElementById('text-watermark-btn');
+        const imageWatermarkBtn = document.getElementById('image-watermark-btn');
+        const textOptions = document.getElementById('text-options');
+        const imageOptions = document.getElementById('image-options');
+        const imageUpload = document.getElementById('image-upload');
+        const imageFileNameEl = document.getElementById('image-file-name');
+        const downloadSelectedBtn = document.getElementById('download-selected-btn');
+        const downloadAllBtn = document.getElementById('download-all-btn');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const previewSection = document.getElementById('preview-section');
+        const previewCanvas = document.getElementById('pdf-preview-canvas');
+        const allConfigInputs = document.querySelectorAll('.config-input');
+        const layerOverBtn = document.getElementById('layer-over-btn');
+        const layerUnderBtn = document.getElementById('layer-under-btn');
+        const prevPageBtn = document.getElementById('prev-page-btn');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        const pageIndicator = document.getElementById('page-indicator');
+        const zoomInBtn = document.getElementById('zoom-in-btn');
+        const zoomOutBtn = document.getElementById('zoom-out-btn');
+        const applyPagesBtn = document.getElementById('apply-pages-btn');
+        const textPositionGrid = document.getElementById('text-position-grid');
+        const imagePositionGrid = document.getElementById('image-position-grid');
+        const textMosaicCheckbox = document.getElementById('text-mosaic');
+        const fileListContainer = document.getElementById('file-list-container');
+        const selectAllFilesCheckbox = document.getElementById('select-all-files');
+        const addMoreFilesBtn = document.getElementById('add-more-files-btn');
+
+
+        // State variables
+        const pdfFiles = new Map();
+        const pdfDocInstances = new Map();
+        let imageFile = null;
+        let watermarkType = 'text';
+        let layerPosition = 'over';
+        let activePreviewId = null;
+        let currentPage = 1;
+        let currentScale = 1.5;
+        let textPosition = 'center';
+        let imagePosition = 'center';
+
+        // --- Initialization ---
+        function initialize() {
+            createPositionGrid(textPositionGrid, 'text');
+            createPositionGrid(imagePositionGrid, 'image');
+            setupEventListeners();
+        }
+
+        function createPositionGrid(gridContainer, type) {
+            gridContainer.innerHTML = '';
+            const positions = [
+                'top-left', 'top-center', 'top-right',
+                'middle-left', 'center', 'middle-right',
+                'bottom-left', 'bottom-center', 'bottom-right'
+            ];
+            positions.forEach(pos => {
+                const cell = document.createElement('div');
+                cell.className = 'position-cell';
+                cell.dataset.position = pos;
+                const marker = document.createElement('div');
+                marker.className = 'marker';
+                cell.appendChild(marker);
+                if (pos === (type === 'text' ? textPosition : imagePosition)) {
+                    cell.classList.add('selected');
+                }
+                gridContainer.appendChild(cell);
+            });
+        }
+        
+        function setupEventListeners() {
+            pdfDropZone.addEventListener('click', () => pdfUpload.click());
+            addMoreFilesBtn.addEventListener('click', () => pdfUpload.click());
+            pdfDropZone.addEventListener('dragover', (e) => { e.preventDefault(); pdfDropZone.classList.add('border-indigo-500', 'bg-slate-50'); });
+            pdfDropZone.addEventListener('dragleave', () => pdfDropZone.classList.remove('border-indigo-500', 'bg-slate-50'));
+            pdfDropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                pdfDropZone.classList.remove('border-indigo-500', 'bg-slate-50');
+                if (e.dataTransfer.files.length > 0) handlePdfFiles(e.dataTransfer.files);
+            });
+            pdfUpload.addEventListener('change', (e) => { if (e.target.files.length > 0) handlePdfFiles(e.target.files); });
+            
+            textWatermarkBtn.addEventListener('click', () => switchWatermarkType('text'));
+            imageWatermarkBtn.addEventListener('click', () => switchWatermarkType('image'));
+            
+            layerOverBtn.addEventListener('click', () => switchLayerPosition('over'));
+            layerUnderBtn.addEventListener('click', () => switchLayerPosition('under'));
+            
+            applyPagesBtn.addEventListener('click', () => renderPage(currentPage));
+
+            imageUpload.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    imageFile = e.target.files[0];
+                    imageFileNameEl.textContent = `Selected: ${imageFile.name}`;
+                    debouncedPreview(); 
+                }
+            });
+            
+            downloadSelectedBtn.addEventListener('click', () => handleDownload('selected'));
+            downloadAllBtn.addEventListener('click', () => handleDownload('all'));
+
+
+            allConfigInputs.forEach(input => {
+                 input.addEventListener('input', () => { if (activePreviewId) { debouncedPreview(); } });
+            });
+
+            prevPageBtn.addEventListener('click', () => {
+                if (currentPage > 1) { currentPage--; renderPage(currentPage); }
+            });
+
+            nextPageBtn.addEventListener('click', () => {
+                const activePdf = pdfDocInstances.get(activePreviewId);
+                if (activePdf && currentPage < activePdf.numPages) { currentPage++; renderPage(currentPage); }
+            });
+            
+            zoomInBtn.addEventListener('click', () => { currentScale += 0.2; renderPage(currentPage); });
+            zoomOutBtn.addEventListener('click', () => { if (currentScale > 0.3) { currentScale -= 0.2; renderPage(currentPage); } });
+
+            textPositionGrid.addEventListener('click', (e) => handlePositionSelection(e, 'text'));
+            imagePositionGrid.addEventListener('click', (e) => handlePositionSelection(e, 'image'));
+
+            textMosaicCheckbox.addEventListener('change', () => {
+                if (textMosaicCheckbox.checked) {
+                    const selectedCell = textPositionGrid.querySelector('.selected');
+                    if(selectedCell) selectedCell.classList.remove('selected');
+                } else if (!textPositionGrid.querySelector('.selected')) {
+                    textPositionGrid.querySelector('[data-position="center"]').classList.add('selected');
+                    textPosition = 'center';
+                }
+                debouncedPreview();
+            });
+
+            selectAllFilesCheckbox.addEventListener('change', (e) => {
+                document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+                    checkbox.checked = e.target.checked;
+                });
+            });
+        }
+
+        // --- Event Handlers & Helper Functions ---
+        function debounce(func, timeout = 300){
+          let timer;
+          return (...args) => { clearTimeout(timer); timer = setTimeout(() => { func.apply(this, args); }, timeout); };
+        }
+
+        function handlePositionSelection(event, type) {
+            const cell = event.target.closest('.position-cell');
+            if (!cell) return;
+            const position = cell.dataset.position;
+            const grid = type === 'text' ? textPositionGrid : imagePositionGrid;
+            if (type === 'text') {
+                textPosition = position;
+                textMosaicCheckbox.checked = false;
+            } else {
+                imagePosition = position;
+            }
+            grid.querySelector('.selected')?.classList.remove('selected');
+            cell.classList.add('selected');
+            debouncedPreview();
+        }
+
+        const debouncedPreview = debounce(() => renderPage(currentPage));
+
+        async function handlePdfFiles(files) {
+            loadingText.textContent = 'Loading your PDF(s)...';
+            loadingOverlay.classList.remove('hidden');
+            let firstNewFileId = null;
+            
+            for (const file of files) {
+                if (file.type === 'application/pdf') {
+                    const id = crypto.randomUUID();
+                    if (!firstNewFileId) firstNewFileId = id;
+                    pdfFiles.set(id, file);
+                }
+            }
+            
+            if (pdfFiles.size > 0) {
+                uploadView.classList.add('hidden');
+                editorView.classList.remove('hidden');
+                renderFileList();
+                if (!activePreviewId && firstNewFileId) {
+                    await setActivePreview(firstNewFileId);
+                }
+            }
+            loadingOverlay.classList.add('hidden');
+        }
+        
+        function renderFileList() {
+            fileListContainer.innerHTML = '';
+            if (pdfFiles.size === 0) return;
+            pdfFiles.forEach((file, id) => {
+                const li = document.createElement('div');
+                li.className = `flex items-center p-2 rounded-md cursor-pointer ${id === activePreviewId ? 'bg-indigo-100' : 'hover:bg-slate-100'}`;
+                li.dataset.id = id;
+                li.innerHTML = `
+                    <input type="checkbox" class="file-checkbox h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 mr-3" checked>
+                    <span class="file-name flex-grow truncate">${file.name}</span>
+                `;
+                li.querySelector('.file-name').addEventListener('click', () => setActivePreview(id));
+                fileListContainer.appendChild(li);
+            });
+        }
+
+        async function setActivePreview(id) {
+            if (activePreviewId === id) return;
+            activePreviewId = id;
+            currentPage = 1;
+            renderFileList(); // Re-render to highlight active file
+            await renderPage(1);
+        }
+        
+        function switchWatermarkType(type) {
+            watermarkType = type;
+            const isText = type === 'text';
+            textOptions.classList.toggle('hidden', !isText);
+            imageOptions.classList.toggle('hidden', isText);
+            textWatermarkBtn.classList.toggle('bg-indigo-600', isText); textWatermarkBtn.classList.toggle('text-white', isText); textWatermarkBtn.classList.toggle('bg-slate-200', !isText); textWatermarkBtn.classList.toggle('text-slate-700', !isText);
+            imageWatermarkBtn.classList.toggle('bg-indigo-600', !isText); imageWatermarkBtn.classList.toggle('text-white', !isText); imageWatermarkBtn.classList.toggle('bg-slate-200', isText); imageWatermarkBtn.classList.toggle('text-slate-700', isText);
+            if (activePreviewId) debouncedPreview();
+        }
+
+        function switchLayerPosition(position) {
+            layerPosition = position;
+            const isOver = position === 'over';
+            layerOverBtn.classList.toggle('selected', isOver);
+            layerOverBtn.classList.toggle('text-slate-500', !isOver);
+            layerUnderBtn.classList.toggle('selected', !isOver);
+            layerUnderBtn.classList.toggle('text-slate-500', isOver);
+        }
+
+        function hexToRgb(hex) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return { r, g, b };
+        }
+        
+        // --- Core Logic ---
+        async function renderPage(pageNumber) {
+            if (!activePreviewId) return;
+
+            if (!pdfDocInstances.has(activePreviewId)) {
+                const file = pdfFiles.get(activePreviewId);
+                const typedarray = new Uint8Array(await file.arrayBuffer());
+                pdfDocInstances.set(activePreviewId, await pdfjsLib.getDocument(typedarray).promise);
+            }
+            const pdfDoc = pdfDocInstances.get(activePreviewId);
+
+            const pagesToWatermark = parsePageSelection(pdfDoc.numPages);
+            const shouldDrawWatermark = pagesToWatermark.includes(pageNumber - 1);
+
+            if (watermarkType === 'image' && !imageFile && shouldDrawWatermark) {
+                 const page = await pdfDoc.getPage(pageNumber);
+                 const viewport = page.getViewport({ scale: currentScale });
+                 const context = previewCanvas.getContext('2d');
+                 previewCanvas.height = viewport.height;
+                 previewCanvas.width = viewport.width;
+                 await page.render({ canvasContext: context, viewport: viewport }).promise;
+                 updatePaginationControls();
+                 return;
+            }
+
+            try {
+                const page = await pdfDoc.getPage(pageNumber);
+                const viewport = page.getViewport({ scale: currentScale });
+                const context = previewCanvas.getContext('2d');
+                previewCanvas.height = viewport.height;
+                previewCanvas.width = viewport.width;
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                if (shouldDrawWatermark) {
+                    if (watermarkType === 'text') {
+                        drawTextWatermarkOnCanvas(context);
+                    } else if (imageFile) {
+                        await drawImageWatermarkOnCanvas(context);
+                    }
+                }
+                updatePaginationControls();
+
+            } catch (error) {
+                console.error('Error rendering page:', error);
+            }
+        }
+        
+        function updatePaginationControls() {
+            const pdfDoc = pdfDocInstances.get(activePreviewId);
+            const total = pdfDoc ? pdfDoc.numPages : 0;
+            pageIndicator.textContent = `Page ${currentPage} of ${total}`;
+            prevPageBtn.disabled = currentPage <= 1;
+            nextPageBtn.disabled = currentPage >= total;
+            zoomOutBtn.disabled = currentScale <= 0.3;
+        }
+
+        function drawTextWatermarkOnCanvas(ctx) {
+            const fontFamilyValue = document.getElementById('font-family').value;
+            const fontWeight = fontFamilyValue.includes('Bold') ? 'bold' : 'normal';
+            const fontStyle = fontFamilyValue.includes('Oblique') || fontFamilyValue.includes('Italic') ? 'italic' : 'normal';
+            let fontName = fontFamilyValue.split('-')[0].replace('Times', 'Times New Roman');
+            const fontSize = parseInt(document.getElementById('font-size').value, 10) * currentScale;
+
+            ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontName}`;
+
+            const text = document.getElementById('watermark-text').value;
+            const fontColorHex = document.getElementById('font-color').value;
+            const opacity = parseFloat(document.getElementById('text-opacity').value);
+            const rotation = parseInt(document.getElementById('text-rotation').value, 10);
+            const { r, g, b } = hexToRgb(fontColorHex);
+
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const textMetrics = ctx.measureText(text);
+            const textWidth = textMetrics.width;
+            const textHeight = fontSize;
+            const { width, height } = ctx.canvas;
+
+            if (textMosaicCheckbox.checked) {
+                ctx.save();
+                ctx.translate(width / 2, height / 2);
+                ctx.rotate(-30 * Math.PI / 180);
+                for (let y = -height * 1.5; y < height * 1.5; y += textHeight * 4) {
+                    for (let x = -width * 1.5; x < width * 1.5; x += textWidth * 1.5) {
+                        ctx.fillText(text, x, y);
+                    }
+                }
+                ctx.restore();
+            } else {
+                let { x, y } = getCoordinates(textPosition, width, height, textWidth, textHeight);
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rotation * Math.PI / 180);
+                ctx.fillText(text, 0, 0);
+                ctx.restore();
+            }
+        }
+
+        async function drawImageWatermarkOnCanvas(ctx) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const opacity = parseFloat(document.getElementById('image-opacity').value);
+                    const scale = parseFloat(document.getElementById('image-scale').value);
+                    const rotation = parseInt(document.getElementById('image-rotation').value, 10);
+                    const { width, height } = ctx.canvas;
+                    const imgWidth = (img.width * scale) * currentScale;
+                    const imgHeight = (img.height * scale) * currentScale;
+                    
+                    let {x, y} = getCoordinates(imagePosition, width, height, imgWidth, imgHeight);
+
+                    ctx.save();
+                    ctx.globalAlpha = opacity;
+                    ctx.translate(x, y);
+                    ctx.rotate(rotation * Math.PI / 180);
+                    ctx.drawImage(img, -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight);
+                    ctx.restore();
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = URL.createObjectURL(imageFile);
+            });
+        }
+
+        async function handleDownload(type) {
+            if (watermarkType === 'image' && !imageFile) { alert('Please upload an image file for the watermark!'); return; }
+            
+            const selectedFiles = [];
+            if (type === 'all') {
+                pdfFiles.forEach((file, id) => selectedFiles.push({file, id}));
+            } else {
+                document.querySelectorAll('.file-checkbox:checked').forEach(checkbox => {
+                    const id = checkbox.closest('[data-id]').dataset.id;
+                    selectedFiles.push({ file: pdfFiles.get(id), id });
+                });
+            }
+
+            if (selectedFiles.length === 0) {
+                alert('Please select at least one file to download.');
+                return;
+            }
+
+            loadingText.textContent = 'Processing your PDF(s)...';
+            loadingOverlay.classList.remove('hidden');
+
+            try {
+                const zip = new JSZip();
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const { file } = selectedFiles[i];
+                    loadingText.textContent = `Processing ${i + 1} of ${selectedFiles.length}: ${file.name}`;
+                    const watermarkedPdfBytes = await applyWatermarkToSinglePdf(file);
+                    zip.file(`watermarked-${file.name}`, watermarkedPdfBytes);
+                }
+                
+                const zipBlob = await zip.generateAsync({type:"blob"});
+                download(zipBlob, "watermarked-files.zip", "application/zip");
+
+            } catch (error) {
+                console.error('Error applying watermark:', error);
+                alert('An error occurred while processing the PDFs.');
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        async function applyWatermarkToSinglePdf(file) {
+            const pdfDoc = await PDFDocument.load(await file.arrayBuffer());
+            const pagesToWatermarkIndexes = parsePageSelection(pdfDoc.getPageCount());
+            const pages = pdfDoc.getPages();
+            
+            const blendMode = layerPosition === 'under' ? BlendMode.Multiply : BlendMode.Normal;
+            const pagesToApply = pagesToWatermarkIndexes.map(index => pages[index]);
+
+            if (watermarkType === 'text') {
+                await applyTextWatermark(pagesToApply, pdfDoc, blendMode);
+            } else {
+                await applyImageWatermark(pagesToApply, pdfDoc, blendMode);
+            }
+            return pdfDoc.save();
+        }
+
+        function parsePageSelection(totalPagesForFile) {
+            const input = document.getElementById('page-selection-input').value.trim();
+            if (!input) {
+                return Array.from({length: totalPagesForFile}, (_, i) => i);
+            }
+            const pages = new Set();
+            const parts = input.split(',');
+            for (const part of parts) {
+                if (part.includes('-')) {
+                    const [start, end] = part.split('-').map(num => parseInt(num.trim(), 10));
+                    if (!isNaN(start) && !isNaN(end) && start <= end) {
+                        for (let i = start; i <= end; i++) {
+                             if (i > 0 && i <= totalPagesForFile) pages.add(i - 1);
+                        }
+                    }
+                } else {
+                    const pageNum = parseInt(part.trim(), 10);
+                    if (!isNaN(pageNum) && pageNum > 0 && pageNum <= totalPagesForFile) {
+                        pages.add(pageNum - 1);
+                    }
+                }
+            }
+            return Array.from(pages);
+        }
+
+        function getCoordinates(position, containerWidth, containerHeight, elWidth, elHeight) {
+            let x, y;
+            const padding = 20;
+            switch(position) {
+                // Top row
+                case 'top-left': x = padding + elWidth / 2; y = padding + elHeight / 2; break;
+                case 'top-center': x = containerWidth / 2; y = padding + elHeight / 2; break;
+                case 'top-right': x = containerWidth - elWidth / 2 - padding; y = padding + elHeight / 2; break;
+                // Middle row
+                case 'middle-left': x = padding + elWidth / 2; y = containerHeight / 2; break;
+                case 'center': x = containerWidth / 2; y = containerHeight / 2; break;
+                case 'middle-right': x = containerWidth - elWidth / 2 - padding; y = containerHeight / 2; break;
+                // Bottom row
+                case 'bottom-left': x = padding + elWidth / 2; y = containerHeight - elHeight / 2 - padding; break;
+                case 'bottom-center': x = containerWidth / 2; y = containerHeight - elHeight / 2 - padding; break;
+                case 'bottom-right': x = containerWidth - elWidth / 2 - padding; y = containerHeight - elHeight / 2 - padding; break;
+                default: x = containerWidth / 2; y = containerHeight / 2; break;
+            }
+            return { x, y };
+        }
+        
+        function getPdfLibCoordinates(position, containerWidth, containerHeight, elWidth, elHeight) {
+             let x, y;
+            const padding = 20;
+            switch(position) {
+                // Top row
+                case 'top-left': x = padding; y = containerHeight - elHeight - padding; break;
+                case 'top-center': x = (containerWidth - elWidth) / 2; y = containerHeight - elHeight - padding; break;
+                case 'top-right': x = containerWidth - elWidth - padding; y = containerHeight - elHeight - padding; break;
+                // Middle row
+                case 'middle-left': x = padding; y = (containerHeight - elHeight) / 2; break;
+                case 'center': x = (containerWidth - elWidth) / 2; y = (containerHeight - elHeight) / 2; break;
+                case 'middle-right': x = containerWidth - elWidth - padding; y = (containerHeight - elHeight) / 2; break;
+                // Bottom row
+                case 'bottom-left': x = padding; y = padding; break;
+                case 'bottom-center': x = (containerWidth - elWidth) / 2; y = padding; break;
+                case 'bottom-right': x = containerWidth - elWidth - padding; y = padding; break;
+                default: x = (containerWidth - elWidth) / 2; y = (containerHeight - elHeight) / 2; break;
+            }
+            return { x, y };
+        }
+
+        async function applyTextWatermark(pages, pdfDoc, blendMode = BlendMode.Normal) {
+            const fontMap = {
+                'Helvetica': StandardFonts.Helvetica,
+                'Helvetica-Bold': StandardFonts.HelveticaBold,
+                'Helvetica-Oblique': StandardFonts.HelveticaOblique,
+                'Helvetica-BoldOblique': StandardFonts.HelveticaBoldOblique,
+                'Times-Roman': StandardFonts.TimesRoman,
+                'Times-Bold': StandardFonts.TimesRomanBold,
+                'Times-Italic': StandardFonts.TimesRomanItalic,
+                'Times-BoldItalic': StandardFonts.TimesRomanBoldItalic,
+                'Courier': StandardFonts.Courier,
+                'Courier-Bold': StandardFonts.CourierBold,
+                'Courier-Oblique': StandardFonts.CourierOblique,
+                'Courier-BoldOblique': StandardFonts.CourierBoldOblique,
+            };
+
+            const text = document.getElementById('watermark-text').value;
+            const fontFamilyValue = document.getElementById('font-family').value;
+            const fontSize = parseInt(document.getElementById('font-size').value, 10);
+            const fontColorHex = document.getElementById('font-color').value;
+            const opacity = parseFloat(document.getElementById('text-opacity').value);
+            const rotation = parseInt(document.getElementById('text-rotation').value, 10);
+            
+            const font = await pdfDoc.embedFont(fontMap[fontFamilyValue] || StandardFonts.Helvetica);
+            const { r, g, b } = hexToRgb(fontColorHex);
+            const color = rgb(r / 255, g / 255, b / 255);
+
+            const textWidth = font.widthOfTextAtSize(text, fontSize);
+            const textHeight = font.heightAtSize(fontSize);
+
+            for (const page of pages) {
+                const { width, height } = page.getSize();
+                if (textMosaicCheckbox.checked) {
+                    for (let y = -height; y < height * 2; y += textHeight * 4) {
+                        for (let x = -width; x < width * 2; x += textWidth * 1.5) {
+                             page.drawText(text, { x, y, font, size: fontSize, color, opacity, rotate: degrees(30), blendMode });
+                        }
+                    }
+                } else {
+                    let {x, y} = getPdfLibCoordinates(textPosition, width, height, textWidth, textHeight);
+                    page.drawText(text, { x, y, font, size: fontSize, color, opacity, rotate: degrees(rotation), blendMode });
+                }
+            }
+        }
+
+        async function applyImageWatermark(pages, pdfDoc, blendMode = BlendMode.Normal) {
+            if (!imageFile) return;
+            const imageBytes = await imageFile.arrayBuffer();
+            const watermarkImage = await (imageFile.type === 'image/png' ? pdfDoc.embedPng(imageBytes) : pdfDoc.embedJpg(imageBytes));
+            
+            const opacity = parseFloat(document.getElementById('image-opacity').value);
+            const scale = parseFloat(document.getElementById('image-scale').value);
+            const rotationDegrees = parseInt(document.getElementById('image-rotation').value, 10);
+            const watermarkDims = watermarkImage.scale(scale);
+
+            for (const page of pages) {
+                 const { width, height } = page.getSize();
+                 const { x, y } = getPdfLibCoordinates(imagePosition, width, height, watermarkDims.width, watermarkDims.height);
+                 
+                 const centerX = x + watermarkDims.width / 2;
+                 const centerY = y + watermarkDims.height / 2;
+                
+                 page.saveGraphicsState();
+                 page.translate(centerX, centerY);
+                 page.rotate(degrees(rotationDegrees));
+                 page.translate(-centerX, -centerY);
+                 page.drawImage(watermarkImage, {
+                    x: x,
+                    y: y,
+                    width: watermarkDims.width,
+                    height: watermarkDims.height,
+                    opacity: opacity,
+                    blendMode: blendMode,
+                 });
+                 page.restoreGraphicsState();
+            }
+        }
+        
+        initialize();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q&A with Document</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for answer box */
+        #answer-box::-webkit-scrollbar {
+            width: 8px;
+        }
+        #answer-box::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        #answer-box::-webkit-scrollbar-thumb {
+            background-color: #94a3b8;
+            border-radius: 10px;
+            border: 3px solid #f1f5f9;
+        }
+        .gemini-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .gemini-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="bg-white shadow-2xl rounded-2xl p-6 sm:p-8">
+            <header class="text-center mb-8">
+                <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Q&A with Document</h1>
+                <p class="mt-2 text-slate-500">Upload a PDF and get intelligent answers, summaries, and suggested questions instantly.</p>
+            </header>
+
+            <!-- Step 1: PDF Upload -->
+            <div class="mb-6">
+                <label for="pdf-upload" class="block text-lg font-semibold text-slate-700 mb-2">1. Upload your PDF</label>
+                <div class="flex items-center justify-center w-full">
+                    <label for="pdf-upload-input" class="flex flex-col items-center justify-center w-full h-40 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <svg class="w-10 h-10 mb-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h10a4 4 0 014 4v6a4 4 0 01-4 4H7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 16v2a2 2 0 01-2 2H10a2 2 0 01-2-2v-2m-4-4h16"></path></svg>
+                            <p id="upload-text" class="mb-2 text-sm text-slate-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p class="text-xs text-slate-500">PDF (MAX. 5MB)</p>
+                        </div>
+                        <input id="pdf-upload-input" type="file" class="hidden" accept="application/pdf" />
+                    </label>
+                </div>
+                 <p id="file-status" class="mt-2 text-sm text-center text-slate-600 h-5"></p>
+            </div>
+
+            <!-- Gemini Features -->
+            <div id="gemini-features" class="mb-6 space-y-3 sm:space-y-0 sm:flex sm:space-x-4 hidden">
+                <button id="summarize-button" class="gemini-button w-full sm:w-1/2 flex items-center justify-center px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                    ✨ Summarize Document
+                </button>
+                <button id="suggest-questions-button" class="gemini-button w-full sm:w-1/2 flex items-center justify-center px-4 py-2.5 bg-teal-500 text-white font-semibold rounded-lg shadow-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                    ✨ Suggest Questions
+                </button>
+            </div>
+
+            <!-- Suggested Questions Display -->
+            <div id="suggested-questions-container" class="mb-6 hidden">
+                 <h3 class="text-md font-semibold text-slate-600 mb-2">Suggested Questions:</h3>
+                 <div id="suggested-questions-list" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Step 2: Ask Question -->
+            <div class="mb-6">
+                <label for="question-input" class="block text-lg font-semibold text-slate-700 mb-2">2. Ask a question</label>
+                <div class="relative">
+                    <input type="text" id="question-input" class="w-full p-4 pr-12 text-slate-700 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g., What is the main conclusion?">
+                    <button id="ask-button" class="absolute inset-y-0 right-0 flex items-center px-4 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors">
+                        Ask
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Get Answer -->
+            <div>
+                <label for="answer-box" class="block text-lg font-semibold text-slate-700 mb-2">3. Answer</label>
+                <div id="answer-container" class="relative w-full p-4 bg-slate-50 border border-slate-200 rounded-lg min-h-[150px]">
+                    <div id="answer-box" class="prose prose-slate max-w-none h-full max-h-60 overflow-y-auto text-slate-600">
+                        <p id="answer-placeholder">Your answer will appear here...</p>
+                    </div>
+                    <div id="loader" class="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center rounded-lg hidden">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-4 h-4 rounded-full bg-blue-600 animate-bounce" style="animation-delay: -0.3s;"></div>
+                            <div class="w-4 h-4 rounded-full bg-blue-600 animate-bounce" style="animation-delay: -0.15s;"></div>
+                            <div class="w-4 h-4 rounded-full bg-blue-600 animate-bounce"></div>
+                            <span class="ml-2 text-slate-600">Analyzing document...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <div id="error-message" class="mt-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded-lg hidden"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Set the workerSrc for pdf.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+        // --- DOM Elements ---
+        const fileInput = document.getElementById('pdf-upload-input');
+        const uploadText = document.getElementById('upload-text');
+        const fileStatus = document.getElementById('file-status');
+        const questionInput = document.getElementById('question-input');
+        const askButton = document.getElementById('ask-button');
+        const answerBox = document.getElementById('answer-box');
+        const answerPlaceholder = document.getElementById('answer-placeholder');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('error-message');
+        const geminiFeatures = document.getElementById('gemini-features');
+        const summarizeButton = document.getElementById('summarize-button');
+        const suggestQuestionsButton = document.getElementById('suggest-questions-button');
+        const suggestedQuestionsContainer = document.getElementById('suggested-questions-container');
+        const suggestedQuestionsList = document.getElementById('suggested-questions-list');
+
+        let documentText = '';
+
+        // --- Event Listeners ---
+        fileInput.addEventListener('change', handleFileSelect);
+        askButton.addEventListener('click', handleQuestionSubmit);
+        summarizeButton.addEventListener('click', handleSummaryClick);
+        suggestQuestionsButton.addEventListener('click', handleSuggestQuestionsClick);
+        questionInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                handleQuestionSubmit();
+            }
+        });
+
+        // --- Functions ---
+
+        /**
+         * Handles the selection of a PDF file.
+         * Reads the file, extracts text, and updates the UI to enable features.
+         */
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                showError('Please select a valid PDF file.');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                showError('File size exceeds 5MB. Please upload a smaller PDF.');
+                return;
+            }
+
+            hideError();
+            resetUI();
+            fileStatus.textContent = `Processing "${file.name}"...`;
+            uploadText.textContent = `"${file.name}"`;
+            
+            try {
+                const pdfText = await extractTextFromPdf(file);
+                documentText = pdfText;
+                fileStatus.textContent = `✅ Ready to analyze "${file.name}"`;
+                geminiFeatures.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error parsing PDF:', error);
+                showError('Could not read the document. It might be corrupted or image-based.');
+                fileStatus.textContent = 'Processing failed.';
+                uploadText.textContent = 'Click to upload';
+            }
+        }
+
+        /**
+         * Extracts text content from a PDF file using pdf.js.
+         * @param {File} file - The PDF file object.
+         * @returns {Promise<string>} A promise that resolves with the extracted text.
+         */
+        async function extractTextFromPdf(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n\n';
+            }
+            return fullText;
+        }
+
+        /**
+         * Handles the submission of a user's question.
+         */
+        async function handleQuestionSubmit() {
+            const question = questionInput.value.trim();
+            if (!validateInputs(question)) return;
+
+            const prompt = `Based on the following document, please provide a clear and concise answer to the question. If the answer is not found in the document, state that the information is not available.
+
+            Document:
+            ---
+            ${documentText}
+            ---
+
+            Question: ${question}`;
+            
+            await generateResponse(prompt);
+        }
+
+        /**
+         * Handles the "Summarize Document" button click.
+         */
+        async function handleSummaryClick() {
+            if (!validateInputs()) return;
+
+            const prompt = `Please provide a concise summary of the following document. Focus on the key points, main arguments, and conclusions.
+
+            Document:
+            ---
+            ${documentText}
+            ---
+            
+            Summary:`;
+            
+            await generateResponse(prompt);
+        }
+
+        /**
+         * Handles the "Suggest Questions" button click.
+         */
+        async function handleSuggestQuestionsClick() {
+            if (!validateInputs()) return;
+
+            const prompt = `Based on the following document, generate 3-4 insightful questions that a user might want to ask to understand the core topics.
+
+            Document:
+            ---
+            ${documentText}
+            ---`;
+
+            await generateSuggestedQuestions(prompt);
+        }
+        
+        /**
+         * Generic function to generate a text response from Gemini.
+         * @param {string} prompt - The prompt for the Gemini API.
+         */
+        async function generateResponse(prompt) {
+            startLoading('Analyzing document...');
+            try {
+                const answer = await callGemini(prompt);
+                displayAnswer(answer);
+            } catch (error) {
+                handleApiError(error, 'Sorry, an error occurred while generating the response.');
+            } finally {
+                stopLoading();
+            }
+        }
+        
+        /**
+         * Generates and displays suggested questions from Gemini.
+         * @param {string} prompt - The prompt for the Gemini API.
+         */
+        async function generateSuggestedQuestions(prompt) {
+            startLoading('Generating questions...');
+            suggestedQuestionsContainer.classList.add('hidden');
+            suggestedQuestionsList.innerHTML = '';
+
+            try {
+                const schema = {
+                    type: "OBJECT",
+                    properties: {
+                        "questions": {
+                            "type": "ARRAY",
+                            "items": { "type": "STRING" }
+                        }
+                    },
+                    required: ["questions"]
+                };
+                const result = await callGemini(prompt, schema);
+                const questions = JSON.parse(result).questions;
+
+                if (questions && questions.length > 0) {
+                    displaySuggestedQuestions(questions);
+                } else {
+                    showError("Could not generate suggested questions.");
+                }
+
+            } catch (error) {
+                handleApiError(error, 'Sorry, an error occurred while generating questions.');
+            } finally {
+                stopLoading();
+            }
+        }
+
+        /**
+         * Calls the Gemini API with a given prompt and optional schema.
+         * @param {string} prompt - The prompt to send.
+         * @param {object|null} schema - The JSON schema for structured output.
+         * @returns {Promise<string>} The text part of the model's response.
+         */
+        async function callGemini(prompt, schema = null) {
+            const apiKey = "AIzaSyA-FfPzdQSAoWF40GaGQyhhU4X9QKDraKU"; // API key is handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }]
+            };
+
+            if (schema) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: schema
+                };
+            }
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                 console.error("Unexpected API response structure:", result);
+                 if (result.promptFeedback?.blockReason) {
+                     throw new Error(`Request blocked: ${result.promptFeedback.blockReason}`);
+                 }
+                 throw new Error("Could not generate a valid response from the API.");
+            }
+        }
+
+        // --- UI Update Functions ---
+
+        function displayAnswer(text) {
+            answerPlaceholder.classList.add('hidden');
+            answerBox.innerHTML = `<p>${text.replace(/\n/g, '<br>')}</p>`;
+        }
+
+        function displaySuggestedQuestions(questions) {
+            suggestedQuestionsList.innerHTML = '';
+            questions.forEach(q => {
+                const button = document.createElement('button');
+                button.textContent = q;
+                button.className = 'bg-slate-200 text-slate-700 text-sm px-3 py-1 rounded-full hover:bg-slate-300 transition-colors';
+                button.onclick = () => {
+                    questionInput.value = q;
+                    handleQuestionSubmit();
+                };
+                suggestedQuestionsList.appendChild(button);
+            });
+            suggestedQuestionsContainer.classList.remove('hidden');
+        }
+
+        function startLoading(message) {
+            loader.querySelector('span').textContent = message;
+            loader.classList.remove('hidden');
+            answerPlaceholder.classList.add('hidden');
+            answerBox.innerHTML = '';
+            askButton.disabled = true;
+            summarizeButton.disabled = true;
+            suggestQuestionsButton.disabled = true;
+            hideError();
+        }
+
+        function stopLoading() {
+            loader.classList.add('hidden');
+            askButton.disabled = false;
+            summarizeButton.disabled = false;
+            suggestQuestionsButton.disabled = false;
+        }
+        
+        function handleApiError(error, defaultMessage) {
+            console.error('API Error:', error);
+            showError(error.message || defaultMessage);
+            answerPlaceholder.classList.remove('hidden');
+            answerPlaceholder.textContent = 'Failed to get a response.';
+        }
+        
+        function validateInputs(question = null) {
+            if (!documentText) {
+                showError('Please upload a PDF document first.');
+                return false;
+            }
+            if (question !== null && !question) {
+                showError('Please enter a question.');
+                return false;
+            }
+            hideError();
+            return true;
+        }
+
+        function resetUI() {
+            documentText = '';
+            geminiFeatures.classList.add('hidden');
+            suggestedQuestionsContainer.classList.add('hidden');
+            suggestedQuestionsList.innerHTML = '';
+            answerBox.innerHTML = '';
+            answerPlaceholder.classList.remove('hidden');
+            answerPlaceholder.textContent = 'Your answer will appear here...';
+            questionInput.value = '';
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+
+    </script>
+</body>
+</html>

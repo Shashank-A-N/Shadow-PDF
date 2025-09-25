@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #upload-status.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .hidden-input {
+            width: 0.1px;
+            height: 0.1px;
+            opacity: 0;
+            overflow: hidden;
+            position: absolute;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="scanner-app" class="w-full max-w-md text-center">
+        <!-- Initial View -->
+        <div id="initial-view">
+            <svg class="mx-auto h-16 w-16 text-indigo-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.776 48.776 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+            </svg>
+            <h1 class="text-3xl font-bold text-white mb-2">Scanner Ready</h1>
+            <p class="text-slate-400 mb-6">Tap the button to capture a document page.</p>
+            <label for="file-input" id="scan-button-label" class="w-full bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-indigo-500 transition-all duration-300 shadow-lg flex items-center justify-center gap-2 cursor-pointer">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2-2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <span>Scan Page</span>
+            </label>
+        </div>
+
+        <!-- Success View -->
+        <div id="success-view" class="hidden">
+            <div id="last-scan-preview" class="mb-4 rounded-lg overflow-hidden border-4 border-slate-700 aspect-[3/4] max-h-[200px] mx-auto">
+                 <img id="preview-image" src="" class="w-full h-full object-contain">
+            </div>
+             <svg class="mx-auto h-16 w-16 text-green-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h1 class="text-3xl font-bold text-white mb-2">Page Uploaded!</h1>
+            <p class="text-slate-400 mb-6">What would you like to do next?</p>
+            <label for="file-input" id="scan-next-button-label" class="w-full bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-indigo-500 transition-all duration-300 shadow-lg flex items-center justify-center gap-2 cursor-pointer">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                <span>Scan Next Page</span>
+            </label>
+             <button id="done-button" class="mt-4 w-full bg-slate-700 text-slate-300 font-bold py-3 px-4 rounded-lg hover:bg-slate-600 transition-all">Done</button>
+        </div>
+        
+        <input type="file" id="file-input" accept="image/*" capture="environment" class="hidden-input">
+    </div>
+
+    <!-- Upload Status Notification -->
+    <div id="upload-status" class="fixed bottom-5 left-1/2 -translate-x-1.2 bg-slate-700 text-white py-2.5 px-5 rounded-lg shadow-xl transition-all duration-300 transform translate-y-20 opacity-0 flex items-center gap-3">
+        <div id="status-loader" class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+        <span id="upload-status-message">Connecting...</span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- DO NOT EDIT THIS CONFIGURATION ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyCqHvYY7AOtOOFLuqQzRXo9dOK14Vo3tHo",
+          authDomain: "scan-pdf-6f8af.firebaseapp.com",
+          projectId: "scan-pdf-6f8af",
+          storageBucket: "scan-pdf-6f8af.appspot.com",
+          messagingSenderId: "90910752973",
+          appId: "1:90910752973:web:9beaf7b68e442894512984",
+          measurementId: "G-YCZV2D7CEK"
+        };
+        const appId = 'default-scan-app';
+        
+        const fileInput = document.getElementById('file-input');
+        const uploadStatus = document.getElementById('upload-status');
+        const statusMessage = document.getElementById('upload-status-message');
+        const statusLoader = document.getElementById('status-loader');
+        const initialView = document.getElementById('initial-view');
+        const successView = document.getElementById('success-view');
+        const previewImage = document.getElementById('preview-image');
+        const doneButton = document.getElementById('done-button');
+
+        let sessionId = null;
+        let docRef = null;
+
+        function showStatus(message, isLoading = false) {
+            statusMessage.textContent = message;
+            statusLoader.style.display = isLoading ? 'block' : 'none';
+            uploadStatus.classList.add('show');
+        }
+        function hideStatus() {
+            uploadStatus.classList.remove('show');
+        }
+
+        async function init() {
+            try {
+                showStatus('Connecting...', true);
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                const auth = getAuth(app);
+                await signInAnonymously(auth);
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                sessionId = urlParams.get('session');
+
+                if (!sessionId) {
+                    document.body.innerHTML = `<div class="text-red-400">Error: No session ID provided. Please re-scan QR code.</div>`;
+                    return;
+                }
+                
+                const collectionPath = `/artifacts/${appId}/public/data/scans`;
+                docRef = doc(db, collectionPath, sessionId);
+                hideStatus();
+
+            } catch (error) {
+                console.error("CRITICAL ERROR: Could not connect to services.", error);
+                showStatus('Connection Error.', false);
+                document.getElementById('scanner-app').innerHTML = `<div class="text-red-400 p-4 rounded-lg bg-red-900/50">A critical connection error occurred.</div>`;
+            }
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file || !docRef) return;
+            
+            showStatus('Compressing image...', true);
+            const compressedDataUrl = await compressImage(file);
+            showStatus('Uploading...', true);
+
+            try {
+                const newPage = { id: crypto.randomUUID(), data: compressedDataUrl };
+                await updateDoc(docRef, { pages: arrayUnion(newPage) });
+                
+                previewImage.src = compressedDataUrl;
+                initialView.classList.add('hidden');
+                successView.classList.remove('hidden');
+
+                setTimeout(() => hideStatus(), 500);
+
+            } catch (error) {
+                console.error("Upload failed:", error);
+                showStatus('Upload failed. Please try again.', false);
+                setTimeout(() => hideStatus(), 3000);
+            } finally {
+                fileInput.value = '';
+            }
+        }
+        
+        function compressImage(file, maxWidth = 1080, quality = 0.8) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = event => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const scale = maxWidth / img.width;
+                        canvas.width = maxWidth;
+                        canvas.height = img.height * scale;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.onerror = error => reject(error);
+                };
+                reader.onerror = error => reject(error);
+            });
+        }
+        
+        fileInput.addEventListener('change', handleFileUpload);
+        doneButton.addEventListener('click', () => {
+             document.getElementById('scanner-app').innerHTML = `<h1 class="text-3xl font-bold text-green-400">All Done!</h1><p class="text-slate-400 mt-2">You can now close this window.</p>`;
+        });
+        
+        init();
+
+    </script>
+</body>
+</html>
