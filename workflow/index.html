@@ -88,7 +88,6 @@
             <h2 class="text-xl text-gray-500">Workflows / <span id="creator-title" class="text-gray-800 font-semibold">Create new workflow</span></h2>
             <button class="bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-semibold py-2 px-4 rounded-lg shadow-sm flex items-center space-x-2 transition-colors">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
-                <span>Upgrade to Premium</span>
             </button>
         </header>
         <main class="bg-white p-8 sm:p-10 rounded-2xl shadow-lg w-full">
@@ -259,35 +258,35 @@
 
             const toolProps = {
                 // Tools that output a PDF can usually be chained
-                "Merge PDF": { interactive: true, compatible: ["Split PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF", "PDF to WORD", "PDF to Image"] },
-                "Split PDF": { interactive: true, compatible: ["Merge PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF", "PDF to WORD", "PDF to Image"] },
-                "Remove pages": { interactive: true, compatible: ["Merge PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF"] },
-                "Extract pages": { interactive: true, compatible: ["Merge PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF"] },
-                "Organize PDF": { interactive: true, compatible: ["Compress PDF", "Protect PDF", "PDF to PowerPoint"] },
-                "Compress PDF": { compatible: ["Split PDF", "Protect PDF", "PDF to JPG", "Edit PDF", "Rotate PDF"] },
-                "Image to PDF": { compatible: ["Merge PDF", "Split PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF"] },
-                "WORD to PDF": { compatible: ["Merge PDF", "Split PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF"] },
-                "POWERPOINT to PDF": { compatible: ["Merge PDF", "Split PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF"] },
-                "EXCEL to PDF": { compatible: ["Merge PDF", "Split PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF"] },
-                "HTML to PDF": { compatible: ["Merge PDF", "Split PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF"] },
-                "Edit PDF": { interactive: true, compatible: ["Split PDF", "Compress PDF", "Protect PDF", "Rotate PDF"] },
-                "Rotate PDF": { interactive: true, compatible: ["Split PDF", "Compress PDF", "Protect PDF", "Edit PDF"] },
+                "Merge PDF": { interactive: true, compatible: ["Split PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF", "PDF to WORD", "PDF to Image","PDF to POWERPOINT","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Remove pages","Extract pages","Add watermark", "Crop PDF"] },
+                "Split PDF": { interactive: true, compatible: ["Merge PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF", "PDF to WORD", "PDF to Image","PDF to POWERPOINT","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Extract pages","Extract pages","Add watermark", "Crop PDF"] },
+                "Remove pages": { interactive: true, compatible: ["Merge PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF","PDF to POWERPOINT","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Extract pages","Add watermark", "Crop PDF""] },
+                "Extract pages": { interactive: true, compatible: ["Merge PDF", "Compress PDF", "Protect PDF", "Edit PDF", "Rotate PDF","PDF to POWERPOINT","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Remove pages","Add watermark", "Crop PDF"] },
+                "Organize PDF": { interactive: true, compatible: ["Extract pages","Extract pages""Compress PDF", "Protect PDF", "PDF to PowerPoint","Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "Compress PDF": { compatible: ["Split PDF","PDF to JPG","Rotate PDF","Remove pages","Extract pages","Organize PDF", "Protect PDF", "PDF to PowerPoint","Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "Image to PDF": { compatible: ["Split PDF","Remove pages","Extract pages","Organize PDF", "Rotate PDF","Compress PDF", "Protect PDF", "PDF to PowerPoint","Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "WORD to PDF": { compatible: ["Split PDF","Remove pages","Extract pages","Organize PDF", "PDF to JPG","Rotate PDF","Compress PDF", "Protect PDF", "PDF to PowerPoint","Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "POWERPOINT to PDF": { compatible: ["PDF to WORD","Split PDF","PDF to JPG","Remove pages","Extract pages","Organize PDF","Rotate PDF","Compress PDF", "Protect PDF", "Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "EXCEL to PDF": { compatible: ["PDF to WORD","Split PDF","Remove pages","Extract pages","Organize PDF", "PDF to JPG","Rotate PDF","Compress PDF", "Protect PDF", "PDF to PowerPoint","Edit PDF","Merge PDF", "Compress PDF","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "HTML to PDF": { compatible: ["PDF to WORD","Remove pages","Extract pages","Organize PDF", "Split PDF","PDF to JPG","Rotate PDF","Compress PDF", "Protect PDF", "PDF to PowerPoint","Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "Edit PDF": { interactive: true, compatible: ["PDF to WORD","Split PDF","PDF to JPG","Rotate PDF","Compress PDF", "Protect PDF", "PDF to PowerPoint","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "Rotate PDF": { interactive: true, compatible: ["PDF to PowerPoint","PDF to WORD","Split PDF","PDF to JPG","Remove pages","Extract pages","Organize PDF","Compress PDF", "Protect PDF", "Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
                 "Protect PDF": { compatible: ["Unlock PDF"] }, // Can be unlocked
-                "Unlock PDF": { compatible: ["Edit PDF", "Compress PDF", "Split PDF", "Merge PDF"] },
-                "Add watermark": { interactive: true, compatible: ["Protect PDF", "Compress PDF"] },
-                "Crop PDF": { interactive: true, compatible: ["Protect PDF", "Compress PDF", "Edit PDF"] },
+                "Unlock PDF": { compatible: ["Rotate PDF","PDF to PowerPoint","PDF to WORD","Split PDF","PDF to JPG","Remove pages","Extract pages","Organize PDF","Compress PDF","Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark", "Crop PDF"] },
+                "Add watermark": { interactive: true, compatible: ["Rotate PDF","PDF to PowerPoint","PDF to WORD","Split PDF","PDF to JPG","Remove pages","Extract pages","Organize PDF","Compress PDF", "Protect PDF", "Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Crop PDF"] },
+                "Crop PDF": { interactive: true, compatible: ["Rotate PDF","PDF to PowerPoint","PDF to WORD","Split PDF","PDF to JPG","Remove pages","Extract pages","Organize PDF","Compress PDF", "Protect PDF", "Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark"] },
                 
                 // AI and Conversion tools are often endpoints
-                "AI Document Summarizer": { compatible: [] },
+                "AI Document Summarizer": { compatible: ["Q&A with Document",] },
                 "Q&A with Document": { compatible: [] },
-                "Image Quality Enhancer": { compatible: [] },
-                "Image Background Remover": { compatible: [] },
-                "PDF to Image": { compatible: [] },
+                "Image Quality Enhancer": { compatible: ["Image to PDF"] },
+                "Image Background Remover": { compatible: ["Image to PDF"] },
+                "PDF to Image": { compatible: ["Image Quality Enhancer","Image Background Remover"] },
                 "PDF to WORD": { compatible: [] },
                 "PDF to POWERPOINT": { compatible: [] },
                 "PDF to EXCEL": { compatible: [] },
                 "PDF to HTML": { compatible: [] },
-                "PDF to PDF/A": { compatible: [] },
+                "PDF to PDF/A": { compatible: ["Crop PDF","Rotate PDF","PDF to PowerPoint","PDF to WORD","Split PDF","PDF to JPG","Remove pages","Extract pages","Organize PDF","Compress PDF", "Protect PDF", "Edit PDF","Merge PDF", "Compress PDF","PDF to EXCEL","PDF to HTML","Q&A with Document","AI Document Summarizer","Add watermark"] },
             };
 
             const toolIcons = { 
@@ -745,5 +744,6 @@
     </script>
 </body>
 </html>
+
 
 
