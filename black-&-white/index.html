@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noirify - Cinema Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- JSZip for ZIP downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- Global Styles --- */
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #f8fafc;
+            /* Subtle film grain texture for UI background */
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+            overflow-x: hidden;
+        }
+
+        /* --- Custom Scrollbar --- */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* --- Noir Buttons --- */
+        .btn-noir {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease-out;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            letter-spacing: 0.025em;
+        }
+        
+        .btn-noir:active { transform: scale(0.98); }
+
+        .btn-primary {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border: 1px solid #1a1a1a;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .btn-primary:hover {
+            background-color: #000000;
+            border-color: #000000;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background-color: #ffffff;
+            color: #334155;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-secondary:hover {
+            border-color: #cbd5e1;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .btn-danger {
+            background-color: #fff1f2;
+            color: #e11d48;
+            border: 1px solid #fecdd3;
+        }
+        .btn-danger:hover {
+            background-color: #ffe4e6;
+            border-color: #fda4af;
+        }
+        
+        /* Toggle Button Special Style */
+        .btn-icon {
+            background: white;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            transition: all 0.2s ease;
+        }
+        .btn-icon:hover, .btn-icon.active {
+            border-color: #1a1a1a;
+            color: #1a1a1a;
+            background: #ffffff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Preset Button */
+        .btn-preset {
+            @apply px-2 py-1 text-[10px] font-bold uppercase rounded border transition-colors;
+        }
+        .btn-preset-active {
+            background-color: #1a1a1a;
+            color: white;
+            border-color: #1a1a1a;
+        }
+        .btn-preset-inactive {
+            background-color: #f8fafc;
+            color: #64748b;
+            border-color: #e2e8f0;
+        }
+        .btn-preset-inactive:hover {
+            border-color: #94a3b8;
+            color: #334155;
+        }
+
+        /* --- Panel Transitions --- */
+        #settings-dropdown {
+            transform-origin: top right;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #settings-dropdown.closed {
+            opacity: 0;
+            transform: scale(0.95) translateY(-10px);
+            pointer-events: none;
+        }
+        #settings-dropdown.open {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            pointer-events: all;
+        }
+
+        /* --- CRT Preview Effect --- */
+        .crt-monitor {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            overflow: hidden;
+        }
+        .crt-monitor::after {
+            content: "REC •";
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            color: #ef4444;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            animation: blink 1.5s infinite;
+            text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+            pointer-events: none;
+        }
+        .crt-monitor.demo::after {
+            content: "DEMO";
+            color: #ffffff;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+        .crt-scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        /* --- Progress Animation --- */
+        @keyframes striping {
+            0% { background-position: 0 0; }
+            100% { background-position: 30px 0; }
+        }
+        .progress-animated {
+            background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent);
+            background-size: 30px 30px;
+            animation: striping 1s linear infinite;
+        }
+
+        /* --- Drop Zone Animation --- */
+        .drop-active {
+            border-color: #1a1a1a !important;
+            background-color: #f1f5f9 !important;
+            transform: scale(1.01);
+        }
+
+        /* --- Dynamic Font Transition --- */
+        #dynamic-logo {
+            transition: opacity 0.4s ease-in-out;
+            will-change: opacity, font-family;
+        }
+
+        /* --- Range Slider Styling --- */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #1a1a1a;
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border: 2px solid white;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 2px;
+        }
+
+        /* --- Toggle Switch --- */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #1a1a1a;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #1a1a1a;
+        }
+        
+        /* --- Modal Styling --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        .modal-content {
+            background: black;
+            border-radius: 12px;
+            overflow: hidden;
+            width: 95%;
+            max-width: 900px;
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen p-4 md:p-6 lg:p-12 flex flex-col items-center">
+
+    <!-- Video Preview Modal -->
+    <div id="video-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="absolute top-4 right-4 z-10">
+                <button id="close-modal-btn" class="bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <!-- Dynamic Video Element Container -->
+            <div id="modal-video-container" class="w-full bg-black flex justify-center bg-stripes">
+                <!-- Video injected via JS to ensure fresh instance -->
+            </div>
+            <div class="bg-slate-900 text-white p-4 flex justify-between items-center">
+                <span id="modal-video-title" class="font-medium truncate pr-4 text-sm sm:text-base">Video Preview</span>
+                <span id="modal-video-type" class="text-[10px] sm:text-xs font-bold bg-slate-800 px-2 py-1 rounded text-slate-400 uppercase shrink-0">Original</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-full max-w-4xl space-y-6 relative">
+        
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-200 relative z-20">
+            <div class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left">
+                <div class="bg-black text-white w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-xl shadow-lg transform -rotate-3 shrink-0">
+                    <i data-lucide="aperture" class="w-5 h-5 md:w-6 md:h-6"></i>
+                </div>
+                <div>
+                    <!-- Responsive Text Size -->
+                    <h1 id="dynamic-logo" class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-slate-900 transition-opacity">Noirify.</h1>
+                </div>
+            </div>
+            
+            <!-- Header Actions & Settings -->
+            <div class="relative w-full sm:w-auto flex justify-center sm:justify-end">
+                <div class="flex items-center gap-3">
+                    <div class="hidden md:flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase text-slate-400 mr-2">
+                        <span>Local</span>
+                        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span>Secure</span>
+                    </div>
+                    
+                    <button id="toggle-settings-btn" class="btn-icon w-10 h-10 rounded-full flex items-center justify-center shadow-sm" title="Studio Controls">
+                        <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Dropdown Panel -->
+                <div id="settings-dropdown" class="closed absolute right-0 top-12 w-[92vw] sm:w-96 md:w-[28rem] lg:w-[32rem] bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50 origin-top-right">
+                    
+                    <!-- Integrated Demo Monitor -->
+                    <div class="bg-black relative h-40 sm:h-48 md:h-56 w-full border-b border-slate-800 flex items-center justify-center overflow-hidden">
+                        <div class="crt-monitor demo w-full h-full">
+                            <div class="crt-scanline"></div>
+                            <canvas id="demo-canvas" class="w-full h-full object-contain block"></canvas>
+                        </div>
+                        <div id="demo-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-500 space-y-2">
+                            <i data-lucide="film" class="w-6 h-6 opacity-50"></i>
+                            <span class="text-[10px] font-mono tracking-widest uppercase">Upload to Preview</span>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-white">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-50">
+                            <span class="text-xs font-bold text-slate-900 uppercase tracking-wide">Studio Controls</span>
+                            <button id="reset-settings" class="text-[10px] text-slate-400 hover:text-red-500 font-bold uppercase tracking-wider transition-colors flex items-center gap-1">
+                                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset
+                            </button>
+                        </div>
+
+                        <!-- Presets Section -->
+                        <div class="mb-4">
+                            <div class="text-[10px] font-bold text-slate-400 uppercase mb-2">Film Stock Presets</div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="applyPreset('silent')" class="btn-preset btn-preset-inactive border">1920s Silent</button>
+                                <button onclick="applyPreset('noir')" class="btn-preset btn-preset-inactive border">1940s Noir</button>
+                                <button onclick="applyPreset('grindhouse')" class="btn-preset btn-preset-inactive border">1970s Grind</button>
+                                <button onclick="applyPreset('default')" class="btn-preset btn-preset-inactive border">Clean Digital</button>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4 max-h-[40vh] overflow-y-auto pr-1 scrollbar-hide">
+                            
+                            <!-- Export Format -->
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                    <span>Export Format</span>
+                                </div>
+                                <select id="format-select" class="w-full text-xs p-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 outline-none focus:border-slate-900">
+                                    <!-- Populated via JS -->
+                                </select>
+                            </div>
+
+                            <div class="h-px bg-slate-100"></div>
+
+                            <!-- Letterboxing Toggle -->
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase">4:3 Letterbox</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="letterbox-toggle" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-slate-900"></div>
+                                </label>
+                            </div>
+
+                            <!-- Audio Mute Toggle -->
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase">Mute Audio</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="mute-toggle" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-slate-900"></div>
+                                </label>
+                            </div>
+
+                            <div class="h-px bg-slate-100"></div>
+
+                            <!-- Projector Section -->
+                            <div class="space-y-3">
+                                <div class="text-[10px] font-bold text-slate-400 uppercase">Projector Mechanics</div>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Gate Weave (Shake)</span>
+                                        <span id="val-shake" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="shake-slider" min="0" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Lamp Flicker</span>
+                                        <span id="val-flicker" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="flicker-slider" min="0" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Frame Rate</span>
+                                        <span id="val-fps" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">30</span>
+                                    </div>
+                                    <input type="range" id="fps-slider" min="12" max="60" step="6" value="30" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                            </div>
+
+                            <div class="h-px bg-slate-100"></div>
+
+                            <!-- Image Adjustments -->
+                            <div class="space-y-3">
+                                <div class="text-[10px] font-bold text-slate-400 uppercase">Exposure & Tone</div>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Contrast</span>
+                                        <span id="val-contrast" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="contrast-slider" min="-100" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Brightness</span>
+                                        <span id="val-brightness" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="brightness-slider" min="-100" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Tint</span>
+                                        <span id="val-tint" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">None</span>
+                                    </div>
+                                    <input type="range" id="tint-slider" min="-50" max="50" value="0" class="w-full h-1 bg-gradient-to-r from-blue-100 via-slate-200 to-amber-100 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                            </div>
+
+                            <div class="h-px bg-slate-100"></div>
+
+                            <!-- Film Artifacts -->
+                            <div class="space-y-3">
+                                <div class="text-[10px] font-bold text-slate-400 uppercase">Film Artifacts</div>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Grain</span>
+                                        <span id="val-grain" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="grain-slider" min="0" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Vignette</span>
+                                        <span id="val-vignette" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="vignette-slider" min="0" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Scratches</span>
+                                        <span id="val-scratches" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="scratches-slider" min="0" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                                        <span>Dust</span>
+                                        <span id="val-dust" class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">0</span>
+                                    </div>
+                                    <input type="range" id="dust-slider" min="0" max="100" value="0" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="space-y-6">
+            
+            <!-- Upload Zone -->
+            <div class="group relative">
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-slate-200 to-slate-300 rounded-2xl opacity-50 blur transition duration-500 group-hover:opacity-100"></div>
+                <div class="relative bg-white rounded-2xl border-2 border-dashed border-slate-200 hover:border-slate-400 transition-all duration-300" id="drop-zone-container">
+                    <label class="flex flex-col items-center justify-center h-32 sm:h-40 cursor-pointer p-6 text-center" id="drop-zone">
+                        <div class="mb-3 p-3 bg-slate-50 rounded-full text-slate-400 group-hover:text-slate-900 group-hover:bg-slate-100 transition-colors">
+                            <i data-lucide="film" class="w-6 h-6 sm:w-8 sm:h-8"></i>
+                        </div>
+                        <h3 class="text-base sm:text-lg font-bold text-slate-700 group-hover:text-slate-900">Drop footage here</h3>
+                        <p class="text-xs sm:text-sm text-slate-400 mt-1">MP4, WEBM, MOV supported</p>
+                        <input type="file" multiple accept="video/*" class="hidden" id="file-input">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div id="action-bar" class="hidden bg-white/80 backdrop-blur-sm p-3 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-4 justify-between items-center transition-all sticky top-2 z-10">
+                <div class="flex items-center gap-3 w-full sm:w-auto px-1">
+                    <div class="bg-slate-100 p-2 rounded-lg shrink-0 text-slate-600">
+                        <i data-lucide="layers" class="w-5 h-5"></i>
+                    </div>
+                    <div class="flex flex-col justify-center">
+                        <p class="text-xs font-bold text-slate-800 leading-tight">Queue Status</p>
+                        <p class="text-[10px] text-slate-500 font-medium leading-tight mt-0.5"><span id="completed-count">0</span> files completed</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto justify-end">
+                    <button id="download-zip-btn" class="hidden btn-noir btn-secondary flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold gap-2">
+                        <i data-lucide="archive" class="w-3.5 h-3.5 fill-current"></i> Zip
+                    </button>
+                    <button id="stop-btn" class="hidden btn-noir btn-danger flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold gap-2">
+                        <i data-lucide="square" class="w-3.5 h-3.5 fill-current"></i> Stop
+                    </button>
+                    <button id="clear-btn" class="btn-noir btn-secondary flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold gap-2">
+                        Clear
+                    </button>
+                    <button id="convert-btn" class="btn-noir btn-primary flex-1 sm:flex-none px-5 py-2 rounded-lg text-xs font-bold gap-2">
+                        <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Process All
+                    </button>
+                </div>
+            </div>
+
+            <!-- Video List -->
+            <div id="video-list" class="space-y-4">
+                <!-- Dynamic Items -->
+            </div>
+
+            <!-- Floating Preview Monitor (Fixed Bottom Right) -->
+            <div id="preview-container" class="hidden fixed bottom-6 right-6 w-64 sm:w-80 z-50 opacity-0 translate-y-4 transition-all duration-500">
+                <div class="bg-black/90 p-2 rounded-xl shadow-2xl backdrop-blur border border-slate-800">
+                    <div id="preview-header" class="flex justify-between items-center mb-2 px-1 cursor-move select-none">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="move" class="w-3 h-3 text-slate-500"></i>
+                            <span id="preview-label" class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Live Monitor</span>
+                        </div>
+                        <span id="preview-badge" class="text-[10px] font-mono text-red-500 animate-pulse">PROCESSING</span>
+                    </div>
+                    <div class="crt-monitor">
+                        <div class="crt-scanline"></div>
+                        <canvas id="processing-canvas" class="w-full aspect-video object-contain bg-black block"></canvas>
+                    </div>
+                    <div class="mt-2 flex justify-between text-[10px] font-mono text-slate-400 px-1">
+                        <span>LUMA ENGINE RUNNING</span>
+                        <span id="fps-counter">00 FPS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hidden Source -->
+            <video id="source-video" class="hidden" playsinline muted crossorigin="anonymous"></video>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // --- Logo Font Animation ---
+        const logo = document.getElementById('dynamic-logo');
+        const fonts = [
+            'Space Grotesk', 'Arial', 'Verdana', 'Times New Roman', 'Courier New', 
+            'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Trebuchet MS', 
+            'Arial Black', 'Impact', 'Lucida Sans Unicode', 'Tahoma', 'Courier', 
+            'Lucida Console', 'Monaco', 'Brush Script MT', 'Copperplate', 'Papyrus', 
+            'Helvetica', 'Futura', 'Rockwell', 'Baskerville', 'Didot', 
+            'American Typewriter', 'Andale Mono', 'Bradley Hand'
+        ];
+        
+        setInterval(() => {
+            // Fade out
+            logo.style.opacity = '0';
+            
+            // Wait for transition, change font, fade in
+            setTimeout(() => {
+                const randomFont = fonts[Math.floor(Math.random() * fonts.length)];
+                logo.style.fontFamily = randomFont;
+                logo.style.opacity = '1';
+            }, 400); // slightly less than css transition time for overlap feel or match it
+        }, 3000);
+
+        // --- State ---
+        let files = [];
+        let isProcessing = false;
+        let isPreviewing = false;
+        let shouldStop = false; 
+        let animationFrameId = null;
+        let lastFrameTime = 0;
+        let currentTempVideo = null; 
+        
+        // Settings State
+        let contrast = 0;
+        let brightness = 0;
+        let grain = 0;
+        let vignette = 0;
+        let scratches = 0;
+        let dust = 0;
+        let tint = 0; 
+        let targetFps = 30;
+        let shake = 0;
+        let flicker = 0;
+        let isLetterbox = false;
+        let isMuted = false;
+        let isControlsOpen = false;
+        let exportFormat = 'video/webm'; // default
+
+        // --- DOM ---
+        const fileInput = document.getElementById('file-input');
+        const dropZoneContainer = document.getElementById('drop-zone-container');
+        const dropZone = document.getElementById('drop-zone');
+        const videoList = document.getElementById('video-list');
+        const actionBar = document.getElementById('action-bar');
+        const convertBtn = document.getElementById('convert-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+        
+        // Main Processing DOM
+        const previewContainer = document.getElementById('preview-container');
+        const processingCanvas = document.getElementById('processing-canvas');
+        const fpsCounter = document.getElementById('fps-counter');
+        const previewBadge = document.getElementById('preview-badge');
+        
+        // Settings Demo DOM
+        const demoCanvas = document.getElementById('demo-canvas');
+        const demoPlaceholder = document.getElementById('demo-placeholder');
+        const demoCtx = demoCanvas.getContext('2d', { willReadFrequently: true });
+        
+        // Modal DOM
+        const videoModal = document.getElementById('video-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const modalVideoContainer = document.getElementById('modal-video-container');
+        const modalVideoTitle = document.getElementById('modal-video-title');
+        const modalVideoType = document.getElementById('modal-video-type');
+        
+        // Settings DOM
+        const toggleSettingsBtn = document.getElementById('toggle-settings-btn');
+        const settingsDropdown = document.getElementById('settings-dropdown');
+        
+        const contrastSlider = document.getElementById('contrast-slider');
+        const brightnessSlider = document.getElementById('brightness-slider');
+        const grainSlider = document.getElementById('grain-slider');
+        const vignetteSlider = document.getElementById('vignette-slider');
+        const scratchesSlider = document.getElementById('scratches-slider');
+        const dustSlider = document.getElementById('dust-slider');
+        const tintSlider = document.getElementById('tint-slider');
+        const fpsSlider = document.getElementById('fps-slider');
+        const shakeSlider = document.getElementById('shake-slider');
+        const flickerSlider = document.getElementById('flicker-slider');
+        const letterboxToggle = document.getElementById('letterbox-toggle');
+        const muteToggle = document.getElementById('mute-toggle');
+        const formatSelect = document.getElementById('format-select');
+        
+        const valContrast = document.getElementById('val-contrast');
+        const valBrightness = document.getElementById('val-brightness');
+        const valGrain = document.getElementById('val-grain');
+        const valVignette = document.getElementById('val-vignette');
+        const valScratches = document.getElementById('val-scratches');
+        const valDust = document.getElementById('val-dust');
+        const valTint = document.getElementById('val-tint');
+        const valFps = document.getElementById('val-fps');
+        const valShake = document.getElementById('val-shake');
+        const valFlicker = document.getElementById('val-flicker');
+        
+        const resetSettings = document.getElementById('reset-settings');
+
+        // Main context
+        const ctx = processingCanvas.getContext('2d', { willReadFrequently: true });
+
+        // --- Init Formats ---
+        function initFormats() {
+            const types = [
+                { value: 'video/webm;codecs=vp9', label: 'WebM (VP9 - High Quality)' },
+                { value: 'video/webm;codecs=vp8', label: 'WebM (VP8 - Compatible)' },
+                { value: 'video/webm', label: 'WebM (Standard)' },
+                { value: 'video/mp4', label: 'MP4 (H.264 - Chrome/Edge)' }
+            ];
+            
+            formatSelect.innerHTML = '';
+            let supportedFound = false;
+            
+            types.forEach(type => {
+                if (MediaRecorder.isTypeSupported(type.value)) {
+                    const option = document.createElement('option');
+                    option.value = type.value;
+                    option.innerText = type.label;
+                    formatSelect.appendChild(option);
+                    supportedFound = true;
+                }
+            });
+            
+            // If no types supported (unlikely), fallback
+            if (!supportedFound) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.innerText = 'Default (Browser)';
+                formatSelect.appendChild(option);
+            }
+            
+            // Set initial value
+            if (formatSelect.options.length > 0) {
+                exportFormat = formatSelect.options[0].value;
+            }
+        }
+        initFormats();
+
+        // --- Interaction ---
+
+        toggleSettingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isControlsOpen = !isControlsOpen;
+            if (isControlsOpen) {
+                settingsDropdown.classList.remove('closed');
+                settingsDropdown.classList.add('open');
+                toggleSettingsBtn.classList.add('active');
+                if (!isProcessing) startSettingsPreview();
+            } else {
+                settingsDropdown.classList.remove('open');
+                settingsDropdown.classList.add('closed');
+                toggleSettingsBtn.classList.remove('active');
+                if (!isProcessing) stopSettingsPreview();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (isControlsOpen && !settingsDropdown.contains(e.target) && !toggleSettingsBtn.contains(e.target)) {
+                isControlsOpen = false;
+                settingsDropdown.classList.remove('open');
+                settingsDropdown.classList.add('closed');
+                toggleSettingsBtn.classList.remove('active');
+                if (!isProcessing) stopSettingsPreview();
+            }
+        });
+
+        settingsDropdown.addEventListener('click', (e) => e.stopPropagation());
+
+        function updateSettings() {
+            contrast = parseInt(contrastSlider.value);
+            brightness = parseInt(brightnessSlider.value);
+            grain = parseInt(grainSlider.value);
+            vignette = parseInt(vignetteSlider.value);
+            scratches = parseInt(scratchesSlider.value);
+            dust = parseInt(dustSlider.value);
+            tint = parseInt(tintSlider.value);
+            targetFps = parseInt(fpsSlider.value);
+            shake = parseInt(shakeSlider.value);
+            flicker = parseInt(flickerSlider.value);
+            isLetterbox = letterboxToggle.checked;
+            isMuted = muteToggle.checked;
+            exportFormat = formatSelect.value;
+
+            valContrast.innerText = contrast > 0 ? `+${contrast}` : contrast;
+            valBrightness.innerText = brightness > 0 ? `+${brightness}` : brightness;
+            valGrain.innerText = grain;
+            valVignette.innerText = vignette;
+            valScratches.innerText = scratches;
+            valDust.innerText = dust;
+            valFps.innerText = targetFps;
+            valShake.innerText = shake;
+            valFlicker.innerText = flicker;
+            
+            if(tint === 0) valTint.innerText = "Neutral";
+            else if(tint < 0) valTint.innerText = `Cool ${Math.abs(tint)}`;
+            else valTint.innerText = `Warm ${tint}`;
+        }
+
+        [contrastSlider, brightnessSlider, grainSlider, vignetteSlider, scratchesSlider, dustSlider, tintSlider, fpsSlider, shakeSlider, flickerSlider].forEach(el => {
+            el.addEventListener('input', updateSettings);
+        });
+        
+        letterboxToggle.addEventListener('change', updateSettings);
+        muteToggle.addEventListener('change', updateSettings);
+        formatSelect.addEventListener('change', updateSettings);
+
+        resetSettings.addEventListener('click', () => {
+            applyPreset('default');
+        });
+
+        window.applyPreset = (preset) => {
+            if (preset === 'silent') {
+                contrastSlider.value = 20;
+                brightnessSlider.value = -5;
+                grainSlider.value = 60;
+                vignetteSlider.value = 75;
+                scratchesSlider.value = 50;
+                dustSlider.value = 60;
+                tintSlider.value = 35;
+                fpsSlider.value = 18;
+                shakeSlider.value = 40;
+                flickerSlider.value = 30;
+                letterboxToggle.checked = true;
+                muteToggle.checked = true;
+            } else if (preset === 'noir') {
+                contrastSlider.value = 45;
+                brightnessSlider.value = 0;
+                grainSlider.value = 25;
+                vignetteSlider.value = 40;
+                scratchesSlider.value = 5;
+                dustSlider.value = 5;
+                tintSlider.value = -10;
+                fpsSlider.value = 24;
+                shakeSlider.value = 5;
+                flickerSlider.value = 10;
+                letterboxToggle.checked = false;
+                muteToggle.checked = false;
+            } else if (preset === 'grindhouse') {
+                contrastSlider.value = 50;
+                brightnessSlider.value = 10;
+                grainSlider.value = 90;
+                vignetteSlider.value = 60;
+                scratchesSlider.value = 85;
+                dustSlider.value = 80;
+                tintSlider.value = 15;
+                fpsSlider.value = 24;
+                shakeSlider.value = 20;
+                flickerSlider.value = 20;
+                letterboxToggle.checked = false;
+                muteToggle.checked = false;
+            } else if (preset === 'default') {
+                contrastSlider.value = 0;
+                brightnessSlider.value = 0;
+                grainSlider.value = 0;
+                vignetteSlider.value = 0;
+                scratchesSlider.value = 0;
+                dustSlider.value = 0;
+                tintSlider.value = 0;
+                fpsSlider.value = 30;
+                shakeSlider.value = 0;
+                flickerSlider.value = 0;
+                letterboxToggle.checked = false;
+                muteToggle.checked = false;
+            }
+            updateSettings();
+        };
+
+        // --- ZIP Download Logic ---
+        downloadZipBtn.addEventListener('click', async () => {
+            const completedFiles = files.filter(f => f.status === 'completed');
+            if (completedFiles.length === 0) return;
+
+            downloadZipBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Zipping...`;
+            downloadZipBtn.disabled = true;
+
+            const zip = new JSZip();
+            
+            try {
+                for (const file of completedFiles) {
+                    const blob = await fetch(file.resultUrl).then(r => r.blob());
+                    // Ext logic: if webm -> .webm, if mp4 -> .mp4
+                    let ext = 'webm';
+                    if (blob.type.includes('mp4')) ext = 'mp4';
+                    
+                    const filename = `noir_${file.file.name.split('.')[0]}.${ext}`;
+                    zip.file(filename, blob);
+                }
+
+                const content = await zip.generateAsync({type: "blob"});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = "noirify_batch.zip";
+                link.click();
+            } catch (err) {
+                console.error("ZIP Error", err);
+                alert("Failed to create ZIP");
+            } finally {
+                downloadZipBtn.innerHTML = `<i data-lucide="archive" class="w-3.5 h-3.5 fill-current"></i> Zip`;
+                downloadZipBtn.disabled = false;
+            }
+        });
+
+        // Modal Logic
+        window.openPreview = (id) => {
+            const file = files.find(f => f.id === id);
+            if (!file) return;
+
+            const isCompleted = file.status === 'completed';
+            const src = isCompleted ? file.resultUrl : file.originalUrl;
+            
+            // Destroy and recreate the video element to force fresh buffer
+            modalVideoContainer.innerHTML = '';
+            const newVideo = document.createElement('video');
+            newVideo.id = 'modal-video-player';
+            newVideo.controls = true;
+            newVideo.className = 'w-full max-h-[80vh] outline-none';
+            newVideo.src = src;
+            modalVideoContainer.appendChild(newVideo);
+            
+            modalVideoTitle.innerText = file.file.name;
+            modalVideoType.innerText = isCompleted ? "Processed B&W" : "Original Source";
+            modalVideoType.className = `text-xs font-bold px-2 py-1 rounded uppercase ${isCompleted ? 'bg-green-900 text-green-200' : 'bg-slate-800 text-slate-400'}`;
+
+            videoModal.classList.add('active');
+            
+            // Try play, handle auto-play restrictions
+            const playPromise = newVideo.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => { console.log("Playback blocked:", error); });
+            }
+        };
+
+        const closeModal = () => {
+            videoModal.classList.remove('active');
+            modalVideoContainer.innerHTML = '';
+        };
+
+        closeModalBtn.addEventListener('click', closeModal);
+        videoModal.addEventListener('click', (e) => {
+            if (e.target === videoModal) closeModal();
+        });
+
+        // File Logic
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                dropZoneContainer.classList.add('drop-active');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                dropZoneContainer.classList.remove('drop-active');
+            });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            if (isProcessing) return;
+            files = [];
+            renderList();
+        });
+
+        convertBtn.addEventListener('click', startQueue);
+        
+        stopBtn.addEventListener('click', () => {
+            shouldStop = true;
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Stopping...`;
+        });
+
+        // --- Core Logic ---
+
+        function handleFiles(fileList) {
+            const newFiles = Array.from(fileList)
+                .filter(file => file.type.startsWith('video/'))
+                .map(file => ({
+                    id: Math.random().toString(36).substr(2, 9),
+                    file,
+                    status: 'idle',
+                    progress: 0,
+                    resultUrl: null,
+                    originalUrl: URL.createObjectURL(file)
+                }));
+            
+            files = [...files, ...newFiles];
+            renderList();
+            
+            if(isControlsOpen && !isProcessing) {
+                stopSettingsPreview();
+                startSettingsPreview();
+            }
+        }
+
+        function drawArtifacts(targetCtx, width, height) {
+            if (scratches > 0) {
+                const numScratches = Math.floor((scratches / 100) * 5); 
+                targetCtx.fillStyle = `rgba(255, 255, 255, ${0.1 + (Math.random() * 0.2)})`;
+                for(let i=0; i<numScratches; i++) {
+                    if (Math.random() > 0.5) {
+                        const x = Math.random() * width;
+                        const w = 1 + Math.random() * 2;
+                        targetCtx.fillRect(x, 0, w, height);
+                    }
+                }
+            }
+
+            if (dust > 0) {
+                const numDust = Math.floor((dust / 100) * 10);
+                targetCtx.fillStyle = "rgba(20, 20, 20, 0.6)"; 
+                for(let i=0; i<numDust; i++) {
+                     if (Math.random() > 0.3) {
+                        const x = Math.random() * width;
+                        const y = Math.random() * height;
+                        const size = 1 + Math.random() * 3;
+                        targetCtx.beginPath();
+                        targetCtx.arc(x, y, size, 0, Math.PI * 2);
+                        targetCtx.fill();
+                     }
+                }
+            }
+        }
+
+        function applyEffects(targetCtx, width, height) {
+            const imageData = targetCtx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            
+            const cFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+            
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const maxDistSq = centerX * centerX + centerY * centerY;
+            const vigStrength = vignette / 100;
+
+            const rOffset = tint > 0 ? tint : -Math.abs(tint)/2; 
+            const bOffset = tint < 0 ? Math.abs(tint) : -tint/2; 
+            
+            let lbWidth = width;
+            let lbOffset = 0;
+            if (isLetterbox) {
+                const targetWidth = height * (4/3);
+                if (targetWidth < width) {
+                    lbWidth = targetWidth;
+                    lbOffset = (width - targetWidth) / 2;
+                }
+            }
+            
+            const flickerVal = flicker > 0 ? (Math.random() - 0.5) * (flicker * 0.5) : 0;
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+
+                    if (isLetterbox && (x < lbOffset || x > width - lbOffset)) {
+                        data[i] = 0; 
+                        data[i+1] = 0; 
+                        data[i+2] = 0; 
+                        continue;
+                    }
+
+                    let gray = (0.299 * data[i]) + (0.587 * data[i + 1]) + (0.114 * data[i + 2]);
+                    
+                    if (grain > 0) {
+                        const noise = (Math.random() - 0.5) * grain;
+                        gray += noise;
+                    }
+
+                    gray = cFactor * (gray - 128) + 128;
+                    gray += brightness;
+                    gray += flickerVal; 
+
+                    if (vignette > 0) {
+                        const dx = x - centerX;
+                        const dy = y - centerY;
+                        const distSq = dx*dx + dy*dy;
+                        const distRatio = distSq / maxDistSq;
+                        const factor = 1 - (distRatio * vigStrength);
+                        gray *= factor;
+                    }
+
+                    let r = gray + rOffset;
+                    let g = gray;
+                    let b = gray + bOffset;
+
+                    data[i] = r < 0 ? 0 : (r > 255 ? 255 : r);
+                    data[i + 1] = g < 0 ? 0 : (g > 255 ? 255 : g);
+                    data[i + 2] = b < 0 ? 0 : (b > 255 ? 255 : b);
+                }
+            }
+            targetCtx.putImageData(imageData, 0, 0);
+            
+            drawArtifacts(targetCtx, width, height);
+            
+            if(isLetterbox) {
+                targetCtx.fillStyle = "black";
+                let targetWidth = height * (4/3);
+                let offset = (width - targetWidth) / 2;
+                if(offset > 0) {
+                    targetCtx.fillRect(0, 0, offset, height);
+                    targetCtx.fillRect(width - offset, 0, offset, height);
+                }
+            }
+        }
+
+        async function startSettingsPreview() {
+            if (files.length === 0) {
+                demoPlaceholder.style.display = 'flex';
+                demoCanvas.style.display = 'none';
+                return;
+            } else {
+                demoPlaceholder.style.display = 'none';
+                demoCanvas.style.display = 'block';
+            }
+            
+            isPreviewing = true;
+            
+            const file = files[Math.floor(Math.random() * files.length)];
+            
+            // Create separate preview video element
+            const previewVideo = document.createElement('video');
+            previewVideo.src = file.originalUrl;
+            previewVideo.muted = true;
+            previewVideo.loop = true;
+            currentTempVideo = previewVideo;
+            
+            await previewVideo.play();
+            
+            const aspect = previewVideo.videoHeight / previewVideo.videoWidth;
+            demoCanvas.width = 320;
+            demoCanvas.height = 320 * aspect;
+
+            const loop = (now) => {
+                if (!isPreviewing) return;
+                
+                const interval = 1000 / targetFps;
+                const delta = now - lastFrameTime;
+                
+                if (delta > interval) {
+                    lastFrameTime = now - (delta % interval);
+                    
+                    const jitterY = shake > 0 ? (Math.random() - 0.5) * (shake * 0.1) : 0;
+                    
+                    demoCtx.fillStyle = "black";
+                    demoCtx.fillRect(0,0, demoCanvas.width, demoCanvas.height);
+                    
+                    demoCtx.drawImage(previewVideo, 0, jitterY, demoCanvas.width, demoCanvas.height);
+                    applyEffects(demoCtx, demoCanvas.width, demoCanvas.height);
+                }
+                
+                animationFrameId = requestAnimationFrame(loop);
+            };
+            requestAnimationFrame(loop);
+        }
+
+        function stopSettingsPreview() {
+            isPreviewing = false;
+            cancelAnimationFrame(animationFrameId);
+            if (currentTempVideo) {
+                currentTempVideo.pause();
+                currentTempVideo = null;
+            }
+            demoPlaceholder.style.display = 'flex';
+            demoCanvas.style.display = 'none';
+        }
+
+        async function processNextVideo(targetId = null) {
+            if (isPreviewing) stopSettingsPreview();
+
+            if (shouldStop) {
+                isProcessing = false;
+                shouldStop = false;
+                togglePreview(false);
+                updateUIState();
+                return;
+            }
+
+            const nextFile = targetId 
+                ? files.find(f => f.id === targetId) 
+                : files.find(f => f.status === 'idle');
+
+            if (!nextFile) {
+                isProcessing = false;
+                togglePreview(false);
+                updateUIState();
+                return;
+            }
+
+            isProcessing = true;
+            updateFileStatus(nextFile.id, 'processing', 0);
+            updateUIState();
+            togglePreview(true);
+
+            try {
+                // Creates a new video element for every process job to allow clean media streams
+                const processVideo = document.createElement('video');
+                currentTempVideo = processVideo;
+                
+                processVideo.src = nextFile.originalUrl;
+                processVideo.muted = true;
+                processVideo.crossOrigin = "anonymous";
+                
+                await new Promise((resolve, reject) => {
+                    processVideo.onloadedmetadata = resolve;
+                    processVideo.onerror = reject;
+                });
+
+                processingCanvas.width = processVideo.videoWidth;
+                processingCanvas.height = processVideo.videoHeight;
+
+                const canvasStream = processingCanvas.captureStream(targetFps); 
+                let finalStream = canvasStream;
+                
+                if (!isMuted) {
+                    try {
+                        let audioStream = processVideo.captureStream ? processVideo.captureStream() : 
+                                         (processVideo.mozCaptureStream ? processVideo.mozCaptureStream() : null);
+                        if (audioStream && audioStream.getAudioTracks().length > 0) {
+                            finalStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioStream.getAudioTracks()]);
+                        }
+                    } catch(e) {}
+                }
+
+                // Check support
+                let mimeType = exportFormat;
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    console.warn(`Format ${mimeType} not supported, falling back to default`);
+                    mimeType = ''; 
+                }
+
+                const recorder = new MediaRecorder(finalStream, {
+                    mimeType: mimeType,
+                    videoBitsPerSecond: 2500000 
+                });
+
+                const chunks = [];
+                recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                
+                recorder.onstop = () => {
+                    if (shouldStop) {
+                        updateFileStatus(nextFile.id, 'idle', 0);
+                    } else {
+                        const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+                        const url = URL.createObjectURL(blob);
+                        updateFileStatus(nextFile.id, 'completed', 100, url);
+                    }
+                    
+                    if (finalStream) {
+                        finalStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    processVideo.src = "";
+                    currentTempVideo = null;
+                    
+                    setTimeout(() => processNextVideo(), 300);
+                };
+
+                recorder.start();
+                processVideo.playbackRate = 1.0;
+                await processVideo.play();
+
+                const processFrame = (now) => {
+                    if (shouldStop || processVideo.paused || processVideo.ended) {
+                        if (shouldStop && !processVideo.paused) processVideo.pause();
+                        return;
+                    }
+
+                    const interval = 1000 / targetFps;
+                    const delta = now - lastFrameTime;
+                    
+                    if (delta > interval) {
+                        lastFrameTime = now - (delta % interval);
+                        fpsCounter.innerText = Math.round(1000/delta) + " FPS";
+                        
+                        const scale = processingCanvas.height / 320; 
+                        const jitterY = shake > 0 ? (Math.random() - 0.5) * (shake * scale * 0.1) : 0;
+
+                        ctx.fillStyle = "black";
+                        ctx.fillRect(0, 0, processingCanvas.width, processingCanvas.height);
+
+                        ctx.drawImage(processVideo, 0, jitterY, processingCanvas.width, processingCanvas.height);
+                        applyEffects(ctx, processingCanvas.width, processingCanvas.height);
+                        
+                        const progress = (processVideo.currentTime / processVideo.duration) * 100;
+                        updateFileProgress(nextFile.id, progress);
+                    }
+
+                    animationFrameId = requestAnimationFrame(processFrame);
+                };
+
+                requestAnimationFrame(processFrame);
+
+                processVideo.onended = () => {
+                    cancelAnimationFrame(animationFrameId);
+                    recorder.stop();
+                };
+                
+                const checkStop = setInterval(() => {
+                    if (shouldStop) {
+                        clearInterval(checkStop);
+                        processVideo.pause();
+                        cancelAnimationFrame(animationFrameId);
+                        recorder.stop();
+                    }
+                }, 100);
+
+            } catch (err) {
+                console.error(err);
+                updateFileStatus(nextFile.id, 'error', 0);
+                processNextVideo();
+            }
+        }
+
+        window.startSingle = (id) => {
+            if (!isProcessing) processNextVideo(id);
+        };
+
+        function startQueue() {
+            if (!isProcessing) processNextVideo();
+        }
+
+        // --- Render Helpers ---
+
+        function togglePreview(show) {
+            if (show) {
+                previewContainer.classList.remove('hidden');
+                setTimeout(() => {
+                    previewContainer.classList.remove('opacity-0', 'translate-y-4');
+                }, 10);
+            } else {
+                previewContainer.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => {
+                    previewContainer.classList.add('hidden');
+                }, 500);
+            }
+        }
+
+        function updateUIState() {
+            document.getElementById('completed-count').innerText = files.filter(f => f.status === 'completed').length;
+            
+            if (files.length > 0) actionBar.classList.remove('hidden');
+            else actionBar.classList.add('hidden');
+            
+            const hasCompleted = files.some(f => f.status === 'completed');
+            if(hasCompleted) downloadZipBtn.classList.remove('hidden');
+            else downloadZipBtn.classList.add('hidden');
+
+            if (isProcessing) {
+                convertBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Processing...`;
+                convertBtn.disabled = true;
+                clearBtn.disabled = true;
+                stopBtn.classList.remove('hidden');
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = `<i data-lucide="square" class="w-3.5 h-3.5 fill-current"></i> Stop`;
+            } else {
+                convertBtn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Process All`;
+                convertBtn.disabled = files.length === 0 || !files.some(f => f.status === 'idle');
+                clearBtn.disabled = false;
+                stopBtn.classList.add('hidden');
+            }
+            lucide.createIcons();
+        }
+
+        function updateFileStatus(id, status, progress, resultUrl = null) {
+            const fileIdx = files.findIndex(f => f.id === id);
+            if (fileIdx > -1) {
+                files[fileIdx].status = status;
+                files[fileIdx].progress = progress;
+                if (resultUrl) files[fileIdx].resultUrl = resultUrl;
+                renderSingleItem(files[fileIdx]);
+                updateUIState();
+            }
+        }
+
+        function updateFileProgress(id, progress) {
+            const bar = document.getElementById(`progress-bar-${id}`);
+            const text = document.getElementById(`progress-text-${id}`);
+            if (bar) bar.style.width = `${progress}%`;
+            if (text) text.innerText = `${Math.round(progress)}%`;
+        }
+
+        function renderList() {
+            videoList.innerHTML = '';
+            files.forEach(file => {
+                videoList.appendChild(createVideoItem(file));
+            });
+            updateUIState();
+            lucide.createIcons();
+        }
+
+        function renderSingleItem(file) {
+            const existing = document.getElementById(`item-${file.id}`);
+            if (existing) {
+                const newItem = createVideoItem(file);
+                videoList.replaceChild(newItem, existing);
+                lucide.createIcons();
+            }
+        }
+
+        function createVideoItem(file) {
+            const div = document.createElement('div');
+            div.id = `item-${file.id}`;
+            div.className = "bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col sm:flex-row gap-5 transition-all duration-300 hover:shadow-md";
+            
+            let contentRight = '';
+            let progressArea = '';
+            let statusBadge = '';
+            
+            const btnClass = "btn-noir btn-secondary w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors";
+
+            if (file.status === 'idle') {
+                statusBadge = `<span class="px-2 py-1 rounded-md bg-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wide">Ready</span>`;
+                contentRight = `
+                    <div class="flex gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                        <button onclick="openPreview('${file.id}')" class="${btnClass}" title="Watch Preview">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="removeFile('${file.id}')" class="${btnClass} hover:text-red-500 hover:bg-red-50 hover:border-red-200" title="Remove">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                         <button onclick="startSingle('${file.id}')" class="${btnClass} text-slate-700 bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300 w-auto px-3" title="Process This File" ${isProcessing ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
+                            <i data-lucide="play" class="w-3.5 h-3.5 mr-2"></i> Convert
+                        </button>
+                    </div>
+                `;
+            } else if (file.status === 'processing') {
+                statusBadge = `<span class="px-2 py-1 rounded-md bg-amber-50 text-xs font-bold text-amber-600 uppercase tracking-wide flex items-center gap-1"><span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span> Developing</span>`;
+                progressArea = `
+                    <div class="mt-3">
+                        <div class="flex justify-between text-xs font-bold text-slate-400 mb-1">
+                            <span>RENDERING FRAMES</span>
+                            <span id="progress-text-${file.id}">0%</span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
+                            <div id="progress-bar-${file.id}" class="h-full bg-slate-900 progress-animated rounded-full" style="width: ${file.progress}%"></div>
+                        </div>
+                    </div>
+                `;
+            } else if (file.status === 'completed') {
+                statusBadge = `<span class="px-2 py-1 rounded-md bg-green-50 text-xs font-bold text-green-600 uppercase tracking-wide">Done</span>`;
+                contentRight = `
+                    <div class="flex gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                        <button onclick="openPreview('${file.id}')" class="${btnClass} bg-green-50 text-green-700 hover:bg-green-100 border-green-200" title="Watch Result">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="removeFile('${file.id}')" class="${btnClass} hover:text-red-500 hover:bg-red-50 hover:border-red-200" title="Remove">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                        <a href="${file.resultUrl}" download="bw_${file.file.name}" class="flex-1">
+                            <button class="btn-noir btn-primary w-full px-4 h-9 rounded-lg text-xs font-bold flex items-center justify-center gap-2">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i> Save
+                            </button>
+                        </a>
+                    </div>
+                `;
+            } else if (file.status === 'error') {
+                statusBadge = `<span class="px-2 py-1 rounded-md bg-red-50 text-xs font-bold text-red-600 uppercase tracking-wide">Error</span>`;
+            }
+
+            const size = (file.file.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+            div.innerHTML = `
+                <div class="w-full sm:w-32 h-20 bg-black rounded-lg relative overflow-hidden group shrink-0 shadow-inner flex-shrink-0">
+                    <video src="${file.originalUrl}" class="w-full h-full object-cover opacity-80" muted></video>
+                    ${file.status === 'processing' ? '<div class="absolute inset-0 bg-amber-500/10 z-10"></div>' : ''}
+                    ${file.status === 'completed' ? '<div class="absolute inset-0 grayscale z-10 pointer-events-none"></div>' : ''}
+                </div>
+
+                <div class="flex-1 min-w-0 flex flex-col justify-center">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        ${statusBadge}
+                        <h4 class="font-bold text-slate-800 truncate text-sm max-w-full" title="${file.file.name}">${file.file.name}</h4>
+                    </div>
+                    <p class="text-[10px] font-mono text-slate-400">${size}</p>
+                    ${progressArea}
+                </div>
+
+                ${contentRight}
+            `;
+            return div;
+        }
+
+        window.removeFile = (id) => {
+            files = files.filter(f => f.id !== id);
+            renderList();
+        };
+
+        // --- Drag Logic ---
+        const previewHeader = document.getElementById('preview-header');
+        
+        let isDragging = false;
+        let dragStartX, dragStartY;
+        let initialLeft, initialTop;
+
+        previewHeader.addEventListener('mousedown', startDrag);
+        previewHeader.addEventListener('touchstart', startDrag, {passive: false});
+
+        function startDrag(e) {
+            e.preventDefault();
+            isDragging = true;
+            previewContainer.classList.remove('transition-all', 'duration-500'); // Disable smooth movement while dragging
+            
+            // On first drag, lock position by converting classes to fixed pixel values
+            const rect = previewContainer.getBoundingClientRect();
+            previewContainer.style.left = rect.left + 'px';
+            previewContainer.style.top = rect.top + 'px';
+            previewContainer.style.bottom = 'auto';
+            previewContainer.style.right = 'auto';
+            previewContainer.style.transform = 'none'; // Remove any transform translation
+
+            if (e.type === 'touchstart') {
+                dragStartX = e.touches[0].clientX;
+                dragStartY = e.touches[0].clientY;
+            } else {
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+            }
+            
+            initialLeft = rect.left;
+            initialTop = rect.top;
+            
+            if (e.type === 'touchstart') {
+                document.addEventListener('touchmove', onDrag, {passive: false});
+                document.addEventListener('touchend', stopDrag);
+            } else {
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', stopDrag);
+            }
+        }
+
+        function onDrag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            let clientX, clientY;
+            if (e.type === 'touchmove') {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const dx = clientX - dragStartX;
+            const dy = clientY - dragStartY;
+            
+            previewContainer.style.left = `${initialLeft + dx}px`;
+            previewContainer.style.top = `${initialTop + dy}px`;
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchmove', onDrag);
+            document.removeEventListener('touchend', stopDrag);
+            
+            // Optional: Re-enable transitions? 
+            // Better to leave disabled so it stays put without jumping
+        }
+
+        updateUIState();
+    </script>
+</body>
+</html>

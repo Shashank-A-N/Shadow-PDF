@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Diff Comparison Tool</title>
+    <!-- 1. Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Load necessary libraries from CDN -->
+    
+    <!-- pdf.js for rendering PDFs to a canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.min.js"></script>
+    <!-- The worker is loaded via JavaScript, not a script tag. Removing the line below. -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.worker.min.js"></script> -->
+    
+    <!-- pixelmatch.js for high-performance pixel-level image comparison -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixelmatch/5.3.0/pixelmatch.min.js"></script>
+    
+    <!-- jsdiff.js for semantic text comparison -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
+
+    <style>
+        /* Custom styles for the text diff output */
+        #text-diff-output pre {
+            white-space: pre-wrap; /* Wrap lines */
+            word-wrap: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.5;
+        }
+        #text-diff-output .added {
+            background-color: #e6ffed; /* Light green */
+            color: #22543d; /* Dark green */
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+        }
+        #text-diff-output .removed {
+            background-color: #fff5f5; /* Light red */
+            color: #7f1d1d; /* Dark red */
+            text-decoration: line-through;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+        }
+        
+        /* Simple loading spinner */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3b82f6; /* Blue */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <script>
+      // Configure Tailwind to use Inter font
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              inter: ['Inter', 'sans-serif'],
+            },
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-gray-100 font-inter text-gray-800 flex flex-col min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-white shadow-md p-4">
+        <h1 class="text-2xl font-bold text-center text-blue-700">Visual Diff Comparison Tool</h1>
+        <p class="text-center text-gray-600">Compare two PDFs or two Images to find differences.</p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto p-4 flex flex-col">
+        
+        <!-- 1. Controls: File Inputs & Compare Button -->
+        <section class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                
+                <!-- File 1 Input -->
+                <div class="flex flex-col">
+                    <label for="file1" class="mb-2 font-semibold text-gray-700">Version 1 (Old)</label>
+                    <input type="file" id="file1" accept=".pdf,image/*" class="w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-lg file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100 cursor-pointer
+                    ">
+                </div>
+                
+                <!-- File 2 Input -->
+                <div class="flex flex-col">
+                    <label for="file2" class="mb-2 font-semibold text-gray-700">Version 2 (New)</label>
+                    <input type="file" id="file2" accept=".pdf,image/*" class="w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-lg file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-green-50 file:text-green-700
+                        hover:file:bg-green-100 cursor-pointer
+                    ">
+                </div>
+                
+                <!-- Compare Button -->
+                <div class="md:mt-8">
+                    <button id="compare-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-300">
+                        Compare
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Status Message Area -->
+            <div id="status-container" class="mt-4 flex items-center justify-center min-h-[2.5rem]">
+                 <div id="loader" class="loader hidden"></div>
+                 <span id="status-msg" class="ml-4 text-lg font-medium text-gray-700"></span>
+            </div>
+        </section>
+
+        <!-- 2. Results Area -->
+        <section id="results-area" class="bg-white rounded-lg shadow-lg p-6 flex-grow flex-col hidden">
+            
+            <!-- Tab Navigation -->
+            <div class="border-b border-gray-200 mb-4">
+                <nav class="flex space-x-4" aria-label="Tabs">
+                    <button id="visual-tab" data-active="true" class="tab-btn px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600">
+                        Visual Diff
+                    </button>
+                    <button id="text-tab" data-active="false" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300">
+                        Text Diff
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Visual Diff View -->
+            <div id="visual-view" class="flex flex-col flex-grow">
+                
+                <!-- PDF Controls (hidden by default) -->
+                <div id="pdf-controls" classclass="hidden flex items-center justify-center gap-4 mb-4 p-2 bg-gray-50 rounded-lg">
+                    <button id="prev-page" class="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 text-sm font-medium">&lt; Previous Page</button>
+                    <span class="font-medium text-gray-700">
+                        Page <span id="page-num">1</span> of <span id="page-count">1</span>
+                    </span>
+                    <button id="next-page" class="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 text-sm font-medium">Next Page &gt;</button>
+                </div>
+
+                <!-- Canvas Container -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 flex-grow">
+                    <div class="flex flex-col items-center">
+                        <h3 class="text-lg font-semibold mb-2">Version 1</h3>
+                        <canvas id="canvas1" class="w-full h-auto border border-gray-300 rounded-md bg-gray-50"></canvas>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <h3 class="text-lg font-semibold mb-2">Version 2</h3>
+                        <canvas id="canvas2" class="w-full h-auto border border-gray-300 rounded-md bg-gray-50"></canvas>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <h3 class="text-lg font-semibold mb-2">Differences (in Red)</h3>
+                        <canvas id="diff-canvas" class="w-full h-auto border border-red-300 rounded-md bg-gray-50"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text Diff View (hidden by default) -->
+            <div id="text-view" class="hidden flex-grow overflow-auto">
+                <div id="text-diff-output" class="w-full p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <p class="text-gray-500">Text comparison will appear here...</p>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- 3. JavaScript Logic -->
+    <script>
+      // Wait for the entire window to load, including all scripts
+      window.addEventListener('load', () => {
+        
+        // --- Access global libraries ---
+        // Assign globals to local constants for clarity and safety.
+        const pdfjsLib = window.pdfjsLib;
+        const pixelmatch = window.pixelmatch;
+        const Diff = window.Diff;
+        
+        // --- DOM Elements ---
+        const file1Input = document.getElementById('file1');
+        const file2Input = document.getElementById('file2');
+        const compareBtn = document.getElementById('compare-btn');
+        
+        const statusContainer = document.getElementById('status-container');
+        const loader = document.getElementById('loader');
+        const statusMsg = document.getElementById('status-msg');
+        
+        const resultsArea = document.getElementById('results-area');
+        const visualTab = document.getElementById('visual-tab');
+        const textTab = document.getElementById('text-tab');
+        const visualView = document.getElementById('visual-view');
+        const textView = document.getElementById('text-view');
+        
+        const pdfControls = document.getElementById('pdf-controls');
+        const prevPageBtn = document.getElementById('prev-page');
+        const nextPageBtn = document.getElementById('next-page');
+        const pageNumEl = document.getElementById('page-num');
+        const pageCountEl = document.getElementById('page-count');
+        
+        const canvas1 = document.getElementById('canvas1');
+        const canvas2 = document.getElementById('canvas2');
+        const diffCanvas = document.getElementById('diff-canvas');
+        const ctx1 = canvas1.getContext('2d');
+        const ctx2 = canvas2.getContext('2d');
+        const diffCtx = diffCanvas.getContext('2d');
+
+        const textDiffOutput = document.getElementById('text-diff-output');
+
+        // --- Initial Library Check ---
+        // Verify that all core libraries have loaded correctly.
+        if (!pdfjsLib) {
+            console.error("pdf.js (pdfjsLib) failed to load.");
+            setStatus("Error: Core PDF library failed to load. Please refresh.", false, 'error');
+            return;
+        }
+        if (!pixelmatch) {
+            console.error("pixelmatch.js (pixelmatch) failed to load.");
+            setStatus("Error: Core visual diff library (pixelmatch) failed to load. Please refresh.", false, 'error');
+            return;
+        }
+        if (!Diff) {
+            console.error("jsdiff.js (Diff) failed to load.");
+            setStatus("Error: Core text diff library (Diff) failed to load. Please refresh.", false, 'error');
+            return;
+        }
+
+        // --- Global State ---
+        let file1Type = null;
+        let file2Type = null;
+        let file1Buffer = null;
+        let file2Buffer = null;
+        
+        let pdfDoc1 = null;
+        let pdfDoc2 = null;
+        let currentPage = 1;
+
+        // --- Utility Functions ---
+        
+        /**
+         * Sets the status message and loading state.
+         * @param {string} message - The text to display.
+         * @param {boolean} isLoading - Whether to show the spinner.
+         * @param {string} [level='info'] - 'info', 'success', 'error'
+         */
+        function setStatus(message, isLoading = false, level = 'info') {
+            statusMsg.textContent = message;
+            loader.classList.toggle('hidden', !isLoading);
+            
+            statusMsg.classList.remove('text-gray-700', 'text-green-600', 'text-red-600');
+            if (level === 'success') {
+                statusMsg.classList.add('text-green-600');
+            } else if (level === 'error') {
+                statusMsg.classList.add('text-red-600');
+            } else {
+                statusMsg.classList.add('text-gray-700');
+            }
+        }
+        
+        /**
+         * Reads a File object as an ArrayBuffer.
+         * @param {File} file - The file to read.
+         * @returns {Promise<ArrayBuffer>}
+         */
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        /**
+         * Loads an image from an ArrayBuffer onto a canvas.
+         * @param {ArrayBuffer} buffer - The image data.
+         * @param {HTMLCanvasElement} canvas - The canvas to draw on.
+         * @returns {Promise<void>}
+         */
+        function loadImageToCanvas(buffer, canvas) {
+            return new Promise((resolve, reject) => {
+                const blob = new Blob([buffer]);
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    URL.revokeObjectURL(url);
+                    resolve();
+                };
+                img.onerror = (e) => {
+                    URL.revokeObjectURL(url);
+                    reject(e);
+                };
+                img.src = url;
+            });
+        }
+        
+        /**
+         * Renders a specific page of a PDF to a canvas.
+         * @param {PDFDocumentProxy} pdfDoc - The loaded PDF document.
+         * @param {number} pageNum - The 1-based page number.
+         * @param {HTMLCanvasElement} canvas - The canvas to draw on.
+         * @returns {Promise<void>}
+         */
+        async function renderPdfPage(pdfDoc, pageNum, canvas) {
+            const page = await pdfDoc.getPage(pageNum);
+            const scale = 2.0; // Higher scale for better resolution
+            const viewport = page.getViewport({ scale });
+            
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            const ctx = canvas.getContext('2d');
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: viewport,
+            };
+            await page.render(renderContext).promise;
+        }
+
+        // --- Core Logic ---
+
+        /**
+         * Main function triggered by the "Compare" button.
+         */
+        async function handleCompare() {
+            const file1 = file1Input.files[0];
+            const file2 = file2Input.files[0];
+
+            if (!file1 || !file2) {
+                setStatus("Please select two files to compare.", false, 'error');
+                return;
+            }
+
+            file1Type = file1.type.startsWith('image/') ? 'image' : (file1.type === 'application/pdf' ? 'pdf' : null);
+            file2Type = file2.type.startsWith('image/') ? 'image' : (file2.type === 'application/pdf' ? 'pdf' : null);
+
+            if (!file1Type || !file2Type) {
+                setStatus("Unsupported file type. Please use images or PDFs.", false, 'error');
+                return;
+            }
+            if (file1Type !== file2Type) {
+                setStatus("Files must be of the same type (e.g., two images or two PDFs).", false, 'error');
+                return;
+            }
+
+            setStatus("Loading and reading files...", true, 'info');
+            resultsArea.classList.add('hidden');
+            
+            try {
+                [file1Buffer, file2Buffer] = await Promise.all([
+                    readFileAsArrayBuffer(file1),
+                    readFileAsArrayBuffer(file2)
+                ]);
+
+                if (file1Type === 'image') {
+                    await compareImages();
+                    // Hide PDF-specific UI
+                    pdfControls.classList.add('hidden');
+                    textTab.classList.add('hidden');
+                } else if (file1Type === 'pdf') {
+                    await comparePdfs();
+                    // Show PDF-specific UI
+                    pdfControls.classList.remove('hidden');
+                    textTab.classList.remove('hidden');
+                }
+                
+                resultsArea.classList.remove('hidden');
+                setStatus("Comparison complete!", false, 'success');
+                
+            } catch (error) {
+                console.error("Comparison failed:", error);
+                setStatus(`Error: ${error.message}`, false, 'error');
+            }
+        }
+
+        /**
+         * Handles the comparison logic for two images.
+         */
+        async function compareImages() {
+            setStatus("Rendering images...", true, 'info');
+            await Promise.all([
+                loadImageToCanvas(file1Buffer, canvas1),
+                loadImageToCanvas(file2Buffer, canvas2)
+            ]);
+            
+            runVisualDiff();
+        }
+
+        /**
+         * Handles the comparison logic for two PDFs.
+         */
+        async function comparePdfs() {
+            setStatus("Loading PDFs (this may take a moment)...", true, 'info');
+            
+            // Set the PDF.js worker source
+            // Note: This global state is required by pdf.js
+            // Accessing the local 'pdfjsLib' constant
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.107/pdf.worker.min.js';
+
+            const loadingTask1 = pdfjsLib.getDocument({ data: file1Buffer });
+            const loadingTask2 = pdfjsLib.getDocument({ data: file2Buffer });
+
+            [pdfDoc1, pdfDoc2] = await Promise.all([
+                loadingTask1.promise,
+                loadingTask2.promise
+            ]);
+            
+            if (pdfDoc1.numPages !== pdfDoc2.numPages) {
+                setStatus(`PDFs have different page counts (${pdfDoc1.numPages} vs ${pdfDoc2.numPages}). Comparing page by page up to the shortest.`, false, 'info');
+                // We can still proceed, but the UI should reflect this.
+            }
+            
+            pageCountEl.textContent = Math.max(pdfDoc1.numPages, pdfDoc2.numPages);
+            currentPage = 1;
+            pageNumEl.textContent = 1;
+            
+            // Render the first page
+            await renderPdfPageAndDiff(currentPage);
+            
+            // Start text diff in the background
+            performTextDiff();
+        }
+        
+        /**
+         * Renders the specified PDF page for both documents and runs the visual diff.
+         * @param {number} pageNum - The 1-based page number to render.
+         */
+        async function renderPdfPageAndDiff(pageNum) {
+            if (pageNum < 1) pageNum = 1;
+            
+            const maxPage = Math.min(pdfDoc1.numPages, pdfDoc2.numPages);
+            if (pageNum > maxPage) {
+                setStatus(`Can only compare up to page ${maxPage}`, false, 'error');
+                return;
+            }
+
+            if (pageNum > pdfDoc1.numPages || pageNum > pdfDoc2.numPages) {
+                 setStatus(`Can't render page ${pageNum}: one PDF is shorter.`, false, 'error');
+                 return;
+            }
+
+            setStatus(`Rendering page ${pageNum}...`, true, 'info');
+            
+            // Clear canvases
+            ctx1.clearRect(0, 0, canvas1.width, canvas1.height);
+            ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+            diffCtx.clearRect(0, 0, diffCanvas.width, diffCanvas.height);
+            
+            try {
+                await Promise.all([
+                    renderPdfPage(pdfDoc1, pageNum, canvas1),
+                    renderPdfPage(pdfDoc2, pageNum, canvas2)
+                ]);
+                
+                runVisualDiff();
+                setStatus(`Comparison complete for page ${pageNum}.`, false, 'success');
+                
+            } catch (error) {
+                console.error(`Failed to render page ${pageNum}:`, error);
+                setStatus(`Error rendering page ${pageNum}: ${error.message}`, false, 'error');
+            }
+        }
+
+        /**
+         * Runs the pixelmatch algorithm on canvas1 and canvas2, drawing output to diffCanvas.
+         */
+        function runVisualDiff() {
+            const width = canvas1.width;
+            const height = canvas1.height;
+            
+            if (width === 0 || height === 0) {
+                setStatus("Cannot compare empty canvases.", false, 'error');
+                return;
+            }
+
+            // Ensure diff canvas matches dimensions
+            diffCanvas.width = width;
+            diffCanvas.height = height;
+
+            if (canvas1.width !== canvas2.width || canvas1.height !== canvas2.height) {
+                setStatus("Images/pages have different dimensions. Visual diff may be inaccurate.", false, 'info');
+                // For this demo, we'll proceed, but a real tool might offer resizing options.
+                // We'll use the smallest dimensions to avoid errors.
+                const minWidth = Math.min(canvas1.width, canvas2.width);
+                const minHeight = Math.min(canvas1.height, canvas2.height);
+                diffCanvas.width = minWidth;
+                diffCanvas.height = minHeight;
+            }
+
+            const imgData1 = ctx1.getImageData(0, 0, width, height);
+            const imgData2 = ctx2.getImageData(0, 0, width, height);
+            const diffData = diffCtx.createImageData(width, height);
+
+            // Run the diff
+            // pixelmatch(img1data, img2data, outputdata, width, height, options)
+            // Accessing the local 'pixelmatch' constant
+            const numDiffPixels = pixelmatch(
+                imgData1.data, 
+                imgData2.data, 
+                diffData.data, 
+                width, 
+                height, 
+                { threshold: 0.1 } // Small threshold for anti-aliasing
+            );
+
+            // Draw the diff output
+            diffCtx.putImageData(diffData, 0, 0);
+            
+            // Update status with diff count
+            const diffPercent = (numDiffPixels / (width * height) * 100).toFixed(2);
+            setStatus(`Found ${numDiffPixels} differing pixels (${diffPercent}% difference).`, false, 'success');
+        }
+
+        /**
+         * Extracts text from all pages of a PDF.
+         * @param {PDFDocumentProxy} pdfDoc - The loaded PDF.
+         * @returns {Promise<string>} - The full text content.
+         */
+        async function extractPdfText(pdfDoc) {
+            let fullText = "";
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                const page = await pdfDoc.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n\n'; // Add newline for page break
+            }
+            return fullText;
+        }
+
+        /**
+         * Performs and renders the semantic text diff for PDFs.
+         */
+        async function performTextDiff() {
+            setStatus("Extracting and comparing text (all pages)...", true, 'info');
+            textDiffOutput.innerHTML = '<p class="text-gray-500">Extracting text...</p>';
+            
+            try {
+                const [text1, text2] = await Promise.all([
+                    extractPdfText(pdfDoc1),
+                    extractPdfText(pdfDoc2)
+                ]);
+
+                // Accessing the local 'Diff' constant
+                const differences = Diff.diffLines(text1, text2);
+                
+                let html = '<pre>';
+                let hasChanges = false;
+                
+                differences.forEach(part => {
+                    const value = part.value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    if (part.added) {
+                        html += `<span class="added">${value}</span>`;
+                        hasChanges = true;
+                    } else if (part.removed) {
+                        html += `<span class="removed">${value}</span>`;
+                        hasChanges = true;
+                    } else {
+                        html += value;
+                    }
+                });
+                
+                html += '</pre>';
+                textDiffOutput.innerHTML = html;
+                
+                if (hasChanges) {
+                    setStatus("Comparison complete. Text differences found!", false, 'success');
+                } else {
+                     setStatus("Comparison complete. No text differences found.", false, 'success');
+                     textDiffOutput.innerHTML = '<p class="text-green-600 font-medium">No text differences found between the two documents.</p>';
+                }
+                
+            } catch (error) {
+                console.error("Text diff failed:", error);
+                textDiffOutput.innerHTML = `<p class="text-red-600">Error during text comparison: ${error.message}</p>`;
+                setStatus("Text comparison failed.", false, 'error');
+            }
+        }
+        
+        /**
+         * Switches between the Visual and Text diff tabs.
+         * @param {string} view - 'visual' or 'text'
+         */
+        function switchView(view) {
+            if (view === 'visual') {
+                visualView.classList.remove('hidden');
+                textView.classList.add('hidden');
+                
+                visualTab.dataset.active = "true";
+                visualTab.classList.add('text-blue-600', 'border-blue-600');
+                visualTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                
+                textTab.dataset.active = "false";
+                textTab.classList.remove('text-blue-600', 'border-blue-600');
+                textTab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            } else {
+                visualView.classList.add('hidden');
+                textView.classList.remove('hidden');
+                
+                textTab.dataset.active = "true";
+                textTab.classList.add('text-blue-600', 'border-blue-600');
+                textTab.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                
+                visualTab.dataset.active = "false";
+                visualTab.classList.remove('text-blue-600', 'border-blue-600');
+                visualTab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            }
+        }
+
+        // --- Event Listeners ---
+        compareBtn.addEventListener('click', handleCompare);
+
+        visualTab.addEventListener('click', () => switchView('visual'));
+        textTab.addEventListener('click', () => switchView('text'));
+
+        prevPageBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                pageNumEl.textContent = currentPage;
+                renderPdfPageAndDiff(currentPage);
+            }
+        });
+
+        nextPageBtn.addEventListener('click', () => {
+            const maxPage = Math.min(pdfDoc1.numPages, pdfDoc2.numPages);
+            if (currentPage < maxPage) {
+                currentPage++;
+                pageNumEl.textContent = currentPage;
+                renderPdfPageAndDiff(currentPage);
+            }
+        });
+        
+        // Initial setup
+        switchView('visual');
+
+      }); // End of DOMContentLoaded listener
+    </script>
+</body>
+</html>
+
+

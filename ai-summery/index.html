@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Document Summarizer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf.js library from Mozilla to process PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- marked.js library to parse Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Simple animation for the loader */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .loader {
+            animation: spin 1s linear infinite;
+        }
+        /* Custom scrollbar for text areas */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b; /* slate-800 */
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #6366f1; /* indigo-500 */
+            border-radius: 10px;
+            border: 2px solid #1e293b;
+        }
+        /* Modal transition */
+        #modal.hidden {
+            display: none;
+        }
+        /* Custom styles for rendered Markdown content */
+        .prose-styles h1, .prose-styles h2, .prose-styles h3, .prose-styles h4 {
+            color: #f1f5f9; /* slate-100 */
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            margin-top: 1rem;
+        }
+        .prose-styles h2 { font-size: 1.25rem; line-height: 1.75rem; }
+        .prose-styles h3 { font-size: 1.1rem; line-height: 1.5rem; }
+        .prose-styles p { margin-bottom: 0.75rem; }
+        .prose-styles strong { color: #f8fafc; /* slate-50 */ font-weight: 600; }
+        .prose-styles ul { list-style-type: disc; margin-bottom: 0.75rem; padding-left: 1.25rem; }
+        .prose-styles li { margin-bottom: 0.25rem; }
+        .prose-styles a { color: #818cf8; /* indigo-400 */ text-decoration: underline; }
+        .prose-styles blockquote {
+            border-left: 4px solid #475569; /* slate-600 */
+            padding-left: 1rem;
+            color: #94a3b8; /* slate-400 */
+            font-style: italic;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-3xl space-y-6">
+        
+        <!-- Header Section -->
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">AI Document Summarizer</h1>
+            <p class="text-slate-400 mt-2">Upload a PDF and let Gemini create a concise summary for you.</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div id="upload-section" class="space-y-4">
+            <label for="pdf-upload" class="w-full cursor-pointer bg-slate-700 hover:bg-slate-600 border-2 border-dashed border-slate-500 rounded-xl flex flex-col items-center justify-center p-8 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span id="file-name" class="mt-2 text-white font-medium">Click to select a PDF file</span>
+                <span class="text-xs text-slate-400 mt-1">Maximum file size: 10MB</span>
+            </label>
+            <input type="file" id="pdf-upload" class="hidden" accept="application/pdf">
+            <button id="summarize-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-all disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400">
+                Summarize Document
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loader-section" class="hidden text-center py-8">
+            <div class="loader border-4 border-t-4 border-t-indigo-500 border-slate-600 rounded-full w-12 h-12 mx-auto"></div>
+            <p id="loader-text" class="mt-4 text-slate-300 font-medium">Processing PDF...</p>
+        </div>
+
+        <!-- Summary Result Section -->
+        <div id="summary-section" class="hidden space-y-4">
+            <h2 class="text-2xl font-bold text-white">Generated Summary</h2>
+            <div id="summary-text" class="bg-slate-900/50 border border-slate-700 rounded-lg p-4 h-64 overflow-y-auto text-slate-300 custom-scrollbar prose-styles"></div>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="copy-btn" class="w-full sm:w-auto flex-grow bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Copy Summary</button>
+                <button id="clear-btn" class="w-full sm:w-auto flex-grow bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Start Over</button>
+            </div>
+        </div>
+
+        <!-- Smart Actions Section -->
+        <div id="smart-actions-section" class="hidden space-y-4 pt-4 border-t border-slate-700">
+             <h3 class="text-xl font-bold text-center text-white">Smart Actions</h3>
+             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button id="action-takeaways" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">✨ Extract Key Takeaways</button>
+                <button id="action-questions" class="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">✨ Generate Potential Questions</button>
+                <button id="action-simplify" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">✨ Explain for Broader Audience</button>
+             </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error-message" class="hidden bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg" role="alert">
+            <strong class="font-bold">Error:</strong>
+            <span id="error-text" class="block sm:inline"></span>
+        </div>
+    </div>
+
+    <!-- Modal for Smart Action Results -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-slate-700">
+                <h3 id="modal-title" class="text-xl font-bold text-white"></h3>
+                <button id="modal-close-btn" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto custom-scrollbar flex-grow prose-styles">
+                <!-- Content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM Element References ---
+        const uploadSection = document.getElementById('upload-section');
+        const pdfUpload = document.getElementById('pdf-upload');
+        const fileName = document.getElementById('file-name');
+        const summarizeBtn = document.getElementById('summarize-btn');
+        const loaderSection = document.getElementById('loader-section');
+        const loaderText = document.getElementById('loader-text');
+        const summarySection = document.getElementById('summary-section');
+        const summaryText = document.getElementById('summary-text');
+        const copyBtn = document.getElementById('copy-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const smartActionsSection = document.getElementById('smart-actions-section');
+        const actionTakeawaysBtn = document.getElementById('action-takeaways');
+        const actionQuestionsBtn = document.getElementById('action-questions');
+        const actionSimplifyBtn = document.getElementById('action-simplify');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalContent = document.getElementById('modal-content');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        // --- State ---
+        let selectedFile = null;
+        let fullPdfText = ''; // Store the full extracted text
+
+        // --- PDF.js Worker Configuration ---
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        // --- Event Listeners ---
+        pdfUpload.addEventListener('change', handleFileSelect);
+        summarizeBtn.addEventListener('click', handleSummarize);
+        clearBtn.addEventListener('click', resetUI);
+        copyBtn.addEventListener('click', copySummaryToClipboard);
+        modalCloseBtn.addEventListener('click', () => modal.classList.add('hidden'));
+        actionTakeawaysBtn.addEventListener('click', () => handleSmartAction('takeaways'));
+        actionQuestionsBtn.addEventListener('click', () => handleSmartAction('questions'));
+        actionSimplifyBtn.addEventListener('click', () => handleSmartAction('simplify'));
+
+        // --- Functions ---
+
+        function handleFileSelect(event) {
+            hideError();
+            const file = event.target.files[0];
+            if (!file) return;
+            if (file.type !== 'application/pdf') {
+                showError('Please select a valid PDF file.');
+                resetFileInput();
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                showError('File is too large. Please select a file smaller than 10MB.');
+                resetFileInput();
+                return;
+            }
+            selectedFile = file;
+            fileName.textContent = selectedFile.name;
+            summarizeBtn.disabled = false;
+        }
+
+        async function handleSummarize() {
+            if (!selectedFile) {
+                showError('No file selected.');
+                return;
+            }
+            uploadSection.classList.add('hidden');
+            smartActionsSection.classList.add('hidden');
+            loaderSection.classList.remove('hidden');
+            loaderText.textContent = 'Reading text from PDF...';
+
+            try {
+                fullPdfText = await extractTextFromPdf(selectedFile);
+                if (!fullPdfText.trim()) {
+                    throw new Error("Could not extract any text from the PDF. It might be an image-only PDF.");
+                }
+
+                loaderText.textContent = 'Generating summary with AI...';
+                const summary = await callGeminiForSummary(fullPdfText);
+                displaySummary(summary);
+            } catch (err) {
+                console.error('Summarization failed:', err);
+                showError(err.message || 'An unknown error occurred.');
+                loaderSection.classList.add('hidden');
+                uploadSection.classList.remove('hidden');
+            }
+        }
+
+        async function extractTextFromPdf(file) {
+            const reader = new FileReader();
+            return new Promise((resolve, reject) => {
+                reader.onload = async (event) => {
+                    try {
+                        const typedarray = new Uint8Array(event.target.result);
+                        const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                        let text = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            text += textContent.items.map(item => item.str).join(' ') + '\n\n';
+                        }
+                        resolve(text);
+                    } catch (error) {
+                        reject(new Error('Failed to parse the PDF file.'));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read the file.'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+        
+        async function callGemini(promptTemplate, text) {
+            const prompt = `${promptTemplate}\n\nDOCUMENT CONTENT:\n"""\n${text}\n"""`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+            const apiKey = "AIzaSyA-FfPzdQSAoWF40GaGQyhhU4X9QKDraKU";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.json();
+                console.error("API Error Response:", errorBody);
+                throw new Error(`API request failed with status ${response.status}.`);
+            }
+
+            const result = await response.json();
+            if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                console.error("Unexpected API response structure:", result);
+                if (result.promptFeedback?.blockReason) {
+                    throw new Error(`Request was blocked. Reason: ${result.promptFeedback.blockReason}.`);
+                }
+                throw new Error('Failed to get a valid response from the AI.');
+            }
+        }
+
+        function callGeminiForSummary(text) {
+            const prompt = `Please provide a concise and easy-to-read summary of the following document. Focus on the key points, main arguments, and conclusions. Use bullet points and bold text for emphasis where appropriate.`;
+            return callGemini(prompt, text);
+        }
+
+        async function handleSmartAction(actionType) {
+            let prompt, title;
+            switch(actionType) {
+                case 'takeaways':
+                    title = 'Key Takeaways';
+                    prompt = 'Analyze the following document and extract the key takeaways as a concise bulleted list. Focus on the most critical findings, conclusions, or actionable items.';
+                    break;
+                case 'questions':
+                    title = 'Potential Questions';
+                    prompt = 'Based on the following document, generate a list of 3-5 insightful questions that a reader could use to test their comprehension or to start a discussion. The questions should be thought-provoking and cover the main themes of the text.';
+                    break;
+                case 'simplify':
+                    title = 'Simplified Explanation';
+                    prompt = 'Explain the core concepts of the following document in simple, easy-to-understand terms, as if you were explaining it to a curious 12-year-old. Avoid jargon and use analogies if helpful.';
+                    break;
+                default:
+                    return;
+            }
+
+            modalTitle.textContent = title;
+            modalContent.innerHTML = `<div class="flex justify-center items-center h-48"><div class="loader border-4 border-t-4 border-t-indigo-500 border-slate-600 rounded-full w-12 h-12"></div></div>`;
+            modal.classList.remove('hidden');
+
+            try {
+                const result = await callGemini(prompt, fullPdfText);
+                modalContent.innerHTML = marked.parse(result);
+            } catch (err) {
+                modalContent.innerHTML = `<div class="text-red-400"><strong>Error:</strong> ${err.message}</div>`;
+            }
+        }
+
+        function displaySummary(summary) {
+            loaderSection.classList.add('hidden');
+            summarySection.classList.remove('hidden');
+            smartActionsSection.classList.remove('hidden');
+            summaryText.innerHTML = marked.parse(summary.trim());
+        }
+
+        function copySummaryToClipboard() {
+            // Copy the text content, not the HTML, for pasting into plain text editors.
+            const textToCopy = summaryText.innerText;
+            const textArea = document.createElement('textarea');
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                copyBtn.textContent = 'Copied!';
+                copyBtn.classList.replace('bg-green-600', 'bg-blue-600');
+                copyBtn.classList.remove('hover:bg-green-700');
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy Summary';
+                    copyBtn.classList.replace('bg-blue-600', 'bg-green-600');
+                    copyBtn.classList.add('hover:bg-green-700');
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                showError("Could not copy text to clipboard.");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function resetUI() {
+            resetFileInput();
+            hideError();
+            summarySection.classList.add('hidden');
+            smartActionsSection.classList.add('hidden');
+            uploadSection.classList.remove('hidden');
+            loaderSection.classList.add('hidden');
+            summaryText.innerHTML = '';
+            fullPdfText = '';
+        }
+
+        function resetFileInput() {
+            selectedFile = null;
+            pdfUpload.value = '';
+            fileName.textContent = 'Click to select a PDF file';
+            summarizeBtn.disabled = true;
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessage.classList.add('hidden');
+            errorText.textContent = '';
+        }
+    </script>
+</body>
+</html>

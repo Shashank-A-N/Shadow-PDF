@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to PDF Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- Cropper.js for image editing -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .file-input-label:hover {
+            background-color: #f0f9ff;
+            border-color: #3b82f6;
+        }
+        .spinner {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .preview-item { touch-action: none; cursor: grab; }
+        .preview-item:grabbing { cursor: grabbing; }
+        .sortable-ghost { opacity: 0.4; background: #c8ebfb; }
+
+        .preview-item .actions { opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .preview-item:hover .actions { opacity: 1; }
+
+        /* Modal styles */
+        #editModal {
+            transition: opacity 0.3s ease;
+        }
+        #editModal .cropper-container {
+            margin: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white rounded-xl shadow-2xl p-6 md:p-10 w-full max-w-5xl m-4">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Advanced Image to PDF</h1>
+            <p class="text-gray-500 mt-2">Upload, reorder, resize, and rotate your images before conversion.</p>
+        </div>
+
+        <div>
+            <input type="file" id="imageInput" accept="image/*" multiple class="hidden">
+            <label for="imageInput" class="file-input-label cursor-pointer flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-lg text-center p-4 transition-colors">
+                <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h10a4 4 0 014 4v6a4 4 0 01-4 4H7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 16v1a2 2 0 01-2 2H10a2 2 0 01-2-2v-1m-4-4h16"></path></svg>
+                <p class="font-semibold text-gray-700">Click to upload or drag and drop</p>
+                <p class="text-sm text-gray-500">PNG, JPG, GIF, etc.</p>
+            </label>
+        </div>
+
+        <div id="imagePreview" class="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 min-h-[150px]">
+            <!-- Image thumbnails will be injected here -->
+        </div>
+
+        <div class="mt-8 flex flex-col sm:flex-row gap-4">
+            <button id="convertBtn" class="w-full flex items-center justify-center bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all" disabled>
+                <span id="btnText">Convert to PDF</span>
+                <div id="spinner" class="spinner w-5 h-5 rounded-full border-2 border-white border-t-blue-500 ml-3 hidden"></div>
+            </button>
+            <button id="clearBtn" class="w-full sm:w-auto bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg hover:bg-gray-300 transition-all hidden">
+                Clear All
+            </button>
+        </div>
+
+        <div id="status" class="mt-4 text-center text-green-600 font-medium"></div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl h-full max-h-[90vh] flex flex-col p-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Edit Image</h2>
+            <div class="flex-grow min-h-0">
+                <img id="imageToEdit" src="" class="max-w-full max-h-full block">
+            </div>
+            <div class="flex items-center justify-center gap-4 mt-4 flex-wrap">
+                <button id="rotateLeftBtn" class="bg-gray-200 p-2 rounded-lg hover:bg-gray-300">Rotate Left</button>
+                <button id="rotateRightBtn" class="bg-gray-200 p-2 rounded-lg hover:bg-gray-300">Rotate Right</button>
+                <button id="saveEditBtn" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700">Save Changes</button>
+                <button id="cancelEditBtn" class="bg-red-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-600">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        window.jsPDF = window.jspdf.jsPDF;
+
+        // DOM Elements
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const convertBtn = document.getElementById('convertBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusDiv = document.getElementById('status');
+        const btnText = document.getElementById('btnText');
+        const spinner = document.getElementById('spinner');
+        const editModal = document.getElementById('editModal');
+        const imageToEdit = document.getElementById('imageToEdit');
+        const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+        const rotateRightBtn = document.getElementById('rotateRightBtn');
+        const saveEditBtn = document.getElementById('saveEditBtn');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+        // State
+        let imageCollection = []; // {id, file, dataURL, editedDataURL}
+        let sortable = null;
+        let cropper = null;
+        let editingIndex = -1;
+
+        // Event Listeners
+        imageInput.addEventListener('change', handleFileSelect);
+        convertBtn.addEventListener('click', convertImagesToPdf);
+        clearBtn.addEventListener('click', clearSelection);
+        rotateLeftBtn.addEventListener('click', () => cropper?.rotate(-90));
+        rotateRightBtn.addEventListener('click', () => cropper?.rotate(90));
+        saveEditBtn.addEventListener('click', saveImageEdits);
+        cancelEditBtn.addEventListener('click', closeEditModal);
+
+        function initSortable() {
+            if (sortable) sortable.destroy();
+            sortable = new Sortable(imagePreview, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: (evt) => {
+                    const movedItem = imageCollection.splice(evt.oldIndex, 1)[0];
+                    imageCollection.splice(evt.newIndex, 0, movedItem);
+                },
+            });
+        }
+
+        async function handleFileSelect(e) {
+            statusDiv.textContent = '';
+            const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+            if (files.length === 0) return;
+
+            for (const file of files) {
+                const dataURL = await readFileAsDataURL(file);
+                imageCollection.push({
+                    id: crypto.randomUUID(),
+                    file,
+                    dataURL,
+                    editedDataURL: null
+                });
+            }
+            renderPreview();
+        }
+
+        function renderPreview() {
+            imagePreview.innerHTML = '';
+            convertBtn.disabled = imageCollection.length === 0;
+            clearBtn.classList.toggle('hidden', imageCollection.length === 0);
+
+            imageCollection.forEach((imgObject, index) => {
+                const previewContainer = document.createElement('div');
+                previewContainer.className = 'preview-item relative group';
+                previewContainer.dataset.id = imgObject.id;
+
+                const img = document.createElement('img');
+                // Show edited version in thumbnail if it exists
+                img.src = imgObject.editedDataURL || imgObject.dataURL;
+                img.className = 'w-full h-32 object-cover rounded-lg shadow-md';
+
+                const actionsWrapper = document.createElement('div');
+                actionsWrapper.className = 'actions absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center gap-2 rounded-lg';
+                
+                // Edit Button
+                const editBtn = document.createElement('button');
+                editBtn.innerHTML = `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>`;
+                editBtn.title = "Edit Image";
+                editBtn.className = 'p-2 rounded-full hover:bg-white/20';
+                editBtn.onclick = (e) => { e.stopPropagation(); openEditModal(index); };
+
+                // Remove Button
+                const removeBtn = document.createElement('button');
+                removeBtn.innerHTML = `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+                removeBtn.title = "Remove";
+                removeBtn.className = 'p-2 rounded-full hover:bg-white/20';
+                removeBtn.onclick = (e) => { e.stopPropagation(); removeImage(index); };
+                
+                actionsWrapper.appendChild(editBtn);
+                actionsWrapper.appendChild(removeBtn);
+                previewContainer.appendChild(img);
+                previewContainer.appendChild(actionsWrapper);
+                imagePreview.appendChild(previewContainer);
+            });
+            
+            initSortable();
+        }
+
+        function removeImage(index) {
+            imageCollection.splice(index, 1);
+            renderPreview();
+        }
+
+        function clearSelection() {
+            imageCollection = [];
+            imageInput.value = '';
+            renderPreview();
+            statusDiv.textContent = '';
+        }
+
+        function openEditModal(index) {
+            editingIndex = index;
+            const imgObject = imageCollection[index];
+            imageToEdit.src = imgObject.dataURL; // Always edit from the original
+            
+            editModal.classList.remove('hidden');
+            editModal.classList.add('flex');
+
+            cropper = new Cropper(imageToEdit, {
+                aspectRatio: NaN, // Free crop
+                viewMode: 1,
+                background: false,
+                responsive: true,
+                autoCropArea: 0.8,
+            });
+        }
+
+        function closeEditModal() {
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            editModal.classList.add('hidden');
+            editModal.classList.remove('flex');
+            editingIndex = -1;
+        }
+
+        function saveImageEdits() {
+            if (!cropper) return;
+            const canvas = cropper.getCroppedCanvas({
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+            imageCollection[editingIndex].editedDataURL = canvas.toDataURL('image/jpeg', 0.9);
+            closeEditModal();
+            renderPreview(); // Re-render to show the updated thumbnail
+        }
+
+        async function convertImagesToPdf() {
+            if (imageCollection.length === 0) return;
+            setLoading(true);
+            statusDiv.textContent = 'Initializing PDF generation...';
+            statusDiv.className = 'mt-4 text-center text-blue-600 font-medium';
+
+            try {
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const a4Width = 210, a4Height = 297, margin = 10;
+                const usableWidth = a4Width - margin * 2;
+                const usableHeight = a4Height - margin * 2;
+
+                for (let i = 0; i < imageCollection.length; i++) {
+                    const imgObject = imageCollection[i];
+                    statusDiv.textContent = `Processing image ${i + 1} of ${imageCollection.length}...`;
+                    
+                    const imgData = imgObject.editedDataURL || imgObject.dataURL;
+                    const img = await loadImage(imgData);
+
+                    if (i > 0) pdf.addPage();
+                    
+                    const pageAspectRatio = usableWidth / usableHeight;
+                    const imgAspectRatio = img.width / img.height;
+                    
+                    let pdfImgWidth, pdfImgHeight;
+                    if (imgAspectRatio > pageAspectRatio) {
+                        pdfImgWidth = usableWidth;
+                        pdfImgHeight = pdfImgWidth / imgAspectRatio;
+                    } else {
+                        pdfImgHeight = usableHeight;
+                        pdfImgWidth = pdfImgHeight * imgAspectRatio;
+                    }
+                    
+                    const x = (a4Width - pdfImgWidth) / 2;
+                    const y = (a4Height - pdfImgHeight) / 2;
+
+                    pdf.addImage(imgData, 'JPEG', x, y, pdfImgWidth, pdfImgHeight);
+                }
+
+                pdf.save('converted-images.pdf');
+                statusDiv.textContent = 'PDF created successfully!';
+                statusDiv.className = 'mt-4 text-center text-green-600 font-medium';
+                setTimeout(clearSelection, 2000);
+
+            } catch (error) {
+                console.error("Error converting to PDF:", error);
+                statusDiv.textContent = 'An error occurred during conversion.';
+                statusDiv.className = 'mt-4 text-center text-red-600 font-medium';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function setLoading(isLoading) {
+            convertBtn.disabled = isLoading;
+            spinner.classList.toggle('hidden', !isLoading);
+            btnText.classList.toggle('hidden', isLoading);
+        }
+
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Algorithmic BG Remover</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .checkerboard {
+            background-color: #f0f0f0;
+            background-image:
+                linear-gradient(45deg, #ccc 25%, transparent 25%),
+                linear-gradient(-45deg, #ccc 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #ccc 75%),
+                linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none; 
+            background: transparent; 
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px; 
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        
+        /* Tool Cursor Styles */
+        .cursor-magic { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(1px 1px 1px black);"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="10" y1="13" x2="8" y2="13"/><line x1="6.3" y1="13" x2="3" y2="13"/></svg>') 0 0, auto; }
+        .cursor-eraser { cursor: crosshair; }
+
+        /* Disable touch actions on canvas to prevent scrolling while drawing */
+        #canvas-wrapper {
+            touch-action: none;
+        }
+        
+        /* Hide scrollbars for cleaner UI but allow scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Mobile FAB Animations */
+        .fab-enter {
+            opacity: 0;
+            transform: translateY(10px) scale(0.9);
+        }
+        .fab-enter-active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white min-h-[100dvh] flex flex-col font-sans selection:bg-blue-500 selection:text-white overflow-hidden">
+
+    <!-- Header -->
+    <header class="w-full p-3 md:p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md z-50 flex-none">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            <!-- Left: Logo -->
+            <h1 class="text-lg md:text-xl font-bold flex items-center gap-2">
+                <span class="bg-blue-600 text-white p-1 rounded-lg text-sm"><i class="fa-solid fa-layer-group"></i></span>
+                <span class="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent hidden sm:inline">Smart Edge Remover</span>
+                <span class="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent sm:hidden">Smart Edge</span>
+            </h1>
+
+            <!-- Right: Actions -->
+            <div class="flex items-center gap-2 md:gap-4 overflow-x-auto no-scrollbar">
+                <button onclick="undo()" class="text-slate-400 hover:text-white transition text-xs md:text-sm flex items-center gap-1 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-800">
+                    <i class="fa-solid fa-rotate-left"></i> <span class="hidden md:inline">Undo</span>
+                </button>
+                <button onclick="redo()" class="text-slate-400 hover:text-white transition text-xs md:text-sm flex items-center gap-1 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-800">
+                    <i class="fa-solid fa-rotate-right"></i> <span class="hidden md:inline">Redo</span>
+                </button>
+                
+                <!-- Separator -->
+                <div class="w-px h-4 bg-slate-700 my-auto"></div>
+                
+                <button onclick="location.reload()" class="text-slate-400 hover:text-white transition text-xs md:text-sm flex items-center gap-1 whitespace-nowrap px-2 py-1 rounded hover:bg-slate-800">
+                    <i class="fa-solid fa-plus"></i> <span class="hidden md:inline">New</span>
+                </button>
+
+                <!-- DOWNLOAD BUTTON (Mobile/Tablet Visible) -->
+                <button onclick="downloadImage()" class="lg:hidden bg-blue-600 text-white hover:bg-blue-500 transition text-sm flex items-center justify-center w-8 h-8 rounded-full shadow-lg ml-2">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col relative w-full h-full overflow-hidden">
+
+        <!-- Upload Section (Centered Overlay) -->
+        <div id="upload-section" class="absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-4 animate-fade-in overflow-y-auto">
+            <div class="w-full max-w-3xl text-center space-y-8">
+                <div class="space-y-4">
+                    <h2 class="text-4xl md:text-5xl font-black tracking-tight">
+                        Smart Analysis. <br>
+                        <span class="text-blue-500">Cleaner Edges.</span>
+                    </h2>
+                    <p class="text-slate-400 text-base md:text-lg">
+                        Advanced statistical algorithm that analyzes the entire image border to detect complex backgrounds without AI downloads.
+                    </p>
+                </div>
+
+                <div id="drop-zone" class="relative group cursor-pointer max-w-md mx-auto w-full">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                    <div class="relative bg-slate-900 border-2 border-slate-700 border-dashed rounded-3xl p-8 md:p-12 hover:border-blue-500 hover:bg-slate-800/50 transition-all">
+                        <div class="flex flex-col items-center pointer-events-none">
+                            <i class="fa-solid fa-image text-3xl md:text-4xl text-blue-400 mb-4"></i>
+                            <h3 class="text-xl md:text-2xl font-bold mb-2">Drop image here</h3>
+                            <p class="text-sm text-slate-500">or tap to browse</p>
+                        </div>
+                        <input type="file" id="file-input" class="hidden" accept="image/*">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Editor Section (Flex Layout) -->
+        <div id="editor-section" class="hidden flex-col lg:flex-row w-full h-full">
+            
+            <!-- SETTINGS SIDEBAR (Right Desktop, Top Mobile) -->
+            <div class="flex-none order-1 lg:order-3 w-full lg:w-72 bg-slate-900 border-b lg:border-b-0 lg:border-l border-slate-800 flex flex-col z-20 h-auto lg:h-full overflow-hidden shadow-xl lg:shadow-none flex-shrink-0">
+                
+                <!-- Inner Container: Row on Mobile, Col on Desktop -->
+                <div class="flex flex-row lg:flex-col overflow-y-auto min-h-0 bg-slate-900 scrollbar-hide">
+                    
+                    <!-- LEFT COLUMN (Mobile): Algorithm & Tools -->
+                    <div class="w-1/2 lg:w-full border-r border-slate-800 lg:border-r-0 p-2 lg:p-4 flex flex-col gap-2 lg:gap-5">
+                        
+                        <!-- Algorithm Settings -->
+                        <div class="w-full">
+                            <div class="flex justify-between items-center mb-2 lg:mb-3">
+                                 <h3 class="font-bold text-[10px] lg:text-xs text-blue-400 uppercase tracking-wider truncate">Algorithm</h3>
+                                 <!-- Mobile: Compact Run Button -->
+                                 <button onclick="runSmartAutoRemove()" class="lg:hidden bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 active:scale-95 transition" title="Run Auto">
+                                    <i class="fa-solid fa-bolt"></i> Auto
+                                 </button>
+                            </div>
+                            
+                            <div class="space-y-2 lg:space-y-4">
+                                <!-- Desktop: Full Width Run Button -->
+                                <button onclick="runSmartAutoRemove()" class="hidden lg:flex w-full py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-lg shadow-md transition items-center justify-center gap-2">
+                                    <i class="fa-solid fa-bolt text-sm"></i> 
+                                    <span class="text-xs">Run Auto-Remove</span>
+                                </button>
+                                
+                                <div class="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-4">
+                                    <div>
+                                        <div class="flex justify-between text-[10px] lg:text-xs mb-0.5">
+                                            <label class="text-slate-400">Sens.</label>
+                                            <span id="sens-val" class="text-slate-500 font-mono">20</span>
+                                        </div>
+                                        <input type="range" id="sensitivity-slider" min="1" max="100" value="20" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                                    </div>
+                                    <div class="flex items-center justify-between lg:block">
+                                        <label class="text-[10px] lg:text-xs text-slate-400">Despeckle</label>
+                                        <label class="flex items-center gap-2 cursor-pointer lg:mt-1">
+                                            <input type="checkbox" id="despeckle-check" checked class="rounded bg-slate-700 border-slate-600 text-blue-500 h-3 w-3">
+                                            <span class="lg:hidden text-[10px] text-slate-500">On</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool Specific Settings (Dynamic - Appears below Algo on Mobile) -->
+                        <div id="tool-settings-panel" class="hidden w-full pt-2 border-t border-slate-800 lg:border-0 lg:pt-0">
+                            <h3 class="font-bold text-[10px] lg:text-xs text-slate-500 uppercase mb-2 lg:mb-3">Tool Options</h3>
+                            <!-- Magic Wand -->
+                            <div id="settings-magic" class="hidden space-y-2 lg:space-y-3">
+                                <div>
+                                    <label class="text-[10px] lg:text-xs text-slate-400 block mb-0.5">Tolerance</label>
+                                    <input type="range" id="tolerance-slider" min="1" max="100" value="15" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                <div class="flex items-center gap-2">
+                                     <input type="checkbox" id="contiguous-check" checked class="rounded bg-slate-700 border-slate-600 text-blue-500 h-3 w-3">
+                                     <label for="contiguous-check" class="text-[10px] lg:text-xs text-slate-400">Contiguous</label>
+                                </div>
+                            </div>
+                            <!-- Brush -->
+                            <div id="settings-brush" class="hidden space-y-2 lg:space-y-3">
+                                <div>
+                                    <label class="text-[10px] lg:text-xs text-slate-400 block mb-0.5">Size: <span id="brush-val">20px</span></label>
+                                    <input type="range" id="brush-slider" min="5" max="100" value="20" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN (Mobile): Background -->
+                    <div class="w-1/2 lg:w-full p-2 lg:p-4 flex flex-col gap-2 lg:gap-4 lg:border-t lg:border-slate-800">
+                        <h4 class="font-bold text-[10px] lg:text-xs text-slate-500 uppercase lg:mb-3 truncate">Background</h4>
+                        
+                        <!-- BG Mode Buttons -->
+                        <div class="grid grid-cols-4 gap-1 lg:gap-2 mb-1 lg:mb-4">
+                            <button onclick="setBgMode('transparent')" class="p-1.5 lg:p-2 rounded bg-slate-800 border border-slate-700 hover:border-blue-500 text-[10px] text-center transition flex items-center justify-center" title="None">
+                                <i class="fa-solid fa-ban text-xs lg:text-lg text-slate-400"></i>
+                                <span class="hidden lg:inline ml-2">None</span>
+                            </button>
+                            <button onclick="setBgMode('color')" class="p-1.5 lg:p-2 rounded bg-slate-800 border border-slate-700 hover:border-blue-500 text-[10px] text-center transition flex items-center justify-center" title="Color">
+                                <i class="fa-solid fa-palette text-xs lg:text-lg text-slate-400"></i>
+                                <span class="hidden lg:inline ml-2">Color</span>
+                            </button>
+                            <button onclick="setBgMode('gradient')" class="p-1.5 lg:p-2 rounded bg-slate-800 border border-slate-700 hover:border-blue-500 text-[10px] text-center transition flex items-center justify-center" title="Gradient">
+                                <i class="fa-solid fa-grip-lines text-xs lg:text-lg text-slate-400"></i>
+                                <span class="hidden lg:inline ml-2">Grad</span>
+                            </button>
+                            <button onclick="setBgMode('image')" class="p-1.5 lg:p-2 rounded bg-slate-800 border border-slate-700 hover:border-blue-500 text-[10px] text-center transition flex items-center justify-center" title="Image">
+                                <i class="fa-regular fa-image text-xs lg:text-lg text-slate-400"></i>
+                                <span class="hidden lg:inline ml-2">Image</span>
+                            </button>
+                        </div>
+
+                        <!-- Solid Color -->
+                        <div id="bg-controls-color" class="hidden">
+                            <input type="color" id="bg-color-picker" class="w-full h-6 lg:h-8 rounded cursor-pointer p-0 border-0" value="#ffffff">
+                        </div>
+
+                        <!-- Linear Gradient -->
+                        <div id="bg-controls-gradient" class="hidden space-y-2 lg:space-y-3">
+                            <div class="flex justify-between items-center">
+                                <label class="text-[10px] lg:text-xs text-slate-400">Angle</label>
+                                <span class="text-[10px] lg:text-xs text-slate-500 font-mono" id="grad-angle-val">90°</span>
+                            </div>
+                            <input type="range" id="grad-angle" min="0" max="360" value="90" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                            
+                            <div class="flex gap-1 lg:gap-2">
+                                <div class="flex-1">
+                                    <input type="color" id="grad-c1" class="w-full h-6 lg:h-8 rounded cursor-pointer border-0 p-0" value="#3b82f6" title="Start Color">
+                                </div>
+                                <div class="flex-1">
+                                    <input type="color" id="grad-c2" class="w-full h-6 lg:h-8 rounded cursor-pointer border-0 p-0" value="#9333ea" title="End Color">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Image -->
+                        <div id="bg-controls-image" class="hidden space-y-2 lg:space-y-3">
+                            <!-- Compact File Input -->
+                            <div class="relative overflow-hidden">
+                                <button class="w-full bg-slate-800 text-[10px] text-slate-400 py-1 rounded border border-slate-700 hover:border-slate-500">Choose File</button>
+                                <input type="file" id="bg-file" class="absolute inset-0 opacity-0 cursor-pointer">
+                            </div>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-3">
+                                <div class="col-span-1 lg:col-span-2">
+                                    <div class="flex justify-between text-[10px] lg:text-xs mb-0.5">
+                                        <label class="text-slate-400">Scale</label>
+                                        <span class="text-[10px] lg:text-xs text-slate-500 font-mono" id="bg-scale-val">1.0x</span>
+                                    </div>
+                                    <input type="range" id="bg-scale" min="0.1" max="3.0" step="0.1" value="1.0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Pan X</label>
+                                        <input type="range" id="bg-pan-x" min="0" max="100" value="50" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-slate-500 block mb-0.5">Pan Y</label>
+                                        <input type="range" id="bg-pan-y" min="0" max="100" value="50" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer / Download (Desktop Only) -->
+                <div class="p-4 bg-slate-900 border-t border-slate-800 flex-none z-30 hidden lg:block">
+                    <button onclick="downloadImage()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-download"></i> <span class="text-sm">Download Image</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TOOLS SIDEBAR (Left Desktop Only) -->
+            <!-- Modified to be hidden on mobile, replaced by floating menu -->
+            <div class="hidden lg:flex flex-none order-2 lg:order-1 w-full lg:w-16 bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-800 flex-col items-center justify-start py-4 gap-4 z-20 overflow-x-auto no-scrollbar">
+                
+                <div class="flex flex-col gap-2">
+                    <button onclick="setTool('move')" id="tool-move" class="p-3 rounded-xl bg-slate-800 text-blue-400 hover:bg-slate-700 transition relative group flex-shrink-0">
+                        <i class="fa-solid fa-up-down-left-right text-lg"></i>
+                    </button>
+
+                    <div class="w-8 h-px bg-slate-700 mx-auto my-auto"></div>
+
+                    <button onclick="setTool('magic')" id="tool-magic" class="p-3 rounded-xl hover:bg-slate-800 text-slate-400 transition relative group flex-shrink-0">
+                        <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                    </button>
+                    
+                    <button onclick="setTool('eraser')" id="tool-eraser" class="p-3 rounded-xl hover:bg-slate-800 text-slate-400 transition relative group flex-shrink-0">
+                        <i class="fa-solid fa-eraser text-lg"></i>
+                    </button>
+
+                    <button onclick="setTool('restore')" id="tool-restore" class="p-3 rounded-xl hover:bg-slate-800 text-slate-400 transition relative group flex-shrink-0">
+                        <i class="fa-solid fa-paintbrush text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- WORKSPACE (Center) -->
+            <!-- Added min-h-[50vh] to ensure canvas never collapses -->
+            <div class="flex-grow order-2 bg-slate-950 relative overflow-hidden group flex flex-col min-h-[50vh]">
+                <!-- Top Info Bar (Desktop) -->
+                <div class="hidden lg:flex absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800/90 backdrop-blur border border-slate-700 rounded-full pl-6 pr-2 py-1.5 items-center gap-4 z-20 shadow-lg pointer-events-auto select-none">
+                     <span id="tool-message" class="text-xs font-bold text-slate-300 w-24 truncate text-center">Ready</span>
+                     <div class="h-4 w-px bg-slate-600"></div>
+                     <button id="compare-btn" class="bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-3 py-1 rounded text-xs font-bold uppercase tracking-wider transition-colors border border-blue-500/30">
+                        Hold to Compare
+                     </button>
+                     <div class="h-4 w-px bg-slate-600"></div>
+                     <span class="text-xs text-slate-500 pr-2">Zoom: <span id="zoom-val">100%</span></span>
+                </div>
+
+                <!-- Canvas Wrapper -->
+                <!-- Added double-tap listener for recenter -->
+                <div class="flex-grow relative overflow-hidden flex items-center justify-center cursor-default bg-slate-900 h-full w-full" id="canvas-wrapper">
+                    <!-- Canvas -->
+                    <canvas id="main-canvas" class="shadow-2xl max-w-none origin-center checkerboard touch-none"></canvas>
+                </div>
+                
+                <!-- Mobile Tool Message -->
+                <div id="mobile-tool-msg" class="lg:hidden absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full pointer-events-none opacity-0 transition-opacity z-10">
+                    Tool Active
+                </div>
+            </div>
+
+        </div>
+
+        <!-- MOBILE FLOATING CONTROLS -->
+        
+        <!-- Floating Left Controls (Fit & Compare) -->
+        <div class="lg:hidden fixed bottom-6 left-6 z-40 flex items-center gap-3">
+            <!-- Fit to Screen Button -->
+            <button onclick="fitToScreen(); render()" class="bg-slate-800/90 backdrop-blur border border-slate-700 text-white w-12 h-12 rounded-full shadow-xl active:scale-95 transition-transform flex items-center justify-center" title="Fit to Screen">
+                <i class="fa-solid fa-compress"></i>
+            </button>
+
+            <!-- Compare Button -->
+            <button id="compare-btn-mobile" class="bg-slate-800/90 backdrop-blur border border-slate-700 text-white px-5 h-12 rounded-full shadow-xl active:scale-95 transition-transform flex items-center gap-2">
+                <i class="fa-solid fa-eye"></i> <span class="text-xs font-bold uppercase tracking-wider">Compare</span>
+            </button>
+        </div>
+
+        <!-- Floating Tools (Bottom Right) -->
+        <div class="lg:hidden fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+            <!-- Floating Menu Items -->
+            <div id="mobile-tools-menu" class="flex flex-col gap-3 transition-all duration-300 opacity-0 translate-y-4 pointer-events-none scale-90 origin-bottom-right">
+                <button onclick="setTool('move')" class="mobile-tool-btn w-12 h-12 rounded-full bg-slate-800 border border-slate-700 shadow-lg text-slate-300 flex items-center justify-center active:scale-95 transition" data-tool="move">
+                    <i class="fa-solid fa-up-down-left-right"></i>
+                </button>
+                <button onclick="setTool('magic')" class="mobile-tool-btn w-12 h-12 rounded-full bg-slate-800 border border-slate-700 shadow-lg text-slate-300 flex items-center justify-center active:scale-95 transition" data-tool="magic">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </button>
+                <button onclick="setTool('eraser')" class="mobile-tool-btn w-12 h-12 rounded-full bg-slate-800 border border-slate-700 shadow-lg text-slate-300 flex items-center justify-center active:scale-95 transition" data-tool="eraser">
+                    <i class="fa-solid fa-eraser"></i>
+                </button>
+                <button onclick="setTool('restore')" class="mobile-tool-btn w-12 h-12 rounded-full bg-slate-800 border border-slate-700 shadow-lg text-slate-300 flex items-center justify-center active:scale-95 transition" data-tool="restore">
+                    <i class="fa-solid fa-paintbrush"></i>
+                </button>
+            </div>
+            
+            <!-- Main Toggle Button -->
+            <button onclick="toggleMobileTools()" id="mobile-tools-toggle" class="w-14 h-14 rounded-full bg-blue-600 text-white shadow-2xl flex items-center justify-center text-xl transition-transform active:scale-95 z-50">
+                <i class="fa-solid fa-plus transition-transform duration-300" id="mobile-toggle-icon"></i>
+            </button>
+        </div>
+
+    </main>
+
+    <script>
+        // --- State ---
+        const state = {
+            originalImg: null,
+            width: 0,
+            height: 0,
+            alphaMask: null, 
+            history: [],
+            redoStack: [], 
+            isComparing: false,
+            
+            // Tools
+            currentTool: 'move',
+            sensitivity: 20,
+            tolerance: 15,
+            contiguous: true,
+            brushSize: 20,
+            
+            // View
+            zoom: 1,
+            panX: 0,
+            panY: 0,
+            isDragging: false,
+            lastMouseX: 0,
+            lastMouseY: 0,
+
+            // BG Settings
+            bgMode: 'transparent',
+            bgColor: '#ffffff',
+            bgImg: null,
+            bgImgObj: null, 
+            
+            // BG Image Transform
+            bgScale: 1.0,
+            bgPanX: 50,
+            bgPanY: 50,
+
+            // BG Gradient
+            gradAngle: 90,
+            gradC1: '#3b82f6',
+            gradC2: '#9333ea'
+        };
+
+        const canvas = document.getElementById('main-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        // --- Initialization ---
+        
+        document.getElementById('drop-zone').addEventListener('click', () => document.getElementById('file-input').click());
+        document.getElementById('file-input').addEventListener('change', e => {
+            if(e.target.files[0]) loadFile(e.target.files[0]);
+        });
+
+        // Compare Button Events (Desktop)
+        const compareBtn = document.getElementById('compare-btn');
+        setupCompareEvents(compareBtn);
+        
+        // Compare Button Events (Mobile)
+        const compareBtnMobile = document.getElementById('compare-btn-mobile');
+        setupCompareEvents(compareBtnMobile);
+
+        function setupCompareEvents(btn) {
+            if(!btn) return;
+            ['mousedown', 'touchstart'].forEach(evt => 
+                btn.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    if(state.originalImg) {
+                        state.isComparing = true;
+                        render();
+                    }
+                })
+            );
+            ['mouseup', 'mouseleave', 'touchend'].forEach(evt => 
+                btn.addEventListener(evt, (e) => {
+                    e.preventDefault(); // Stop mouse emulation on touch
+                    if(state.isComparing) {
+                        state.isComparing = false;
+                        render();
+                    }
+                })
+            );
+        }
+
+        async function loadFile(file) {
+            const img = new Image();
+            img.onload = () => {
+                state.originalImg = img;
+                state.width = img.naturalWidth;
+                state.height = img.naturalHeight;
+                state.alphaMask = new Uint8Array(state.width * state.height).fill(255);
+                state.history = [];
+                state.redoStack = [];
+                saveHistory();
+
+                canvas.width = state.width;
+                canvas.height = state.height;
+                document.getElementById('upload-section').classList.add('hidden');
+                
+                // Switch to Flex Layout for Editor
+                const editor = document.getElementById('editor-section');
+                editor.classList.remove('hidden');
+                editor.classList.add('flex');
+                
+                // CRITICAL FIX: Allow layout to paint before calculating screen fit
+                // This prevents 0-height calculations on mobile
+                setTimeout(() => {
+                    fitToScreen();
+                    runSmartAutoRemove();
+                }, 100);
+                
+                requestAnimationFrame(render);
+            };
+            img.src = URL.createObjectURL(file);
+        }
+
+        // --- Core Algorithm: SMART Auto Remove ---
+        
+        function runSmartAutoRemove() {
+            showMsg("Processing...");
+            
+            // Draw original to read pixels
+            ctx.drawImage(state.originalImg, 0, 0);
+            const imageData = ctx.getImageData(0, 0, state.width, state.height);
+            const data = imageData.data;
+            const w = state.width;
+            const h = state.height;
+            
+            // 1. Histogram Sampling
+            const frameDepth = Math.max(5, Math.floor(Math.min(w, h) * 0.05));
+            const colorBuckets = new Map(); 
+            
+            const addColor = (r, g, b) => {
+                const qr = Math.floor(r/5)*5;
+                const qg = Math.floor(g/5)*5;
+                const qb = Math.floor(b/5)*5;
+                const key = `${qr},${qg},${qb}`;
+                colorBuckets.set(key, (colorBuckets.get(key) || 0) + 1);
+            };
+
+            // Sample borders
+            for(let y = 0; y < frameDepth; y++) {
+                for(let x = 0; x < w; x++) {
+                    const i = (y * w + x) * 4; addColor(data[i], data[i+1], data[i+2]);
+                    const j = ((h - 1 - y) * w + x) * 4; addColor(data[j], data[j+1], data[j+2]);
+                }
+            }
+            for(let x = 0; x < frameDepth; x++) {
+                for(let y = frameDepth; y < h - frameDepth; y++) {
+                    const i = (y * w + x) * 4; addColor(data[i], data[i+1], data[i+2]);
+                    const j = (y * w + (w - 1 - x)) * 4; addColor(data[j], data[j+1], data[j+2]);
+                }
+            }
+
+            const sortedColors = [...colorBuckets.entries()].sort((a, b) => b[1] - a[1]);
+            const bgReferences = sortedColors.slice(0, 20).map(entry => {
+                const parts = entry[0].split(',').map(Number);
+                return { r: parts[0], g: parts[1], b: parts[2] };
+            });
+
+            // 2. Multi-Reference Distance Check
+            const sens = parseInt(document.getElementById('sensitivity-slider').value);
+            const baseDist = sens * 3.5; 
+            const tolSq = baseDist * baseDist;
+            
+            for(let i=0; i < w*h; i++) {
+                const idx = i*4;
+                if(data[idx+3] === 0) {
+                    state.alphaMask[i] = 0;
+                    continue;
+                }
+
+                const r = data[idx], g = data[idx+1], b = data[idx+2];
+                let isBg = false;
+                
+                for(let ref of bgReferences) {
+                    const dr = r - ref.r;
+                    const dg = g - ref.g;
+                    const db = b - ref.b;
+                    const distSq = (2*dr*dr + 4*dg*dg + 3*db*db);
+                    
+                    if (distSq < tolSq) { 
+                        isBg = true;
+                        break;
+                    }
+                }
+                state.alphaMask[i] = isBg ? 0 : 255;
+            }
+
+            // 3. Despeckle
+            if(document.getElementById('despeckle-check').checked) {
+                applyDespeckle(w, h);
+            }
+
+            saveHistory();
+            render();
+            showMsg("Done");
+        }
+
+        function applyDespeckle(w, h) {
+            const readBuffer = new Uint8Array(state.alphaMask);
+            for(let y=1; y<h-1; y++) {
+                for(let x=1; x<w-1; x++) {
+                    const idx = y*w + x;
+                    let fgNeighbors = 0;
+                    // Check neighbors
+                    if(readBuffer[idx-1] === 255) fgNeighbors++;
+                    if(readBuffer[idx+1] === 255) fgNeighbors++;
+                    if(readBuffer[idx-w] === 255) fgNeighbors++;
+                    if(readBuffer[idx+w] === 255) fgNeighbors++;
+                    
+                    if (readBuffer[idx] === 255) {
+                        if (fgNeighbors < 1) state.alphaMask[idx] = 0; 
+                    } else {
+                        if (fgNeighbors > 3) state.alphaMask[idx] = 255;
+                    }
+                }
+            }
+        }
+
+        // --- Tools (Magic Wand & Brush) ---
+
+        function magicWand(startX, startY, remove = true) {
+            ctx.drawImage(state.originalImg, 0, 0); 
+            const imageData = ctx.getImageData(0, 0, state.width, state.height);
+            const data = imageData.data;
+            const startIdx = startY * state.width + startX;
+            const startR = data[startIdx * 4];
+            const startG = data[startIdx * 4 + 1];
+            const startB = data[startIdx * 4 + 2];
+            
+            const tol = parseInt(document.getElementById('tolerance-slider').value);
+            const baseDist = tol * 4.0; 
+            const tolSq = baseDist * baseDist;
+            
+            const w = state.width;
+            const limit = w * state.height;
+            const contiguous = document.getElementById('contiguous-check').checked;
+
+            if (contiguous) {
+                const queue = [startIdx];
+                const visited = new Uint8Array(limit);
+                visited[startIdx] = 1;
+                let head = 0;
+                while(head < queue.length) {
+                    const idx = queue[head++];
+                    const r = data[idx*4], g = data[idx*4+1], b = data[idx*4+2];
+                    
+                    const dr = r - startR, dg = g - startG, db = b - startB;
+                    const distSq = (2*dr*dr + 4*dg*dg + 3*db*db);
+                    
+                    if (distSq <= tolSq) {
+                        state.alphaMask[idx] = remove ? 0 : 255;
+                        const cx = idx % w;
+                        const neighbors = [cx > 0 ? idx-1 : -1, cx < w-1 ? idx+1 : -1, idx-w, idx+w];
+                        for(let n of neighbors) {
+                            if(n >= 0 && n < limit && !visited[n]) {
+                                visited[n] = 1; queue.push(n);
+                            }
+                        }
+                    }
+                }
+            } else {
+                for(let i=0; i<limit; i++) {
+                    const r = data[i*4], g = data[i*4+1], b = data[i*4+2];
+                    const dr = r - startR, dg = g - startG, db = b - startB;
+                    if ((2*dr*dr + 4*dg*dg + 3*db*db) <= tolSq) state.alphaMask[i] = remove ? 0 : 255;
+                }
+            }
+            saveHistory();
+            render();
+        }
+
+        function applyBrush(cx, cy, remove) {
+            const size = state.brushSize;
+            const rSq = (size/2) ** 2;
+            const startX = Math.max(0, Math.floor(cx - size/2));
+            const endX = Math.min(state.width, Math.ceil(cx + size/2));
+            const startY = Math.max(0, Math.floor(cy - size/2));
+            const endY = Math.min(state.height, Math.ceil(cy + size/2));
+            
+            for(let y=startY; y<endY; y++) {
+                for(let x=startX; x<endX; x++) {
+                    if ((x-cx)**2 + (y-cy)**2 <= rSq) {
+                        state.alphaMask[y * state.width + x] = remove ? 0 : 255;
+                    }
+                }
+            }
+            render();
+        }
+
+        // --- Core Rendering & UI ---
+
+        function render() {
+            if (!state.originalImg) return;
+            canvas.width = state.width; 
+            canvas.height = state.height;
+            
+            // Draw Main Image
+            ctx.drawImage(state.originalImg, 0, 0);
+            
+            if (!state.isComparing) {
+                const rawData = ctx.getImageData(0,0, state.width, state.height);
+                const pixels = rawData.data;
+
+                // Apply Mask
+                for(let i=0; i<state.alphaMask.length; i++) {
+                    pixels[i*4 + 3] = state.alphaMask[i];
+                }
+                ctx.putImageData(rawData, 0, 0);
+            }
+
+            // Handle Viewport Transforms
+            canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+            
+            // Apply Background directly to Canvas
+            canvas.style.background = '';
+            canvas.classList.remove('checkerboard');
+            
+            if (state.isComparing) {
+                canvas.classList.add('checkerboard');
+            } else {
+                if(state.bgMode === 'transparent') {
+                    canvas.classList.add('checkerboard');
+                } else if(state.bgMode === 'color') {
+                    canvas.style.backgroundColor = state.bgColor;
+                } else if (state.bgMode === 'gradient') {
+                    canvas.style.backgroundImage = `linear-gradient(${state.gradAngle}deg, ${state.gradC1}, ${state.gradC2})`;
+                } else if (state.bgMode === 'image' && state.bgImg) {
+                    canvas.style.backgroundImage = `url(${state.bgImg})`;
+                    canvas.style.backgroundPosition = `${state.bgPanX}% ${state.bgPanY}%`;
+                    canvas.style.backgroundSize = `${state.bgScale * 100}%`; 
+                    canvas.style.backgroundRepeat = 'no-repeat';
+                }
+            }
+        }
+
+        // --- Interactions ---
+
+        const getCoords = (clientX, clientY) => {
+            const rect = canvas.getBoundingClientRect();
+            // Need to account for current zoom and scale
+            // The bounding rect includes the CSS transform scale
+            // We want the coordinate relative to the unscaled canvas internal pixels
+            
+            // Strategy: 
+            // 1. Get click position relative to canvas element top-left
+            const relX = clientX - rect.left;
+            const relY = clientY - rect.top;
+            
+            // 2. Scale this by the ratio of (Canvas Internal Width / Canvas Rendered Width)
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            return {
+                x: relX * scaleX,
+                y: relY * scaleY
+            };
+        };
+
+        // Double tap to fit to screen
+        let lastTap = 0;
+        document.getElementById('canvas-wrapper').addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                const now = new Date().getTime();
+                if (now - lastTap < 300) {
+                    e.preventDefault();
+                    fitToScreen();
+                    render();
+                }
+                lastTap = now;
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => startInteract(e.clientX, e.clientY));
+        canvas.addEventListener('touchstart', (e) => {
+            // e.preventDefault(); // Handled by CSS touch-action: none
+            if(e.touches.length === 1) {
+                startInteract(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, {passive: false});
+        
+        function startInteract(clientX, clientY) {
+            if (state.isComparing) return;
+
+            state.isDragging = true;
+            state.lastMouseX = clientX;
+            state.lastMouseY = clientY;
+            
+            const c = getCoords(clientX, clientY);
+            
+            if(state.currentTool === 'magic') magicWand(Math.floor(c.x), Math.floor(c.y), true);
+            else if(state.currentTool === 'eraser') applyBrush(c.x, c.y, true);
+            else if(state.currentTool === 'restore') applyBrush(c.x, c.y, false);
+        }
+
+        // Mouse Move
+        window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+        // Touch Move
+        window.addEventListener('touchmove', (e) => {
+            if(state.isDragging && e.touches.length === 1) {
+                // e.preventDefault(); // Prevents scroll if not handled by CSS
+                handleMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, {passive: false});
+
+        function handleMove(clientX, clientY) {
+            if(!state.isDragging) return;
+            
+            if(state.currentTool === 'move') {
+                state.panX += clientX - state.lastMouseX;
+                state.panY += clientY - state.lastMouseY;
+                render();
+            } else if (state.currentTool === 'eraser' || state.currentTool === 'restore') {
+                const c = getCoords(clientX, clientY);
+                applyBrush(c.x, c.y, state.currentTool === 'eraser');
+            }
+            state.lastMouseX = clientX;
+            state.lastMouseY = clientY;
+        }
+
+        window.addEventListener('mouseup', endInteract);
+        window.addEventListener('touchend', endInteract);
+        
+        function endInteract() {
+            if(state.isDragging) saveHistory();
+            state.isDragging = false;
+        }
+        
+        // Zoom Wheel
+        document.getElementById('canvas-wrapper').addEventListener('wheel', (e) => {
+            // Only zoom if using move tool OR holding ctrl
+            if(state.currentTool === 'move' || e.ctrlKey) {
+                e.preventDefault();
+                state.zoom *= (e.deltaY > 0 ? 0.9 : 1.1);
+                state.zoom = Math.max(0.1, Math.min(5, state.zoom));
+                document.getElementById('zoom-val').innerText = Math.round(state.zoom*100) + '%';
+                render();
+            }
+        }, {passive: false});
+
+        // UI Helpers
+        let isMobileToolsOpen = false;
+
+        window.toggleMobileTools = () => {
+            isMobileToolsOpen = !isMobileToolsOpen;
+            const menu = document.getElementById('mobile-tools-menu');
+            const icon = document.getElementById('mobile-toggle-icon');
+            
+            if(isMobileToolsOpen) {
+                menu.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none', 'scale-90');
+                icon.classList.remove('fa-plus');
+                icon.classList.add('fa-times', 'rotate-90');
+            } else {
+                menu.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none', 'scale-90');
+                icon.classList.remove('fa-times', 'rotate-90');
+                icon.classList.add('fa-plus');
+            }
+        };
+
+        window.setTool = (t) => {
+            state.currentTool = t;
+            
+            // Desktop active state
+            document.querySelectorAll('#editor-section button i').forEach(el => {
+                if(el.closest('button').id.startsWith('tool-')) {
+                    el.parentElement.classList.remove('bg-slate-700', 'text-blue-400');
+                    el.parentElement.classList.add('text-slate-400');
+                }
+            });
+            
+            const btn = document.getElementById(`tool-${t}`);
+            if(btn) {
+                btn.classList.add('bg-slate-700', 'text-blue-400');
+                btn.classList.remove('text-slate-400');
+            }
+
+            // Mobile active state
+            document.querySelectorAll('.mobile-tool-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white', 'border-transparent');
+                btn.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
+                if(btn.dataset.tool === t) {
+                    btn.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700');
+                    btn.classList.add('bg-blue-600', 'text-white', 'border-transparent');
+                }
+            });
+            
+            // Toggle Settings Panels
+            const settingsPanel = document.getElementById('tool-settings-panel');
+            const magicPanel = document.getElementById('settings-magic');
+            const brushPanel = document.getElementById('settings-brush');
+            
+            settingsPanel.classList.add('hidden');
+            magicPanel.classList.add('hidden');
+            brushPanel.classList.add('hidden');
+            
+            if(t === 'magic') {
+                settingsPanel.classList.remove('hidden');
+                magicPanel.classList.remove('hidden');
+            } else if(t === 'eraser' || t === 'restore') {
+                settingsPanel.classList.remove('hidden');
+                brushPanel.classList.remove('hidden');
+            }
+
+            canvas.className = 'shadow-2xl max-w-none origin-center touch-none';
+            if(t === 'move') canvas.style.cursor = 'grab';
+            else if(t === 'magic') canvas.classList.add('cursor-magic');
+            else canvas.classList.add('cursor-eraser');
+            
+            // Close mobile menu if open
+            if(isMobileToolsOpen) {
+                 toggleMobileTools();
+            }
+
+            showMsg(`Tool: ${t.toUpperCase()}`);
+        };
+
+        // Sliders Listeners
+        document.getElementById('sensitivity-slider').addEventListener('input', (e) => document.getElementById('sens-val').innerText = e.target.value);
+        document.getElementById('brush-slider').addEventListener('input', (e) => { state.brushSize = e.target.value; document.getElementById('brush-val').innerText = e.target.value + 'px'; });
+
+        // History (Undo/Redo)
+        function saveHistory() {
+            if(state.history.length > 10) state.history.shift();
+            state.history.push(new Uint8Array(state.alphaMask));
+            state.redoStack = []; 
+        }
+        window.undo = () => {
+            if(state.history.length > 1) {
+                const current = state.history.pop();
+                state.redoStack.push(current);
+                state.alphaMask = new Uint8Array(state.history[state.history.length-1]);
+                render();
+                showMsg("Undo");
+            }
+        };
+        window.redo = () => {
+            if(state.redoStack.length > 0) {
+                const next = state.redoStack.pop();
+                state.history.push(next);
+                state.alphaMask = new Uint8Array(next);
+                render();
+                showMsg("Redo");
+            }
+        };
+
+        function fitToScreen() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            // Allow some padding
+            const pad = 40;
+            const wAvailable = wrapper.clientWidth - pad;
+            const hAvailable = wrapper.clientHeight - pad;
+            
+            // Safety check for 0 dimensions
+            if (wAvailable <= 0 || hAvailable <= 0) {
+                setTimeout(fitToScreen, 100);
+                return;
+            }
+            
+            state.zoom = Math.min(wAvailable / state.width, hAvailable / state.height);
+            // Limit max initial zoom to 100% if image is small, unless very small
+            if(state.zoom > 1) state.zoom = 1;
+            if(state.zoom <= 0) state.zoom = 0.1; // Safety fallback
+            
+            document.getElementById('zoom-val').innerText = Math.round(state.zoom*100) + '%';
+            
+            // Center
+            state.panX = 0; 
+            state.panY = 0;
+        }
+
+        function showMsg(txt) {
+            // Desktop Msg
+            const el = document.getElementById('tool-message');
+            el.innerText = txt;
+            el.classList.add('text-white');
+            
+            // Mobile Msg
+            const mobEl = document.getElementById('mobile-tool-msg');
+            mobEl.innerText = txt;
+            mobEl.style.opacity = '1';
+            
+            setTimeout(() => {
+                el.classList.remove('text-white');
+                mobEl.style.opacity = '0';
+            }, 1000);
+        }
+
+        // BG Modes & Controls
+        window.setBgMode = (m) => {
+            state.bgMode = m;
+            document.getElementById('bg-controls-color').classList.add('hidden');
+            document.getElementById('bg-controls-gradient').classList.add('hidden');
+            document.getElementById('bg-controls-image').classList.add('hidden');
+            
+            if(m === 'color') document.getElementById('bg-controls-color').classList.remove('hidden');
+            if(m === 'gradient') document.getElementById('bg-controls-gradient').classList.remove('hidden');
+            if(m === 'image') document.getElementById('bg-controls-image').classList.remove('hidden');
+            render();
+        };
+
+        // Gradient Controls
+        document.getElementById('grad-angle').addEventListener('input', (e) => { 
+            state.gradAngle = e.target.value; 
+            document.getElementById('grad-angle-val').innerText = e.target.value + '°';
+            render(); 
+        });
+        document.getElementById('grad-c1').addEventListener('input', (e) => { state.gradC1 = e.target.value; render(); });
+        document.getElementById('grad-c2').addEventListener('input', (e) => { state.gradC2 = e.target.value; render(); });
+
+        // Image Controls
+        document.getElementById('bg-file').addEventListener('change', (e) => {
+            if(e.target.files[0]) { 
+                const url = URL.createObjectURL(e.target.files[0]); 
+                state.bgImg = url; 
+                const img = new Image();
+                img.onload = () => { state.bgImgObj = img; render(); };
+                img.src = url;
+                setBgMode('image'); 
+            }
+        });
+        document.getElementById('bg-scale').addEventListener('input', (e) => { 
+            state.bgScale = parseFloat(e.target.value); 
+            document.getElementById('bg-scale-val').innerText = state.bgScale.toFixed(1) + 'x';
+            render(); 
+        });
+        document.getElementById('bg-pan-x').addEventListener('input', (e) => { state.bgPanX = parseInt(e.target.value); render(); });
+        document.getElementById('bg-pan-y').addEventListener('input', (e) => { state.bgPanY = parseInt(e.target.value); render(); });
+        document.getElementById('bg-color-picker').addEventListener('input', (e) => { state.bgColor = e.target.value; render(); });
+
+        window.downloadImage = () => {
+            const temp = document.createElement('canvas');
+            temp.width = state.width; temp.height = state.height;
+            const tCtx = temp.getContext('2d');
+            
+            // 1. Draw Background
+            if(state.bgMode === 'color') { 
+                tCtx.fillStyle = state.bgColor; 
+                tCtx.fillRect(0,0,state.width,state.height); 
+            } else if (state.bgMode === 'gradient') {
+                const angleRad = (state.gradAngle * Math.PI) / 180;
+                const cx = state.width/2;
+                const cy = state.height/2;
+                const diag = Math.sqrt(state.width**2 + state.height**2);
+                
+                const x1 = cx - (Math.cos(angleRad) * diag / 2);
+                const y1 = cy - (Math.sin(angleRad) * diag / 2);
+                const x2 = cx + (Math.cos(angleRad) * diag / 2);
+                const y2 = cy + (Math.sin(angleRad) * diag / 2);
+                
+                const grad = tCtx.createLinearGradient(x1, y1, x2, y2);
+                grad.addColorStop(0, state.gradC1);
+                grad.addColorStop(1, state.gradC2);
+                tCtx.fillStyle = grad;
+                tCtx.fillRect(0,0, state.width, state.height);
+            } else if (state.bgMode === 'image' && state.bgImgObj) {
+                const img = state.bgImgObj;
+                // Scale Logic matches CSS "100%" = Canvas Width
+                const baseScale = state.width / img.naturalWidth;
+                const finalScale = baseScale * state.bgScale;
+                
+                const dW = img.naturalWidth * finalScale;
+                const dH = img.naturalHeight * finalScale;
+                
+                const dx = (state.width - dW) * (state.bgPanX / 100);
+                const dy = (state.height - dH) * (state.bgPanY / 100);
+                
+                tCtx.drawImage(img, dx, dy, dW, dH);
+            }
+
+            // 2. Draw Foreground
+            tCtx.drawImage(canvas, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = 'smart_removed.png';
+            link.href = temp.toDataURL();
+            link.click();
+        };
+    </script>
+</body>
+</html>

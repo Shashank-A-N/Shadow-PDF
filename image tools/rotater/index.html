@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Batch Studio - Ultimate Image Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' },
+                        dark: { 800: '#1e293b', 900: '#0f172a' }
+                    },
+                    screens: { 'xs': '480px' }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .checkered {
+            background-color: #ffffff;
+            background-image: linear-gradient(45deg, #f1f5f9 25%, transparent 25%), linear-gradient(-45deg, #f1f5f9 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f1f5f9 75%), linear-gradient(-45deg, transparent 75%, #f1f5f9 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+        }
+
+        .dark .checkered {
+            background-color: #1e293b;
+            background-image: linear-gradient(45deg, #0f172a 25%, transparent 25%), linear-gradient(-45deg, #0f172a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #0f172a 75%), linear-gradient(-45deg, transparent 75%, #0f172a 75%);
+        }
+
+        .range-slider {
+            -webkit-appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+            background: #e2e8f0;
+            cursor: pointer;
+        }
+
+        .dark .range-slider {
+            background: #334155;
+        }
+
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s;
+        }
+
+        .range-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        .slider-progress {
+            background: linear-gradient(to right, #3b82f6 0%, #3b82f6 var(--progress, 50%), #e2e8f0 var(--progress, 50%), #e2e8f0 100%);
+        }
+
+        .dark .slider-progress {
+            background: linear-gradient(to right, #3b82f6 0%, #3b82f6 var(--progress, 50%), #334155 var(--progress, 50%), #334155 100%);
+        }
+
+        details>summary {
+            list-style: none;
+        }
+
+        details>summary::-webkit-details-marker {
+            display: none;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-slate-50 text-slate-900 dark:bg-dark-900 dark:text-slate-100 h-[100dvh] flex flex-col transition-colors duration-200 overflow-hidden text-sm sm:text-base">
+
+    <!-- Navbar -->
+    <nav
+        class="h-12 sm:h-14 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-3 sm:px-4 z-20 shrink-0">
+        <div class="flex items-center gap-2 sm:gap-3">
+            <div class="bg-primary-600 text-white p-1 sm:p-1.5 rounded-lg shadow-sm shadow-primary-500/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+            </div>
+            <h1 class="font-bold text-base sm:text-lg tracking-tight">Batch<span class="text-primary-600">Studio</span>
+            </h1>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+            <div id="selection-stats"
+                class="hidden md:flex items-center gap-2 text-xs font-medium bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-full text-slate-600 dark:text-slate-300">
+                <span id="stat-count">0 items</span>
+                <span class="w-1 h-1 bg-slate-400 rounded-full"></span>
+                <span id="stat-size">0 MB</span>
+            </div>
+            <button onclick="toggleTheme()"
+                class="p-1.5 sm:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                title="Toggle Theme">
+                <svg id="theme-icon-sun" class="hidden dark:block w-4 h-4 sm:w-5 sm:h-5"
+                    xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2" />
+                    <path d="M12 20v2" />
+                    <path d="m4.93 4.93 1.41 1.41" />
+                    <path d="m17.66 17.66 1.41 1.41" />
+                    <path d="M2 12h2" />
+                    <path d="M20 12h2" />
+                    <path d="m6.34 17.66-1.41 1.41" />
+                    <path d="m19.07 4.93-1.41 1.41" />
+                </svg>
+                <svg id="theme-icon-moon" class="block dark:hidden w-4 h-4 sm:w-5 sm:h-5"
+                    xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+            </button>
+            <button onclick="openExportModal()"
+                class="bg-primary-600 hover:bg-primary-700 text-white px-2.5 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-sm shadow-primary-500/20 flex items-center gap-2"
+                title="Export Files">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span class="hidden sm:inline">Export</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- App Body -->
+    <div class="flex flex-1 overflow-hidden relative">
+
+        <!-- Left Sidebar (Tools) -->
+        <aside
+            class="w-72 sm:w-80 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden z-20 shadow-xl lg:shadow-none absolute lg:relative h-full transition-transform -translate-x-full lg:translate-x-0"
+            id="sidebar">
+            <div
+                class="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 shrink-0">
+                <div class="flex items-center gap-2">
+                    <h2
+                        class="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        Editor</h2>
+                    <select id="preset-selector" onchange="loadPreset(this.value)"
+                        class="text-[10px] sm:text-xs py-0.5 px-1 bg-slate-100 dark:bg-slate-700 rounded border-none outline-none text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <option value="">Load Preset...</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="savePreset()"
+                        class="text-[10px] sm:text-xs text-primary-500 hover:text-primary-600 font-medium"
+                        title="Save Preset">Save</button>
+                    <span class="text-slate-300">|</span>
+                    <button onclick="resetAll()"
+                        class="text-[10px] sm:text-xs text-red-500 hover:text-red-600 font-medium"
+                        title="Reset All">Reset</button>
+                    <button onclick="toggleSidebar()"
+                        class="lg:hidden p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors"
+                        title="Close Sidebar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-y-auto flex-1 p-3 sm:p-4 space-y-4 scrollbar-hide pb-24">
+
+                <!-- Target Selection -->
+                <div class="space-y-2">
+                    <label class="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-slate-300">Apply Changes
+                        To</label>
+                    <div class="grid grid-cols-2 gap-2 text-[10px] sm:text-xs">
+                        <label
+                            class="flex items-center gap-2 cursor-pointer bg-slate-100 dark:bg-slate-700 p-2 rounded-lg border border-transparent has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 dark:has-[:checked]:bg-slate-600 transition-all">
+                            <input type="radio" name="target" value="all" checked onchange="updateTarget()"
+                                class="text-primary-600 accent-primary-600">
+                            <span>All Images</span>
+                        </label>
+                        <label
+                            class="flex items-center gap-2 cursor-pointer bg-slate-100 dark:bg-slate-700 p-2 rounded-lg border border-transparent has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 dark:has-[:checked]:bg-slate-600 transition-all">
+                            <input type="radio" name="target" value="selected" onchange="updateTarget()"
+                                class="text-primary-600 accent-primary-600">
+                            <span>Selected</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 1. Transform & Crop -->
+                <details open class="group">
+                    <summary
+                        class="flex items-center justify-between cursor-pointer text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 select-none">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="M3 7v6h6" />
+                                <path d="M21 17v-6h-6" />
+                                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                            </svg>
+                            Transform & Crop
+                        </span>
+                        <svg class="w-3 h-3 text-slate-400 transition-transform group-open:rotate-180"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </summary>
+                    <div class="space-y-3 pl-1">
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="applyAction('rotate', -90)" title="Rotate Left"
+                                class="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-slate-600 dark:text-slate-300 transition-colors flex justify-center"><svg
+                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                    <path d="M3 3v5h5" />
+                                </svg></button>
+                            <button onclick="applyAction('rotate', 90)" title="Rotate Right"
+                                class="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-slate-600 dark:text-slate-300 transition-colors flex justify-center"><svg
+                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                                    <path d="M21 3v5h-5" />
+                                </svg></button>
+                            <button onclick="applyAction('flipH')" title="Flip Horizontal"
+                                class="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-slate-600 dark:text-slate-300 transition-colors flex justify-center"><svg
+                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m3 7 5 5-5 5V7" />
+                                    <path d="m21 7-5 5 5 5V7" />
+                                    <path d="M12 7v10" />
+                                </svg></button>
+                            <button onclick="applyAction('flipV')" title="Flip Vertical"
+                                class="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-slate-600 dark:text-slate-300 transition-colors flex justify-center"><svg
+                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    style="transform: rotate(90deg);">
+                                    <path d="m3 7 5 5-5 5V7" />
+                                    <path d="m21 7-5 5 5 5V7" />
+                                    <path d="M12 7v10" />
+                                </svg></button>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1.5">Smart Crop (Center)</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button onclick="setCrop(0)"
+                                    class="p-1.5 text-[10px] rounded border border-slate-200 dark:border-slate-600 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-slate-700 transition-colors">None</button>
+                                <button onclick="setCrop(1)"
+                                    class="p-1.5 text-[10px] rounded border border-slate-200 dark:border-slate-600 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-slate-700 transition-colors">1:1</button>
+                                <button onclick="setCrop(1.777)"
+                                    class="p-1.5 text-[10px] rounded border border-slate-200 dark:border-slate-600 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-slate-700 transition-colors">16:9</button>
+                                <button onclick="setCrop(1.333)"
+                                    class="p-1.5 text-[10px] rounded border border-slate-200 dark:border-slate-600 hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-slate-700 transition-colors">4:3</button>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <hr class="border-slate-100 dark:border-slate-700">
+
+                <!-- 2. Watermark -->
+                <details class="group">
+                    <summary
+                        class="flex items-center justify-between cursor-pointer text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 select-none">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="m12 19 7-7 3 3-7 7-3-3z" />
+                                <path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+                                <path d="m2 2 7.586 7.586" />
+                                <circle cx="11" cy="11" r="2" />
+                            </svg>
+                            Watermark
+                        </span>
+                        <svg class="w-3 h-3 text-slate-400 transition-transform group-open:rotate-180"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </summary>
+                    <div class="space-y-3 pl-1 pb-2">
+                        <!-- Live Preview Canvas -->
+                        <div
+                            class="bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center p-2 mb-2 border border-slate-200 dark:border-slate-700">
+                            <canvas id="wm-preview-canvas" class="max-w-full h-auto object-contain max-h-[120px]"
+                                width="300" height="150"></canvas>
+                        </div>
+                        <p class="text-[9px] text-center text-slate-400 mb-2">Live Preview (First Image)</p>
+
+                        <input type="text" id="wm-text" placeholder="Enter watermark text..."
+                            class="w-full text-xs p-2 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:border-primary-500"
+                            oninput="updateWatermark()">
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="wm-font" onchange="updateWatermark()"
+                                class="text-[10px] p-1.5 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600 outline-none">
+                                <option value="sans-serif">Sans Serif</option>
+                                <option value="serif">Serif</option>
+                                <option value="monospace">Monospace</option>
+                                <option value="cursive">Cursive</option>
+                            </select>
+                            <select id="wm-position" onchange="updateWatermark()"
+                                class="text-[10px] p-1.5 bg-slate-50 dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600 outline-none">
+                                <option value="bottom-right">Bottom Right</option>
+                                <option value="bottom-left">Bottom Left</option>
+                                <option value="top-right">Top Right</option>
+                                <option value="top-left">Top Left</option>
+                                <option value="center">Center</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-2">
+                            <div
+                                class="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 p-1 rounded border border-slate-200 dark:border-slate-600 flex-1">
+                                <input type="color" id="wm-color" value="#ffffff"
+                                    class="w-6 h-6 rounded cursor-pointer border-none bg-transparent"
+                                    oninput="updateWatermark()">
+                                <span class="text-[10px] text-slate-500">Color</span>
+                            </div>
+                            <label class="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer">
+                                <input type="checkbox" id="wm-shadow" onchange="updateWatermark()"
+                                    class="accent-primary-600">
+                                Shadow
+                            </label>
+                        </div>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between"><label
+                                    class="text-[10px] text-slate-500">Opacity</label><span id="val-wm-opacity"
+                                    class="text-[10px] text-slate-400">80%</span></div>
+                            <input type="range" id="wm-opacity" min="10" max="100" value="80"
+                                class="range-slider w-full" oninput="updateWatermark()">
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between"><label
+                                    class="text-[10px] text-slate-500">Size</label><span id="val-wm-size"
+                                    class="text-[10px] text-slate-400">30px</span></div>
+                            <input type="range" id="wm-size" min="10" max="100" value="30" class="range-slider w-full"
+                                oninput="updateWatermark()">
+                        </div>
+                    </div>
+                </details>
+
+                <hr class="border-slate-100 dark:border-slate-700">
+
+                <!-- 3. Adjustments -->
+                <details open class="group">
+                    <summary
+                        class="flex items-center justify-between cursor-pointer text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 select-none">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 2a7 7 0 1 0 10 10" />
+                            </svg>
+                            Adjustments
+                        </span>
+                        <svg class="w-3 h-3 text-slate-400 transition-transform group-open:rotate-180"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </summary>
+                    <div class="space-y-4 pl-1">
+                        <!-- Brightness -->
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between items-center">
+                                <label
+                                    class="text-[10px] font-medium text-slate-600 dark:text-slate-400">Brightness</label>
+                                <div class="flex items-center gap-2">
+                                    <span id="val-brightness"
+                                        class="text-[10px] font-mono text-slate-500 dark:text-slate-500 w-8 text-right">100%</span>
+                                    <button onclick="resetAdj('brightness')"
+                                        class="text-slate-400 hover:text-primary-500 transition-colors"
+                                        title="Reset"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                            <path d="M3 3v5h5" />
+                                        </svg></button>
+                                </div>
+                            </div>
+                            <input id="adj-brightness" type="range" min="0" max="200" value="100"
+                                class="range-slider slider-progress w-full"
+                                oninput="updateAdj('brightness', this.value)" ondblclick="resetAdj('brightness')"
+                                style="--progress: 50%">
+                        </div>
+                        <!-- Contrast -->
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between items-center">
+                                <label
+                                    class="text-[10px] font-medium text-slate-600 dark:text-slate-400">Contrast</label>
+                                <div class="flex items-center gap-2">
+                                    <span id="val-contrast"
+                                        class="text-[10px] font-mono text-slate-500 dark:text-slate-500 w-8 text-right">100%</span>
+                                    <button onclick="resetAdj('contrast')"
+                                        class="text-slate-400 hover:text-primary-500 transition-colors"
+                                        title="Reset"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                            <path d="M3 3v5h5" />
+                                        </svg></button>
+                                </div>
+                            </div>
+                            <input id="adj-contrast" type="range" min="0" max="200" value="100"
+                                class="range-slider slider-progress w-full" oninput="updateAdj('contrast', this.value)"
+                                ondblclick="resetAdj('contrast')" style="--progress: 50%">
+                        </div>
+                        <!-- Saturation -->
+                        <div class="space-y-1.5">
+                            <div class="flex justify-between items-center">
+                                <label
+                                    class="text-[10px] font-medium text-slate-600 dark:text-slate-400">Saturation</label>
+                                <div class="flex items-center gap-2">
+                                    <span id="val-saturation"
+                                        class="text-[10px] font-mono text-slate-500 dark:text-slate-500 w-8 text-right">100%</span>
+                                    <button onclick="resetAdj('saturation')"
+                                        class="text-slate-400 hover:text-primary-500 transition-colors"
+                                        title="Reset"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                            <path d="M3 3v5h5" />
+                                        </svg></button>
+                                </div>
+                            </div>
+                            <input id="adj-saturation" type="range" min="0" max="200" value="100"
+                                class="range-slider slider-progress w-full"
+                                oninput="updateAdj('saturation', this.value)" ondblclick="resetAdj('saturation')"
+                                style="--progress: 50%">
+                        </div>
+                    </div>
+                </details>
+
+                <hr class="border-slate-100 dark:border-slate-700">
+
+                <!-- 4. Filters -->
+                <details class="group">
+                    <summary
+                        class="flex items-center justify-between cursor-pointer text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 select-none">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2">
+                                <path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z" />
+                                <path d="m5 11 4 4" />
+                                <path d="m11 5 4 4" />
+                            </svg>
+                            Filters
+                        </span>
+                        <svg class="w-3 h-3 text-slate-400 transition-transform group-open:rotate-180"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </summary>
+                    <div class="grid grid-cols-2 gap-2 pl-1 pb-2">
+                        <button id="btn-grayscale" onclick="toggleFilter('grayscale')"
+                            class="px-2 py-2 text-[10px] sm:text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-left">Grayscale</button>
+                        <button id="btn-sepia" onclick="toggleFilter('sepia')"
+                            class="px-2 py-2 text-[10px] sm:text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-left">Sepia</button>
+                        <button id="btn-invert" onclick="toggleFilter('invert')"
+                            class="px-2 py-2 text-[10px] sm:text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-left">Invert</button>
+                        <button id="btn-blur" onclick="toggleFilter('blur')"
+                            class="px-2 py-2 text-[10px] sm:text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-left">Soft
+                            Blur</button>
+                    </div>
+                </details>
+
+                <!-- Resize -->
+                <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <div class="flex justify-between items-center mb-1">
+                        <h3 class="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-slate-300">Scale Resize
+                        </h3>
+                        <div class="flex items-center gap-2">
+                            <span id="val-scale"
+                                class="text-[10px] font-mono text-slate-500 dark:text-slate-500 w-8 text-right">100%</span>
+                            <button onclick="resetAdj('scale')"
+                                class="text-slate-400 hover:text-primary-500 transition-colors" title="Reset">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                    <path d="M3 3v5h5" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <input id="adj-scale" type="range" min="10" max="100" value="100" step="10"
+                        class="range-slider slider-progress w-full" oninput="updateAdj('scale', this.value)"
+                        ondblclick="resetAdj('scale')" style="--progress: 100%">
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="flex-1 flex flex-col relative bg-slate-100 dark:bg-slate-900 overflow-hidden" id="drop-area">
+
+            <!-- Toolbar -->
+            <div
+                class="h-12 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between px-3 sm:px-4 shrink-0 z-10">
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleSidebar()"
+                        class="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+
+                    <div class="flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                        <button onclick="document.getElementById('file-input').click()"
+                            class="px-2.5 sm:px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-600 hover:shadow rounded-md transition-all flex items-center gap-2"
+                            title="Add Images">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                            <span class="hidden sm:inline">Add Images</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <select onchange="sortImages(this.value)"
+                        class="bg-transparent text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 outline-none cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 max-w-[80px] sm:max-w-none">
+                        <option value="name">Sort: Name</option>
+                        <option value="size">Sort: Size</option>
+                    </select>
+                    <div class="w-px h-3 sm:h-4 bg-slate-300 dark:bg-slate-600 mx-1 sm:mx-2"></div>
+                    <button onclick="selectAll()"
+                        class="text-xs font-medium text-slate-500 hover:text-primary-600 transition-colors p-1"
+                        title="Select All">
+                        <span class="hidden sm:inline">Select All</span>
+                        <svg class="sm:hidden w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="m7 15 5 5 5-5" />
+                            <path d="m7 9 5-5 5 5" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state"
+                class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-0 px-4">
+                <div class="w-full max-w-sm h-48 sm:h-64 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-800/30 backdrop-blur-sm transition-colors pointer-events-auto cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 dark:hover:bg-slate-800/80"
+                    onclick="document.getElementById('file-input').click()">
+                    <div class="p-3 sm:p-4 bg-white dark:bg-slate-700 rounded-full shadow-sm mb-3 sm:mb-4">
+                        <svg class="text-primary-500 w-6 h-6 sm:w-8 sm:h-8" xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                    </div>
+                    <h3 class="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">Drop images here</h3>
+                    <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">or click to browse</p>
+                    <p class="text-[10px] sm:text-xs text-slate-400 mt-3 sm:mt-4">JPG, PNG, GIF, WEBP</p>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            <div id="image-grid"
+                class="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 content-start hidden">
+                <!-- Cards Injected Here -->
+            </div>
+
+            <input type="file" id="file-input" class="hidden" multiple accept="image/*">
+        </main>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="export-modal"
+        class="fixed inset-0 z-[60] bg-black/80 hidden items-center justify-center p-4 backdrop-blur-sm">
+        <div
+            class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div
+                class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                <h3 class="font-bold text-base sm:text-lg text-slate-800 dark:text-white">Export Options</h3>
+                <button onclick="closeExportModal()"
+                    class="text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto">
+                <div class="space-y-2 sm:space-y-3">
+                    <label class="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">File
+                        Format</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="export-format"
+                            class="w-full text-xs sm:text-sm p-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary-500 outline-none">
+                            <option value="">Match Original</option>
+                            <option value="image/jpeg">JPG</option>
+                            <option value="image/png">PNG</option>
+                            <option value="image/webp">WEBP</option>
+                        </select>
+                        <select id="export-quality"
+                            class="w-full text-xs sm:text-sm p-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary-500 outline-none">
+                            <option value="1.0">Quality: 100%</option>
+                            <option value="0.9" selected>Quality: 90%</option>
+                            <option value="0.8">Quality: 80%</option>
+                            <option value="0.6">Quality: 60%</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="space-y-2 sm:space-y-3">
+                    <label class="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">Export
+                        Scope</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label
+                            class="cursor-pointer border border-slate-200 dark:border-slate-600 rounded-lg p-2.5 sm:p-3 flex items-center gap-2 sm:gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 dark:has-[:checked]:bg-primary-900/20 transition-all">
+                            <input type="radio" name="export-scope" value="all" checked
+                                class="accent-primary-600 w-4 h-4 shrink-0">
+                            <span class="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200">All
+                                Images</span>
+                        </label>
+                        <label
+                            class="cursor-pointer border border-slate-200 dark:border-slate-600 rounded-lg p-2.5 sm:p-3 flex items-center gap-2 sm:gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 dark:has-[:checked]:bg-primary-900/20 transition-all">
+                            <input type="radio" name="export-scope" value="selected"
+                                class="accent-primary-600 w-4 h-4 shrink-0">
+                            <span class="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200">Selected
+                                Only</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="space-y-2 sm:space-y-3">
+                    <label class="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">File
+                        Naming</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="rename-prefix" placeholder="Prefix-"
+                            class="w-1/2 text-xs sm:text-sm p-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+                        <input type="text" id="rename-suffix" placeholder="-Suffix"
+                            class="w-1/2 text-xs sm:text-sm p-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
+                <button onclick="processExport('individual')"
+                    class="flex-1 px-3 sm:px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span class="hidden xs:inline">Individual</span><span class="xs:hidden">Files</span>
+                </button>
+                <button onclick="processExport('zip')"
+                    class="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium shadow-lg shadow-primary-500/30 transition-all flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+                        <path d="M12 12v9" />
+                        <path d="m8 17 4 4 4-4" />
+                    </svg>
+                    Download ZIP
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Preview -->
+    <div id="preview-modal"
+        class="fixed inset-0 z-50 bg-black/90 hidden items-center justify-center p-4 md:p-10 backdrop-blur-md"
+        onclick="closePreview()">
+        <img id="preview-img"
+            class="max-w-full max-h-full object-contain rounded shadow-2xl transition-transform duration-200">
+        <button
+            class="absolute top-4 right-4 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-md transition-all">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+        <div
+            class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 text-sm font-medium bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm whitespace-nowrap">
+            Preview Mode
+        </div>
+    </div>
+
+    <!-- Processing Overlay -->
+    <div id="loader"
+        class="fixed inset-0 bg-white/80 dark:bg-slate-900/90 backdrop-blur-sm z-[70] hidden flex-col items-center justify-center">
+        <div class="w-64 bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-4 overflow-hidden">
+            <div id="loader-bar" class="bg-primary-600 h-full w-0 transition-all duration-300"></div>
+        </div>
+        <p class="text-slate-900 dark:text-white font-semibold text-lg animate-pulse">Processing...</p>
+        <p id="loader-status" class="text-slate-500 dark:text-slate-400 text-sm mt-1">Please wait</p>
+    </div>
+
+    <script>
+        // --- State ---
+        let images = [];
+        let config = { target: 'all' };
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+            updatePresetList();
+        });
+
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+        }
+
+        // --- Drag & Drop ---
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+
+        dropArea.addEventListener('dragenter', () => dropArea.classList.add('bg-blue-50', 'dark:bg-slate-800/50'));
+        dropArea.addEventListener('dragleave', () => dropArea.classList.remove('bg-blue-50', 'dark:bg-slate-800/50'));
+
+        dropArea.addEventListener('drop', (e) => {
+            dropArea.classList.remove('bg-blue-50', 'dark:bg-slate-800/50');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        // --- File Handling ---
+        function handleFiles(files) {
+            if (!files.length) return;
+
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('image-grid').classList.remove('hidden');
+
+            Array.from(files).forEach(file => {
+                if (!file.type.match('image.*')) return;
+
+                if (images.some(img => img.file.name === file.name && img.file.size === file.size)) return;
+
+                const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const newImg = {
+                            id: Math.random().toString(36).substr(2, 9),
+                            file: file,
+                            name: baseName,
+                            src: e.target.result,
+                            originalWidth: img.width,
+                            originalHeight: img.height,
+                            selected: false,
+                            edits: getDefaultEdits()
+                        };
+                        images.push(newImg);
+                        renderCard(newImg);
+                        updateStats();
+                        updateWatermark(); // Initial draw if exists
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            fileInput.value = '';
+        }
+
+        function getDefaultEdits() {
+            return {
+                rotation: 0, flipH: 1, flipV: 1, cropRatio: 0,
+                brightness: 100, contrast: 100, saturation: 100,
+                grayscale: 0, sepia: 0, invert: 0, blur: 0, scale: 100,
+                wmText: "", wmColor: "#ffffff", wmOpacity: 80, wmSize: 30, wmPos: "bottom-right",
+                wmFont: "sans-serif", wmShadow: false
+            };
+        }
+
+        function renderCard(img) {
+            const grid = document.getElementById('image-grid');
+            const card = document.createElement('div');
+            card.id = `card-${img.id}`;
+            card.className = `group relative bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden ${img.selected ? 'ring-2 ring-primary-500' : ''}`;
+            card.onclick = (e) => toggleSelection(img.id, e);
+
+            card.innerHTML = `
+                <div class="aspect-square checkered relative overflow-hidden">
+                    <img id="img-${img.id}" src="${img.src}" class="w-full h-full object-contain transition-transform duration-300" style="transform: rotate(0deg) scale(1,1)">
+                    
+                    <div class="absolute top-2 left-2 w-4 h-4 sm:w-5 sm:h-5 rounded border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-800 flex items-center justify-center transition-colors z-10 ${img.selected ? 'bg-primary-500 border-primary-500' : ''}">
+                         ${img.selected ? '<svg class="text-white w-2.5 h-2.5 sm:w-3 sm:h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+                    </div>
+                    
+                    <div id="badges-${img.id}" class="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none"></div>
+
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 sm:gap-2 p-2" onclick="event.stopPropagation()">
+                         <div class="flex gap-1 sm:gap-2">
+                             <button onclick="rotateSingle('${img.id}', -90)" class="p-1.5 sm:p-2 bg-white/90 hover:bg-white text-slate-900 rounded-full shadow-lg transform hover:scale-110 transition-all" title="Rotate Left">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            </button>
+                             <button onclick="rotateSingle('${img.id}', 90)" class="p-1.5 sm:p-2 bg-white/90 hover:bg-white text-slate-900 rounded-full shadow-lg transform hover:scale-110 transition-all" title="Rotate Right">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                            </button>
+                         </div>
+                         <div class="flex gap-1 sm:gap-2">
+                            <button onclick="previewImage('${img.id}')" class="p-1.5 sm:p-2 bg-white/90 hover:bg-white text-slate-900 rounded-full shadow-lg transform hover:scale-110 transition-all" title="Zoom">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </button>
+                            <button onclick="downloadSingle('${img.id}')" class="p-1.5 sm:p-2 bg-white/90 hover:bg-white text-slate-900 rounded-full shadow-lg transform hover:scale-110 transition-all" title="Download">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            </button>
+                            <button onclick="removeImage('${img.id}')" class="p-1.5 sm:p-2 bg-red-500/90 hover:bg-red-500 text-white rounded-full shadow-lg transform hover:scale-110 transition-all" title="Remove">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-2 sm:p-3 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+                     <div class="flex items-center group/edit">
+                        <input type="text" 
+                               value="${img.name}" 
+                               class="text-[10px] sm:text-xs font-medium text-slate-700 dark:text-slate-200 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-primary-500 focus:outline-none w-full truncate transition-colors"
+                               onchange="updateName('${img.id}', this.value)"
+                               onclick="event.stopPropagation();"
+                               title="Click to rename"
+                        >
+                        <svg class="hidden sm:block w-3 h-3 text-slate-300 opacity-0 group-hover/edit:opacity-100 transition-opacity ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    </div>
+                    <div class="flex justify-between items-center mt-1">
+                        <span class="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-mono">${img.originalWidth}x${img.originalHeight}</span>
+                        <span class="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500">${(img.file.size / 1024).toFixed(0)}KB</span>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+            applyVisuals(img);
+        }
+
+        // --- Core Logic ---
+
+        function toggleSelection(id, e) {
+            if (e.target.tagName === 'INPUT') return;
+
+            const img = images.find(i => i.id === id);
+            if (!img) return;
+
+            img.selected = !img.selected;
+
+            const card = document.getElementById(`card-${id}`);
+            if (img.selected) {
+                card.classList.add('ring-2', 'ring-primary-500');
+                card.querySelector('.absolute.top-2').classList.add('bg-primary-500', 'border-primary-500');
+                card.querySelector('.absolute.top-2').innerHTML = '<svg class="text-white w-2.5 h-2.5 sm:w-3 sm:h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>';
+            } else {
+                card.classList.remove('ring-2', 'ring-primary-500');
+                card.querySelector('.absolute.top-2').classList.remove('bg-primary-500', 'border-primary-500');
+                card.querySelector('.absolute.top-2').innerHTML = '';
+            }
+            updateStats();
+        }
+
+        function updateName(id, newName) {
+            const img = images.find(i => i.id === id);
+            if (img && newName.trim() !== "") {
+                img.name = newName.trim();
+            }
+        }
+
+        function rotateSingle(id, deg) {
+            const img = images.find(i => i.id === id);
+            if (img) {
+                img.edits.rotation += deg;
+                applyVisuals(img);
+            }
+        }
+
+        function selectAll() {
+            const allSelected = images.every(i => i.selected);
+            images.forEach(i => {
+                i.selected = !allSelected;
+                const card = document.getElementById(`card-${i.id}`);
+                if (i.selected) {
+                    card.classList.add('ring-2', 'ring-primary-500');
+                    card.querySelector('.absolute.top-2').classList.add('bg-primary-500', 'border-primary-500');
+                    card.querySelector('.absolute.top-2').innerHTML = '<svg class="text-white w-2.5 h-2.5 sm:w-3 sm:h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><polyline points="20 6 9 17 4 12"/></svg>';
+                } else {
+                    card.classList.remove('ring-2', 'ring-primary-500');
+                    card.querySelector('.absolute.top-2').classList.remove('bg-primary-500', 'border-primary-500');
+                    card.querySelector('.absolute.top-2').innerHTML = '';
+                }
+            });
+            updateStats();
+        }
+
+        function updateTarget() {
+            config.target = document.querySelector('input[name="target"]:checked').value;
+        }
+
+        function updateStats() {
+            const selectedCount = images.filter(i => i.selected).length;
+            const totalCount = images.length;
+            const totalSize = images.reduce((acc, curr) => acc + curr.file.size, 0) / (1024 * 1024);
+
+            const countText = selectedCount > 0 ? `${selectedCount}/${totalCount} selected` : `${totalCount} items`;
+            document.getElementById('stat-count').innerText = countText;
+            document.getElementById('stat-size').innerText = `${totalSize.toFixed(1)} MB`;
+        }
+
+        function getTargets() {
+            if (config.target === 'selected') {
+                const selected = images.filter(i => i.selected);
+                return selected.length > 0 ? selected : [];
+            }
+            return images;
+        }
+
+        // --- Editing Functions ---
+
+        function applyAction(action, value) {
+            const targets = getTargets();
+            if (config.target === 'selected' && targets.length === 0) return;
+
+            targets.forEach(img => {
+                if (action === 'rotate') img.edits.rotation += value;
+                if (action === 'flipH') img.edits.flipH *= -1;
+                if (action === 'flipV') img.edits.flipV *= -1;
+                applyVisuals(img);
+            });
+        }
+
+        function updateAdj(type, value) {
+            const input = document.getElementById(`adj-${type}`);
+            if (input) {
+                const min = input.min || 0;
+                const max = input.max || 100;
+                const percent = ((value - min) / (max - min)) * 100;
+                input.style.setProperty('--progress', `${percent}%`);
+            }
+            document.getElementById(`val-${type}`).innerText = value + '%';
+
+            const targets = getTargets();
+            if (config.target === 'selected' && targets.length === 0) return;
+
+            targets.forEach(img => {
+                img.edits[type] = parseInt(value);
+                applyVisuals(img);
+            });
+        }
+
+        function setCrop(ratio) {
+            const targets = getTargets();
+            if (config.target === 'selected' && targets.length === 0) return;
+            targets.forEach(img => {
+                img.edits.cropRatio = ratio;
+                applyVisuals(img);
+            });
+        }
+
+        function updateWatermark() {
+            const text = document.getElementById('wm-text').value;
+            const color = document.getElementById('wm-color').value;
+            const pos = document.getElementById('wm-position').value;
+            const opacity = document.getElementById('wm-opacity').value;
+            const size = document.getElementById('wm-size').value;
+            const font = document.getElementById('wm-font').value;
+            const shadow = document.getElementById('wm-shadow').checked;
+
+            document.getElementById('val-wm-opacity').innerText = opacity + '%';
+            document.getElementById('val-wm-size').innerText = size + 'px';
+
+            // Sidebar Preview
+            drawMiniPreview({ text, color, pos, opacity, size, font, shadow });
+
+            const targets = getTargets();
+            if (config.target === 'selected' && targets.length === 0) return;
+
+            targets.forEach(img => {
+                img.edits.wmText = text;
+                img.edits.wmColor = color;
+                img.edits.wmPos = pos;
+                img.edits.wmOpacity = opacity;
+                img.edits.wmSize = size;
+                img.edits.wmFont = font;
+                img.edits.wmShadow = shadow;
+                applyVisuals(img);
+            });
+        }
+
+        function drawMiniPreview(wm) {
+            const canvas = document.getElementById('wm-preview-canvas');
+            if (!canvas || images.length === 0) return;
+
+            const ctx = canvas.getContext('2d');
+            const imgObj = getTargets().length > 0 ? getTargets()[0] : images[0];
+
+            const img = new Image();
+            img.onload = () => {
+                // Simplified drawing for preview (no rotate/crop)
+                canvas.width = 300;
+                canvas.height = 300 * (img.height / img.width);
+                if (canvas.height > 150) {
+                    canvas.height = 150;
+                    canvas.width = 150 * (img.width / img.height);
+                }
+
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                if (wm.text) {
+                    const fontSize = (wm.size / 100) * (Math.min(canvas.width, canvas.height) / 5);
+                    ctx.font = `bold ${Math.max(10, fontSize)}px ${wm.font}`;
+                    ctx.globalAlpha = wm.opacity / 100;
+                    ctx.fillStyle = wm.color;
+                    ctx.textBaseline = 'middle';
+
+                    if (wm.shadow) {
+                        ctx.shadowColor = "rgba(0,0,0,0.7)";
+                        ctx.shadowBlur = 4;
+                        ctx.shadowOffsetX = 2;
+                        ctx.shadowOffsetY = 2;
+                    } else {
+                        ctx.shadowColor = "transparent";
+                    }
+
+                    const textMetrics = ctx.measureText(wm.text);
+                    const txtW = textMetrics.width;
+                    const txtH = fontSize;
+                    const pad = 10;
+
+                    let tx = 0, ty = 0;
+
+                    if (wm.pos.includes('left')) tx = pad;
+                    else if (wm.pos.includes('right')) tx = canvas.width - txtW - pad;
+                    else tx = (canvas.width - txtW) / 2;
+
+                    if (wm.pos.includes('top')) ty = pad + (txtH / 2);
+                    else if (wm.pos.includes('bottom')) ty = canvas.height - (txtH / 2) - pad;
+                    else ty = canvas.height / 2;
+
+                    ctx.fillText(wm.text, tx, ty);
+                }
+            };
+            img.src = imgObj.src;
+        }
+
+        function resetAdj(type) {
+            const defaultValue = 100;
+            const input = document.getElementById(`adj-${type}`);
+            if (input) {
+                input.value = defaultValue;
+                input.style.setProperty('--progress', `50%`);
+                if (type === 'scale') input.style.setProperty('--progress', `100%`);
+            }
+            document.getElementById(`val-${type}`).innerText = defaultValue + '%';
+
+            const targets = getTargets();
+            targets.forEach(img => {
+                img.edits[type] = defaultValue;
+                applyVisuals(img);
+            });
+        }
+
+        function toggleFilter(type) {
+            const btn = document.getElementById(`btn-${type}`);
+            const isActive = btn.classList.contains('bg-slate-100') || btn.classList.contains('border-primary-500');
+
+            if (!isActive) {
+                btn.classList.add('bg-primary-50', 'border-primary-500', 'text-primary-700', 'dark:bg-slate-700', 'dark:text-primary-400');
+            } else {
+                btn.classList.remove('bg-primary-50', 'border-primary-500', 'text-primary-700', 'dark:bg-slate-700', 'dark:text-primary-400');
+            }
+
+            const targets = getTargets();
+            if (config.target === 'selected' && targets.length === 0) return;
+
+            targets.forEach(img => {
+                img.edits[type] = isActive ? 0 : 1;
+                applyVisuals(img);
+            });
+        }
+
+        function applyVisuals(img) {
+            const el = document.getElementById(`img-${img.id}`);
+            if (!el) return;
+
+            const filters = `
+                brightness(${img.edits.brightness}%) 
+                contrast(${img.edits.contrast}%) 
+                saturate(${img.edits.saturation}%) 
+                grayscale(${img.edits.grayscale * 100}%) 
+                sepia(${img.edits.sepia * 100}%) 
+                invert(${img.edits.invert * 100}%)
+                blur(${img.edits.blur * 2}px)
+            `;
+            const transform = `rotate(${img.edits.rotation}deg) scale(${img.edits.flipH}, ${img.edits.flipV})`;
+
+            el.style.filter = filters;
+            el.style.transform = transform;
+
+            const badges = document.getElementById(`badges-${img.id}`);
+            if (badges) {
+                badges.innerHTML = '';
+                if (img.edits.cropRatio > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'px-1.5 py-0.5 bg-blue-500 text-[8px] text-white rounded font-bold shadow';
+                    badge.innerText = 'CROP';
+                    badges.appendChild(badge);
+                }
+                if (img.edits.wmText) {
+                    const badge = document.createElement('span');
+                    badge.className = 'px-1.5 py-0.5 bg-purple-500 text-[8px] text-white rounded font-bold shadow';
+                    badge.innerText = 'WM';
+                    badges.appendChild(badge);
+                }
+            }
+        }
+
+        function resetAll() {
+            if (!confirm('Reset all edits for ALL images?')) return;
+            images.forEach(img => img.edits = getDefaultEdits());
+
+            ['brightness', 'contrast', 'saturation', 'scale'].forEach(k => {
+                const input = document.getElementById(`adj-${k}`);
+                if (input) {
+                    input.value = 100;
+                    input.style.setProperty('--progress', k === 'scale' ? '100%' : '50%');
+                    document.getElementById(`val-${k}`).innerText = '100%';
+                }
+            });
+            document.querySelectorAll('[id^="btn-"]').forEach(btn => btn.classList.remove('bg-primary-50', 'border-primary-500', 'text-primary-700', 'dark:bg-slate-700', 'dark:text-primary-400'));
+            document.getElementById('wm-text').value = '';
+            document.getElementById('wm-color').value = '#ffffff';
+            document.getElementById('wm-size').value = 30;
+            document.getElementById('wm-opacity').value = 80;
+            document.getElementById('wm-shadow').checked = false;
+
+            // Clear preview
+            const canvas = document.getElementById('wm-preview-canvas');
+            if (canvas) { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); }
+
+            images.forEach(img => applyVisuals(img));
+        }
+
+        function removeImage(id) {
+            images = images.filter(i => i.id !== id);
+            const card = document.getElementById(`card-${id}`);
+            if (card) card.remove();
+
+            if (images.length === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+                document.getElementById('image-grid').classList.add('hidden');
+            }
+            updateStats();
+        }
+
+        function sortImages(by) {
+            const grid = document.getElementById('image-grid');
+            images.sort((a, b) => {
+                if (by === 'size') return b.file.size - a.file.size;
+                return a.name.localeCompare(b.name);
+            });
+            images.forEach(img => grid.appendChild(document.getElementById(`card-${img.id}`)));
+        }
+
+        // --- Presets System ---
+        function savePreset() {
+            const name = prompt("Enter a name for this preset:");
+            if (!name) return;
+
+            const currentSettings = {
+                brightness: document.getElementById('adj-brightness').value,
+                contrast: document.getElementById('adj-contrast').value,
+                saturation: document.getElementById('adj-saturation').value,
+                grayscale: document.getElementById('btn-grayscale').classList.contains('bg-primary-50') ? 1 : 0,
+                sepia: document.getElementById('btn-sepia').classList.contains('bg-primary-50') ? 1 : 0,
+                invert: document.getElementById('btn-invert').classList.contains('bg-primary-50') ? 1 : 0,
+                blur: document.getElementById('btn-blur').classList.contains('bg-primary-50') ? 1 : 0,
+                wmText: document.getElementById('wm-text').value,
+                wmColor: document.getElementById('wm-color').value,
+                wmPos: document.getElementById('wm-position').value,
+                wmSize: document.getElementById('wm-size').value,
+                wmOpacity: document.getElementById('wm-opacity').value,
+                wmFont: document.getElementById('wm-font').value,
+                wmShadow: document.getElementById('wm-shadow').checked
+            };
+
+            const presets = JSON.parse(localStorage.getItem('batchPresets') || '{}');
+            presets[name] = currentSettings;
+            localStorage.setItem('batchPresets', JSON.stringify(presets));
+            updatePresetList();
+            alert("Preset saved!");
+        }
+
+        function loadPreset(name) {
+            if (!name) return;
+            const presets = JSON.parse(localStorage.getItem('batchPresets') || '{}');
+            const p = presets[name];
+            if (!p) return;
+
+            updateAdj('brightness', p.brightness);
+            updateAdj('contrast', p.contrast);
+            updateAdj('saturation', p.saturation);
+
+            const setFilterState = (id, val) => {
+                const btn = document.getElementById(id);
+                if (val) btn.classList.add('bg-primary-50', 'border-primary-500', 'text-primary-700', 'dark:bg-slate-700', 'dark:text-primary-400');
+                else btn.classList.remove('bg-primary-50', 'border-primary-500', 'text-primary-700', 'dark:bg-slate-700', 'dark:text-primary-400');
+            };
+            setFilterState('btn-grayscale', p.grayscale);
+            setFilterState('btn-sepia', p.sepia);
+            setFilterState('btn-invert', p.invert);
+            setFilterState('btn-blur', p.blur);
+
+            document.getElementById('wm-text').value = p.wmText || '';
+            document.getElementById('wm-color').value = p.wmColor || '#ffffff';
+            document.getElementById('wm-position').value = p.wmPos || 'bottom-right';
+            document.getElementById('wm-size').value = p.wmSize || 30;
+            document.getElementById('wm-opacity').value = p.wmOpacity || 80;
+            document.getElementById('wm-font').value = p.wmFont || 'sans-serif';
+            document.getElementById('wm-shadow').checked = p.wmShadow || false;
+
+            updateWatermark();
+
+            const targets = getTargets();
+            targets.forEach(img => {
+                img.edits.grayscale = p.grayscale;
+                img.edits.sepia = p.sepia;
+                img.edits.invert = p.invert;
+                img.edits.blur = p.blur;
+                applyVisuals(img);
+            });
+        }
+
+        function updatePresetList() {
+            const selector = document.getElementById('preset-selector');
+            selector.innerHTML = '<option value="">Load Preset...</option>';
+            const presets = JSON.parse(localStorage.getItem('batchPresets') || '{}');
+            Object.keys(presets).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.innerText = name;
+                selector.appendChild(opt);
+            });
+        }
+
+        // --- Preview Modal ---
+        function previewImage(id) {
+            const img = images.find(i => i.id === id);
+            if (!img) return;
+
+            const modal = document.getElementById('preview-modal');
+            const previewEl = document.getElementById('preview-img');
+
+            processCanvas(img, 'image/png', 1.0).then(blob => {
+                previewEl.src = URL.createObjectURL(blob);
+            });
+
+            previewEl.style.filter = 'none';
+            previewEl.style.transform = 'none';
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closePreview() {
+            document.getElementById('preview-modal').classList.add('hidden');
+            document.getElementById('preview-modal').classList.remove('flex');
+        }
+
+        // --- Export Logic ---
+
+        function openExportModal() {
+            if (images.length === 0) {
+                alert("Please add images first!");
+                return;
+            }
+            document.getElementById('export-modal').classList.remove('hidden');
+            document.getElementById('export-modal').classList.add('flex');
+        }
+
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.add('hidden');
+            document.getElementById('export-modal').classList.remove('flex');
+        }
+
+        async function processExport(type) {
+            const formatInput = document.getElementById('export-format').value;
+            const quality = parseFloat(document.getElementById('export-quality').value);
+            const prefix = document.getElementById('rename-prefix').value;
+            const suffix = document.getElementById('rename-suffix').value;
+            const scope = document.querySelector('input[name="export-scope"]:checked').value;
+
+            let targets = images;
+            if (scope === 'selected') {
+                targets = images.filter(i => i.selected);
+                if (targets.length === 0) { alert("No images selected!"); return; }
+            }
+
+            closeExportModal();
+
+            const loader = document.getElementById('loader');
+            const bar = document.getElementById('loader-bar');
+            const status = document.getElementById('loader-status');
+            loader.classList.remove('hidden');
+            loader.classList.add('flex');
+
+            if (type === 'zip') {
+                const zip = new JSZip();
+                for (let i = 0; i < targets.length; i++) {
+                    const img = targets[i];
+                    bar.style.width = `${((i + 1) / targets.length) * 100}%`;
+                    status.innerText = `Processing ${i + 1}/${targets.length}`;
+                    await new Promise(r => setTimeout(r, 10)); // Yield
+
+                    try {
+                        const finalFormat = formatInput || img.file.type || 'image/png';
+                        let ext = finalFormat.split('/')[1]; if (ext === 'jpeg') ext = 'jpg';
+                        const blob = await processCanvas(img, finalFormat, quality);
+                        let filename = img.name;
+                        if (prefix) filename = `${prefix}${filename}`;
+                        if (suffix) filename = `${filename}${suffix}`;
+                        zip.file(`${filename}.${ext}`, blob);
+                    } catch (e) { console.error(e); }
+                }
+                status.innerText = "Compressing ZIP...";
+                zip.generateAsync({ type: "blob" }).then(content => {
+                    saveAs(content, "batch_studio_export.zip");
+                    loader.classList.add('hidden');
+                    loader.classList.remove('flex');
+                });
+            } else if (type === 'individual') {
+                if (targets.length > 10 && !confirm(`Download ${targets.length} files?`)) {
+                    loader.classList.add('hidden'); loader.classList.remove('flex'); return;
+                }
+                for (let i = 0; i < targets.length; i++) {
+                    const img = targets[i];
+                    bar.style.width = `${((i + 1) / targets.length) * 100}%`;
+                    status.innerText = `Downloading ${i + 1}/${targets.length}`;
+                    await new Promise(r => setTimeout(r, 200));
+                    try {
+                        const finalFormat = formatInput || img.file.type || 'image/png';
+                        let ext = finalFormat.split('/')[1]; if (ext === 'jpeg') ext = 'jpg';
+                        const blob = await processCanvas(img, finalFormat, quality);
+                        let filename = img.name;
+                        if (prefix) filename = `${prefix}${filename}`;
+                        if (suffix) filename = `${filename}${suffix}`;
+                        saveAs(blob, `${filename}.${ext}`);
+                    } catch (e) { console.error(e); }
+                }
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+            }
+        }
+
+        async function downloadSingle(id) {
+            const img = images.find(i => i.id === id);
+            if (!img) return;
+
+            const formatInput = document.getElementById('export-format').value;
+            const finalFormat = formatInput || img.file.type || 'image/png';
+            let ext = finalFormat.split('/')[1]; if (ext === 'jpeg') ext = 'jpg';
+            const quality = parseFloat(document.getElementById('export-quality').value) || 0.9;
+
+            try {
+                const blob = await processCanvas(img, finalFormat, quality);
+                saveAs(blob, `${img.name}.${ext}`);
+            } catch (e) { console.error(e); }
+        }
+
+        function processCanvas(imgObj, format, quality) {
+            return new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                img.onload = () => {
+                    const edits = imgObj.edits;
+
+                    let sx = 0, sy = 0, sw = img.width, sh = img.height;
+                    if (edits.cropRatio > 0) {
+                        const imgRatio = img.width / img.height;
+                        if (imgRatio > edits.cropRatio) {
+                            sw = img.height * edits.cropRatio;
+                            sx = (img.width - sw) / 2;
+                        } else {
+                            sh = img.width / edits.cropRatio;
+                            sy = (img.height - sh) / 2;
+                        }
+                    }
+
+                    const scaleFactor = edits.scale / 100;
+                    const baseW = sw * scaleFactor;
+                    const baseH = sh * scaleFactor;
+
+                    const rads = (edits.rotation * Math.PI) / 180;
+                    const sin = Math.abs(Math.sin(rads));
+                    const cos = Math.abs(Math.cos(rads));
+                    canvas.width = (baseW * cos) + (baseH * sin);
+                    canvas.height = (baseW * sin) + (baseH * cos);
+
+                    ctx.filter = `
+                        brightness(${edits.brightness}%) 
+                        contrast(${edits.contrast}%) 
+                        saturate(${edits.saturation}%) 
+                        grayscale(${edits.grayscale * 100}%) 
+                        sepia(${edits.sepia * 100}%) 
+                        invert(${edits.invert * 100}%)
+                        blur(${edits.blur * 2}px)
+                    `;
+
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(rads);
+                    ctx.scale(edits.flipH, edits.flipV);
+                    ctx.drawImage(img, sx, sy, sw, sh, -baseW / 2, -baseH / 2, baseW, baseH);
+
+                    if (edits.wmText) {
+                        ctx.setTransform(1, 0, 0, 1, 0, 0);
+                        ctx.filter = 'none';
+
+                        const fontSize = (edits.wmSize / 100) * (Math.min(canvas.width, canvas.height) / 5);
+                        ctx.font = `bold ${Math.max(12, fontSize)}px ${edits.wmFont || 'sans-serif'}`;
+                        ctx.globalAlpha = edits.wmOpacity / 100;
+                        ctx.fillStyle = edits.wmColor;
+                        ctx.textBaseline = 'middle';
+
+                        if (edits.wmShadow) {
+                            ctx.shadowColor = "rgba(0,0,0,0.7)";
+                            ctx.shadowBlur = 4;
+                            ctx.shadowOffsetX = 2;
+                            ctx.shadowOffsetY = 2;
+                        } else {
+                            ctx.shadowColor = "transparent";
+                        }
+
+                        const textMetrics = ctx.measureText(edits.wmText);
+                        const txtW = textMetrics.width;
+                        const txtH = fontSize;
+                        const pad = 20;
+
+                        let tx = 0, ty = 0;
+                        const pos = edits.wmPos;
+
+                        if (pos.includes('left')) tx = pad;
+                        else if (pos.includes('right')) tx = canvas.width - txtW - pad;
+                        else tx = (canvas.width - txtW) / 2;
+
+                        if (pos.includes('top')) ty = pad + (txtH / 2);
+                        else if (pos.includes('bottom')) ty = canvas.height - (txtH / 2) - pad;
+                        else ty = canvas.height / 2;
+
+                        ctx.fillText(edits.wmText, tx, ty);
+                    }
+
+                    canvas.toBlob(resolve, format, quality);
+                };
+                img.onerror = reject;
+                img.src = imgObj.src;
+            });
+        }
+
+        // --- Keyboard Shortcuts ---
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('preview-modal').classList.contains('flex')) {
+                if (e.key === 'Escape') closePreview();
+                return;
+            }
+            if (e.target.tagName === 'INPUT') return;
+            if (e.key === 'ArrowRight') applyAction('rotate', 90);
+            if (e.key === 'ArrowLeft') applyAction('rotate', -90);
+            if (e.key === 'Delete') {
+                const selectedIds = images.filter(i => i.selected).map(i => i.id);
+                selectedIds.forEach(id => removeImage(id));
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                selectAll();
+            }
+        });
+    </script>
+</body>
+
+</html>

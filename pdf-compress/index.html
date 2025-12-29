@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Compressor</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf.js from Mozilla to render PDF pages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- pdf-lib.js to create the new, compressed PDF -->
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Spinner animation */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* File input styling */
+        .file-input-label {
+            transition: all 0.2s ease-in-out;
+        }
+        .file-input-label:hover {
+            background-color: #f0f9ff; /* light blue */
+            border-color: #3b82f6; /* blue-500 */
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="bg-white rounded-2xl shadow-lg p-8 transition-all duration-300">
+            
+            <!-- Header Section -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">PDF Compressor</h1>
+                <p class="text-slate-500 mt-2">Reduce PDF file size while optimizing for quality.</p>
+            </div>
+
+            <!-- Main Application View -->
+            <div id="app-view">
+                <!-- Upload View -->
+                <div id="upload-view">
+                    <input type="file" id="pdf-input" class="hidden" accept=".pdf">
+                    <label for="pdf-input" class="file-input-label flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer bg-slate-50">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-blue-500"></i>
+                            <p class="mb-2 text-sm text-slate-500 mt-4"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p class="text-xs text-slate-500">PDF files only</p>
+                        </div>
+                    </label>
+                    <!-- NEW: Added a more prominent warning -->
+                    <div class="mt-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded-r-lg">
+                        <p class="text-sm font-semibold">Important Note:</p>
+                        <p class="text-xs mt-1">This tool works best for PDFs with large images. For PDFs that are mostly text, the file size might increase because text is converted to images.</p>
+                    </div>
+                    <div class="mt-6">
+                        <label for="quality-slider" class="block mb-2 text-sm font-medium text-slate-700">Image Quality</label>
+                        <input id="quality-slider" type="range" min="0.1" max="1.0" value="0.7" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
+                            <span>Lower Quality</span>
+                            <span>Best Quality</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Processing View -->
+                <div id="processing-view" class="hidden text-center py-12">
+                    <div class="spinner mx-auto"></div>
+                    <p id="status-text" class="mt-4 text-slate-600 font-medium">Compressing your file...</p>
+                    <p class="text-sm text-slate-500">This may take a moment for large files.</p>
+                </div>
+
+                <!-- Result View -->
+                <div id="result-view" class="hidden text-center">
+                    <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg mb-6">
+                        <div class="flex">
+                            <div class="py-1"><i class="fas fa-check-circle fa-2x text-green-500"></i></div>
+                            <div class="ml-3 text-left">
+                                <h3 class="text-lg font-semibold text-green-800">Compression Successful!</h3>
+                                <div id="result-stats" class="text-sm text-green-700 mt-1"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <a id="download-btn" class="w-full sm:w-auto inline-block bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors shadow-md" href="#" download="compressed.pdf">
+                        <i class="fas fa-download mr-2"></i>Download Compressed PDF
+                    </a>
+                    <button id="start-over-btn" class="w-full sm:w-auto mt-4 sm:mt-0 sm:ml-4 inline-block bg-slate-200 text-slate-700 font-bold py-3 px-8 rounded-lg hover:bg-slate-300 transition-colors">
+                        <i class="fas fa-redo mr-2"></i>Compress Another
+                    </button>
+                </div>
+            </div>
+        </div>
+        <footer class="text-center mt-6 text-sm text-slate-400">
+            <p>&copy; 2024 PDF Compressor. All processing is done locally in your browser.</p>
+        </footer>
+    </div>
+
+    <script type="module">
+        // Set the workerSrc for pdf.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+
+        // DOM Elements
+        const uploadView = document.getElementById('upload-view');
+        const processingView = document.getElementById('processing-view');
+        const resultView = document.getElementById('result-view');
+        const pdfInput = document.getElementById('pdf-input');
+        const qualitySlider = document.getElementById('quality-slider');
+        const downloadBtn = document.getElementById('download-btn');
+        const startOverBtn = document.getElementById('start-over-btn');
+        const statusText = document.getElementById('status-text');
+        const resultStats = document.getElementById('result-stats');
+
+        let originalFileSize = 0;
+
+        /**
+         * Handles the file input change event.
+         */
+        pdfInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                originalFileSize = file.size;
+                compressPdf(file);
+            } else {
+                alert('Please select a valid PDF file.');
+            }
+        });
+
+        /**
+         * Resets the UI to the initial upload state.
+         */
+        startOverBtn.addEventListener('click', () => {
+            resultView.classList.add('hidden');
+            uploadView.classList.remove('hidden');
+            pdfInput.value = ''; // Reset file input
+        });
+
+        /**
+         * Formats bytes into a human-readable string (KB, MB).
+         * @param {number} bytes - The number of bytes.
+         * @returns {string} - The formatted file size.
+         */
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        /**
+         * The core function to compress the PDF.
+         * It renders each page to a canvas and creates a new PDF from these images.
+         * @param {File} file - The PDF file to compress.
+         */
+        async function compressPdf(file) {
+            // --- UI Update: Show processing view ---
+            uploadView.classList.add('hidden');
+            processingView.classList.remove('hidden');
+            statusText.textContent = 'Reading your PDF...';
+
+            try {
+                const fileReader = new FileReader();
+                fileReader.readAsArrayBuffer(file);
+                
+                fileReader.onload = async (event) => {
+                    const arrayBuffer = event.target.result;
+
+                    // --- Step 1: Load the PDF using pdf.js to render pages ---
+                    const pdfJsDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const numPages = pdfJsDoc.numPages;
+
+                    // --- Step 2: Create a new PDF document using pdf-lib ---
+                    const { PDFDocument } = PDFLib;
+                    const pdfLibDoc = await PDFDocument.create();
+                    const quality = parseFloat(qualitySlider.value);
+
+                    // --- Step 3: Process each page ---
+                    for (let i = 1; i <= numPages; i++) {
+                        statusText.textContent = `Compressing page ${i} of ${numPages}...`;
+
+                        const page = await pdfJsDoc.getPage(i);
+                        // UPDATED: Reduced scale from 1.5 to 1.0 to generate smaller images.
+                        const viewport = page.getViewport({ scale: 1.0 }); 
+
+                        // Create a canvas to render the page
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        // Render the page onto the canvas
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                        // Get the image from the canvas as a JPEG with specified quality
+                        const jpegDataUrl = canvas.toDataURL('image/jpeg', quality);
+                        const jpegImageBytes = await fetch(jpegDataUrl).then(res => res.arrayBuffer());
+                        
+                        // Embed the JPEG into the new PDF
+                        const jpegImage = await pdfLibDoc.embedJpg(jpegImageBytes);
+
+                        // Add a new page to the new PDF and draw the image on it
+                        const newPage = pdfLibDoc.addPage([viewport.width, viewport.height]);
+                        newPage.drawImage(jpegImage, {
+                            x: 0,
+                            y: 0,
+                            width: newPage.getWidth(),
+                            height: newPage.getHeight(),
+                        });
+                    }
+
+                    // --- Step 4: Save the new PDF and prepare for download ---
+                    statusText.textContent = 'Finalizing your compressed file...';
+                    const pdfBytes = await pdfLibDoc.save();
+                    const compressedSize = pdfBytes.length;
+
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    const url = URL.createObjectURL(blob);
+
+                    downloadBtn.href = url;
+                    
+                    // --- UI Update: Show result view ---
+                    const reduction = Math.round(((originalFileSize - compressedSize) / originalFileSize) * 100);
+                    const reductionText = reduction > 0 ? `(${reduction}% reduction)` : `(${Math.abs(reduction)}% increase)`;
+                    const reductionColor = reduction > 0 ? 'text-green-600' : 'text-red-600';
+
+                    resultStats.innerHTML = `
+                        Original Size: <strong>${formatBytes(originalFileSize)}</strong><br>
+                        Compressed Size: <strong>${formatBytes(compressedSize)}</strong>
+                        <span class="font-bold ${reductionColor} ml-2">${reductionText}</span>
+                    `;
+
+                    processingView.classList.add('hidden');
+                    resultView.classList.remove('hidden');
+                };
+
+            } catch (error) {
+                console.error('Error during PDF compression:', error);
+                alert('An error occurred during compression. Please try again with a different file.');
+                // Reset UI on error
+                processingView.classList.add('hidden');
+                uploadView.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

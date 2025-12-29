@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document to HTML Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #messageBox {
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(-20px);
+        }
+        #messageBox.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6">
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">Document to HTML Converter</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Convert DOCX, XLSX, and PDF files to HTML directly in your browser.</p>
+        </div>
+
+        <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-center">
+            <label for="fileUpload" class="cursor-pointer">
+                <i class="fas fa-file-upload text-4xl text-blue-500"></i>
+                <p class="mt-2 font-semibold text-gray-700 dark:text-gray-300">Click to upload a file</p>
+                <p id="fileName" class="text-sm text-gray-500 dark:text-gray-400">Supported formats: .docx, .xlsx, .pdf</p>
+            </label>
+            <input type="file" id="fileUpload" class="hidden" accept=".docx,.xlsx,.pdf">
+        </div>
+
+        <div>
+            <div class="flex justify-between items-center mb-2">
+                <label for="htmlOutput" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Generated HTML Output</label>
+                <button id="clearBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg text-sm flex items-center">
+                    <i class="fas fa-trash-alt mr-2"></i>Clear
+                </button>
+            </div>
+            <textarea id="htmlOutput" rows="15" readonly class="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200" placeholder="Your converted HTML will appear here..."></textarea>
+        </div>
+        
+        <div class="text-center pt-4">
+            <button id="convertBtn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-transform transform hover:scale-105 duration-300 ease-in-out flex items-center justify-center mx-auto disabled:opacity-75 disabled:cursor-not-allowed">
+                <i class="fas fa-cogs mr-2"></i>
+                <span id="btn-text">Convert to HTML</span>
+                <div id="loader" class="loader ml-3 hidden"></div>
+            </button>
+        </div>
+    </div>
+
+    <div id="messageBox" class="fixed top-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg opacity-0">
+        <span id="messageText"></span>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.7.1/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <script>
+        // Set the workerSrc for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        const fileUpload = document.getElementById('fileUpload');
+        const convertBtn = document.getElementById('convertBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const htmlOutput = document.getElementById('htmlOutput');
+        const fileNameDisplay = document.getElementById('fileName');
+        const btnText = document.getElementById('btn-text');
+        const loader = document.getElementById('loader');
+        
+        let currentFile = null;
+
+        function showMessage(message, isError = true) {
+            const messageBox = document.getElementById('messageBox');
+            const messageText = document.getElementById('messageText');
+            messageBox.className = 'fixed top-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg opacity-0';
+            messageBox.classList.add(isError ? 'bg-red-500' : 'bg-green-500');
+            messageText.textContent = message;
+            messageBox.classList.add('show');
+            setTimeout(() => { messageBox.classList.remove('show'); }, 5000);
+        }
+
+        fileUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                currentFile = file;
+                fileNameDisplay.textContent = `Selected: ${file.name}`;
+                htmlOutput.value = ''; // Clear previous output
+            }
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            htmlOutput.value = '';
+            fileUpload.value = '';
+            currentFile = null;
+            fileNameDisplay.textContent = 'Supported formats: .docx, .xlsx, .pdf';
+            showMessage('Content cleared.', false);
+        });
+
+        const handleDocx = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const arrayBuffer = e.target.result;
+                    mammoth.convertToHtml({ arrayBuffer: arrayBuffer })
+                        .then(result => resolve(result.value))
+                        .catch(reject);
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        };
+
+        const handleXlsx = (file) => {
+             return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    let finalHtml = '';
+                    workbook.SheetNames.forEach(sheetName => {
+                        finalHtml += `<h2>Sheet: ${sheetName}</h2>`;
+                        const html = XLSX.utils.sheet_to_html(workbook.Sheets[sheetName]);
+                        finalHtml += html;
+                    });
+                    resolve(finalHtml);
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        };
+
+        const handlePdf = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const arrayBuffer = e.target.result;
+                    try {
+                        const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+                        const pdf = await loadingTask.promise;
+                        let fullText = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            fullText += `<p>${pageText.replace(/\n/g, '<br>')}</p>`;
+                        }
+                        resolve(`<h1>PDF Text Content (Page by Page)</h1>${fullText}`);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        };
+
+        convertBtn.addEventListener('click', async () => {
+            if (!currentFile) {
+                showMessage('Please upload a file first.');
+                return;
+            }
+
+            convertBtn.disabled = true;
+            btnText.textContent = 'Converting...';
+            loader.classList.remove('hidden');
+            htmlOutput.value = '';
+
+            try {
+                let htmlContent = '';
+                const fileExtension = currentFile.name.split('.').pop().toLowerCase();
+
+                switch (fileExtension) {
+                    case 'docx':
+                        htmlContent = await handleDocx(currentFile);
+                        break;
+                    case 'xlsx':
+                        htmlContent = await handleXlsx(currentFile);
+                        break;
+                    case 'pdf':
+                        htmlContent = await handlePdf(currentFile);
+                        break;
+                    default:
+                        throw new Error('Unsupported file format.');
+                }
+                
+                htmlOutput.value = htmlContent;
+                showMessage('Conversion successful!', false);
+            } catch (e) {
+                showMessage('An error occurred during conversion.');
+                console.error(e);
+            }
+            
+            convertBtn.disabled = false;
+            btnText.textContent = 'Convert to HTML';
+            loader.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>

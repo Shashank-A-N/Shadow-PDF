@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PassportBooth Ultimate - Professional ID Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Cyber-Pro Aesthetic */
+        :root {
+            --bg-dark: #020617;
+            --panel-bg: #0f172a;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+        }
+        
+        body {
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 50% 0%, #1e293b 0%, transparent 50%),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent-glow);
+            margin-top: -5px;
+            cursor: pointer;
+            border: 2px solid #fff;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Animations */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px var(--accent-glow); }
+            50% { box-shadow: 0 0 15px var(--accent-glow); }
+        }
+        .animate-glow { animation: pulse-glow 2s infinite; }
+        
+        .canvas-container {
+            background-image: 
+                linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        /* High Visibility Cursor */
+        #brush-cursor {
+            position: absolute;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8); /* Hard black outline */
+            background-color: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            transform: translate(-50%, -50%);
+            display: none; /* Managed by JS */
+        }
+        #brush-cursor.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="text-slate-200 font-sans pb-20 selection:bg-blue-500/30">
+
+    <!-- Top Bar -->
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-1.5 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                    <i data-lucide="scan-face" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white leading-none">PassportBooth <span class="text-blue-500">Ultimate</span></h1>
+                    <div class="flex items-center gap-2 text-[10px] text-slate-500 font-mono mt-0.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        LOCAL PROCESSING
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="btn-shortcuts" class="p-2 text-slate-400 hover:text-white transition-colors hidden md:block" title="Keyboard Shortcuts">
+                    <i data-lucide="keyboard" class="w-4 h-4"></i>
+                </button>
+                <div class="h-4 w-px bg-slate-800 hidden md:block"></div>
+                <button id="reset-all-btn" class="hidden md:flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
+                </button>
+                <div class="px-3 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-xs font-medium text-slate-300">
+                    v4.3.0
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout Grid -->
+    <!-- Mobile: Stacked (Col 1) | Tablet: Canvas Top, Split Bottom (Col 12) | Desktop: 3-Col (Col 12) -->
+    <main class="max-w-screen-2xl mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6">
+        
+        <!-- LEFT: Tools & Settings -->
+        <!-- Mobile: Order 1 (Upload First) -->
+        <!-- Tablet: Order 2 (Bottom Left, Half Width) -->
+        <!-- Desktop: Order 1 (Left, Sidebar) -->
+        <div class="col-span-1 md:col-span-6 lg:col-span-3 order-1 md:order-2 lg:order-1 space-y-4 h-fit lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto custom-scrollbar lg:pr-2">
+            
+            <!-- 1. Source -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                <div class="p-3 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Source</span>
+                    <span id="file-meta" class="text-[10px] font-mono text-emerald-500"></span>
+                </div>
+                <div class="p-4">
+                    <div id="upload-zone" class="relative group cursor-pointer border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-lg h-32 flex flex-col items-center justify-center transition-all bg-slate-950">
+                         <div class="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                         <i data-lucide="upload-cloud" class="w-8 h-8 text-slate-600 group-hover:text-blue-500 mb-2 transition-colors"></i>
+                         <span class="text-xs text-slate-400 font-medium">Drop or Click</span>
+                         <input type="file" id="file-input" class="hidden" accept="image/*">
+                    </div>
+                    
+                    <!-- Thumbnail (Hidden initially) -->
+                    <div id="file-preview" class="hidden flex items-center gap-3 mt-0">
+                        <img id="thumb-img" class="w-10 h-10 rounded object-cover border border-slate-700" src="">
+                        <div class="flex-1 min-w-0">
+                            <p id="file-name" class="text-xs font-medium text-slate-300 truncate">filename.jpg</p>
+                            <button id="reupload-btn" class="text-[10px] text-blue-400 hover:text-blue-300 uppercase font-bold">Change</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Standards Database -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                 <div class="p-3 bg-slate-950 border-b border-slate-800">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Requirement Standard</span>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="relative">
+                        <select id="country-select" class="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 pl-3 pr-8 text-xs text-slate-200 outline-none focus:border-blue-500 transition-colors appearance-none font-medium">
+                            <!-- Populated via JS -->
+                        </select>
+                        <i data-lucide="chevron-down" class="absolute right-3 top-2.5 w-3.5 h-3.5 text-slate-500 pointer-events-none"></i>
+                    </div>
+                    
+                    <!-- Custom Dimensions (Hidden) -->
+                    <div id="custom-dims" class="hidden grid-cols-2 gap-2 p-3 bg-slate-950 rounded border border-dashed border-slate-800">
+                        <div>
+                            <label class="text-[9px] uppercase text-slate-500 font-bold">W (mm)</label>
+                            <input type="number" id="cust-w" value="50" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[9px] uppercase text-slate-500 font-bold">H (mm)</label>
+                            <input type="number" id="cust-h" value="50" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Toolset Tabs -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                <div class="flex border-b border-slate-800">
+                    <button class="flex-1 py-3 text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-blue-400 border-b-2 border-blue-500" id="tab-geo">Geometry</button>
+                    <button class="flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 hover:bg-slate-800/50" id="tab-color">Color</button>
+                    <button class="flex-1 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 hover:bg-slate-800/50" id="tab-bg">Eraser</button>
+                </div>
+
+                <div class="p-5 min-h-[200px]">
+                    <!-- GEOMETRY PANEL -->
+                    <div id="panel-geo" class="space-y-5">
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                                <span>Scale</span> <span id="val-scale" class="text-blue-400">1.0x</span>
+                            </div>
+                            <input type="range" id="input-scale" min="0.1" max="5" step="0.05" value="1">
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                                <span>Rotate</span> <span id="val-rotate" class="text-blue-400">0°</span>
+                            </div>
+                            <input type="range" id="input-rotate" min="-45" max="45" step="1" value="0">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                             <button id="btn-flip" class="py-2 bg-slate-800 rounded border border-slate-700 hover:border-slate-500 text-xs text-slate-300 flex items-center justify-center gap-2">
+                                <i data-lucide="flip-horizontal" class="w-3.5 h-3.5"></i> Flip
+                            </button>
+                            <button id="btn-fit" class="py-2 bg-slate-800 rounded border border-slate-700 hover:border-slate-500 text-xs text-slate-300 flex items-center justify-center gap-2">
+                                <i data-lucide="maximize" class="w-3.5 h-3.5"></i> Fit
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- COLOR PANEL -->
+                    <div id="panel-color" class="hidden space-y-5">
+                        <button id="btn-auto-fix" class="w-full py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/30 transition-all mb-4">
+                            <i data-lucide="wand-2" class="w-3.5 h-3.5"></i> Auto Enhance
+                        </button>
+
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                                <span>Brightness</span> <span id="val-bright" class="text-blue-400">0</span>
+                            </div>
+                            <input type="range" id="input-bright" min="-50" max="50" step="1" value="0">
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                                <span>Contrast</span> <span id="val-contrast" class="text-blue-400">0</span>
+                            </div>
+                            <input type="range" id="input-contrast" min="-50" max="50" step="1" value="0">
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                                <span>Temp (Warmth)</span> <span id="val-temp" class="text-blue-400">0</span>
+                            </div>
+                            <input type="range" id="input-temp" min="-50" max="50" step="1" value="0">
+                        </div>
+                         <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                                <span>Saturation</span> <span id="val-sat" class="text-blue-400">0</span>
+                            </div>
+                            <input type="range" id="input-sat" min="-100" max="100" step="1" value="0">
+                        </div>
+                    </div>
+
+                    <!-- BACKGROUND ERASER PANEL -->
+                    <div id="panel-bg" class="hidden space-y-4">
+                        <div class="bg-blue-900/20 border border-blue-900/50 p-3 rounded text-[10px] text-blue-200 leading-relaxed mb-2">
+                            <i data-lucide="info" class="w-3 h-3 inline mr-1"></i>
+                            Use the brush to paint over the background to make it white.
+                        </div>
+
+                        <div class="flex gap-2 mb-2">
+                             <button id="tool-eraser" class="flex-1 py-2 bg-blue-600 text-white rounded text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/50">
+                                <i data-lucide="eraser" class="w-3.5 h-3.5"></i> Erase
+                            </button>
+                            <button id="tool-restore" class="flex-1 py-2 bg-slate-800 text-slate-400 hover:text-white rounded text-xs font-bold flex items-center justify-center gap-2 border border-slate-700">
+                                <i data-lucide="undo-2" class="w-3.5 h-3.5"></i> Restore
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] text-slate-400 font-bold uppercase">
+                                <span>Brush Size</span> <span id="val-brush" class="text-blue-400">20px</span>
+                            </div>
+                            <input type="range" id="input-brush" min="5" max="100" step="1" value="20">
+                        </div>
+
+                        <!-- BG Color Selection -->
+                         <div class="pt-3 border-t border-slate-800">
+                             <span class="text-[10px] text-slate-500 font-bold uppercase block mb-2">Replacement Color</span>
+                             <div class="flex gap-2">
+                                 <button class="w-6 h-6 rounded-full bg-white border-2 border-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] color-btn" data-color="#FFFFFF"></button>
+                                 <button class="w-6 h-6 rounded-full bg-blue-200 border-2 border-slate-700 color-btn" data-color="#bfdbfe"></button>
+                                 <button class="w-6 h-6 rounded-full bg-slate-300 border-2 border-slate-700 color-btn" data-color="#cbd5e1"></button>
+                                 <button class="w-6 h-6 rounded-full bg-red-200 border-2 border-slate-700 color-btn" data-color="#fecaca"></button>
+                             </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- CENTER: Canvas Editor -->
+        <!-- Mobile: Order 2 -->
+        <!-- Tablet: Order 1 (Full Width Top) -->
+        <!-- Desktop: Order 2 (Center) -->
+        <div class="col-span-1 md:col-span-12 lg:col-span-6 order-2 md:order-1 lg:order-2 flex flex-col items-center">
+            
+            <!-- Editor Wrapper -->
+            <div class="relative w-full max-w-lg aspect-square bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 overflow-hidden ring-1 ring-white/5 canvas-container group" id="canvas-wrapper">
+                
+                <!-- On-Canvas History Controls -->
+                <div class="absolute top-4 left-4 flex flex-col gap-2 z-40 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div class="flex gap-2">
+                        <button id="btn-undo" class="p-2 bg-slate-900/90 backdrop-blur text-slate-300 rounded-lg border border-slate-700 hover:text-white hover:border-blue-500 shadow-lg" title="Undo (Ctrl+Z)">
+                            <i data-lucide="undo" class="w-4 h-4"></i>
+                        </button>
+                        <button id="btn-redo" class="p-2 bg-slate-900/90 backdrop-blur text-slate-300 rounded-lg border border-slate-700 hover:text-white hover:border-blue-500 shadow-lg" title="Redo (Ctrl+Y)">
+                            <i data-lucide="redo" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Canvas -->
+                <canvas id="main-canvas" class="w-full h-full object-contain touch-none cursor-crosshair"></canvas>
+                
+                <!-- Brush Cursor Element -->
+                <div id="brush-cursor"></div>
+
+                <!-- Overlay Guides -->
+                <div id="guide-layer" class="absolute inset-0 pointer-events-none opacity-60">
+                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+                            </pattern>
+                        </defs>
+                        <!-- Biometric Oval -->
+                        <ellipse cx="50%" cy="45%" rx="28%" ry="35%" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6 4" />
+                        <!-- Center Line -->
+                        <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#60a5fa" stroke-width="1" stroke-opacity="0.5" stroke-dasharray="4 4" />
+                        <!-- Eye Line -->
+                        <line x1="20%" y1="40%" x2="80%" y2="40%" stroke="#ef4444" stroke-width="1" stroke-opacity="0.6" />
+                        <text x="82%" y="40%" fill="#ef4444" font-size="10" font-family="sans-serif" alignment-baseline="middle" opacity="0.8">EYES</text>
+                        <!-- Chin Line -->
+                         <line x1="35%" y1="78%" x2="65%" y2="78%" stroke="#60a5fa" stroke-width="1" stroke-opacity="0.4" />
+                    </svg>
+                </div>
+                
+                <!-- Placeholder State -->
+                <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-800/30 transition-colors" title="Tap to Upload">
+                    <div class="w-32 h-32 rounded-full bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-700/50 animate-pulse">
+                        <i data-lucide="scan" class="w-12 h-12 text-slate-600"></i>
+                    </div>
+                    <p class="text-slate-500 font-medium">No Image Loaded</p>
+                    <p class="text-xs text-blue-500 mt-2 md:hidden">Tap below to upload</p>
+                    <p class="text-xs text-blue-500 mt-2 hidden md:block">Tap to upload</p>
+                </div>
+
+                <!-- Floating Controls -->
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <button id="toggle-guide" class="px-3 py-1.5 bg-slate-900/90 backdrop-blur text-xs font-bold text-blue-400 rounded-full border border-blue-500/30 hover:bg-slate-800 shadow-lg">Guides: ON</button>
+                    <button id="toggle-mask-view" class="px-3 py-1.5 bg-slate-900/90 backdrop-blur text-xs font-bold text-slate-400 rounded-full border border-slate-700 hover:text-white shadow-lg hidden">Show Mask</button>
+                </div>
+                
+                <!-- Dimensions Badge -->
+                <div id="dims-badge" class="absolute top-4 right-4 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] font-mono text-white border border-white/10">0x0mm</div>
+            </div>
+
+            <!-- Bottom Action Bar (Mobile/Tablet Priority - Hidden on Desktop) -->
+            <div class="mt-6 w-full max-w-lg grid grid-cols-2 gap-4 lg:hidden">
+                 <button id="btn-download-digital-mob" class="col-span-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2 group transition-all active:scale-[0.98]">
+                    <i data-lucide="file-check" class="w-5 h-5"></i>
+                    <span>Save Digital</span>
+                </button>
+                <button id="btn-download-print-mob" class="col-span-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 group transition-all active:scale-[0.98]">
+                    <i data-lucide="printer" class="w-5 h-5"></i>
+                    <span>Print Sheet</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- RIGHT: Export Optimizer -->
+        <!-- Mobile: Order 3 -->
+        <!-- Tablet: Order 3 (Bottom Right) -->
+        <!-- Desktop: Order 3 (Right) -->
+        <div class="col-span-1 md:col-span-6 lg:col-span-3 order-3 md:order-3 lg:order-3 h-fit lg:sticky lg:top-20 space-y-4">
+            
+            <!-- Intelligent Compression -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+                 <div class="p-3 bg-slate-950 border-b border-slate-800 flex items-center gap-2">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-emerald-500"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Smart Compression</span>
+                </div>
+                <div class="p-4 space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-slate-950 rounded border border-slate-800">
+                        <span class="text-xs text-slate-400 font-medium">Est. Size</span>
+                        <span id="est-size" class="text-sm font-mono text-emerald-400 font-bold">-- KB</span>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[10px] text-slate-400 uppercase font-bold">
+                            <span>Max Target Size</span>
+                            <span id="target-val" class="text-blue-400">Unlimited</span>
+                        </div>
+                        <!-- Range: 20KB to 500KB + Unlimited -->
+                        <input type="range" id="input-target-size" min="20" max="550" step="10" value="550">
+                        <p class="text-[10px] text-slate-500 leading-tight">
+                            Set a limit (e.g., 50KB) and we will auto-adjust quality to fit.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Print Settings -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                 <div class="p-3 bg-slate-950 border-b border-slate-800 flex items-center gap-2">
+                    <i data-lucide="grid" class="w-3.5 h-3.5 text-blue-500"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Print Layout</span>
+                </div>
+                <div class="p-4 space-y-3">
+                    <label class="block text-[10px] uppercase font-bold text-slate-500">Paper Size</label>
+                    <div class="grid grid-cols-2 gap-2" id="paper-options">
+                        <!-- JS populated -->
+                    </div>
+                    
+                    <div class="flex items-center gap-2 py-2">
+                        <input type="checkbox" id="chk-border" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900">
+                        <label for="chk-border" class="text-xs text-slate-300 font-medium">Add Cut Border (1px Black)</label>
+                    </div>
+
+                    <div class="mt-2 p-2 bg-white rounded border border-slate-300">
+                        <canvas id="sheet-preview" class="w-full h-auto block"></canvas>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] font-mono text-slate-500">
+                        <span>300 DPI</span>
+                        <span id="sheet-count">-- photos</span>
+                    </div>
+                    
+                    <!-- Desktop Download Buttons (Hidden on Mobile/Tablet if used in Bottom Bar) -->
+                    <!-- Actually, let's keep them here for Desktop and Tablet Right Col usage -->
+                    <div class="hidden lg:grid grid-cols-1 gap-2 pt-2">
+                         <button id="btn-download-digital" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                            <i data-lucide="file-check" class="w-4 h-4"></i>
+                            <span>Save Digital</span>
+                        </button>
+                        <button id="btn-download-print" class="py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                            <i data-lucide="printer" class="w-4 h-4"></i>
+                            <span>Print Sheet</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Shortcuts Modal -->
+    <dialog id="modal-shortcuts" class="bg-slate-900 text-slate-200 rounded-2xl shadow-2xl border border-slate-700 p-0 backdrop:bg-black/50 backdrop:backdrop-blur-sm w-full max-w-md">
+        <div class="p-5 border-b border-slate-800 flex justify-between items-center">
+            <h3 class="font-bold text-lg">Keyboard Shortcuts</h3>
+            <button id="btn-close-modal" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="p-6 space-y-4 text-sm">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex justify-between border-b border-slate-800 pb-2"><span>Undo</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono text-xs">Ctrl + Z</kbd></div>
+                <div class="flex justify-between border-b border-slate-800 pb-2"><span>Redo</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono text-xs">Ctrl + Y</kbd></div>
+                <div class="flex justify-between border-b border-slate-800 pb-2"><span>Brush Size -</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono text-xs">[</kbd></div>
+                <div class="flex justify-between border-b border-slate-800 pb-2"><span>Brush Size +</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono text-xs">]</kbd></div>
+                <div class="flex justify-between border-b border-slate-800 pb-2"><span>Eraser</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono text-xs">E</kbd></div>
+                <div class="flex justify-between border-b border-slate-800 pb-2"><span>Restore</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono text-xs">R</kbd></div>
+                <div class="flex justify-between border-b border-slate-800 pb-2"><span>Nudge</span> <kbd class="bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono text-xs">Arrows</kbd></div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Hidden Canvas for Processing -->
+    <canvas id="proc-canvas" class="hidden"></canvas>
+
+    <script>
+        // --- DATA & CONFIG ---
+        const DB = [
+            { id: 'us', name: 'USA (2x2")', w: 50.8, h: 50.8 },
+            { id: 'uk', name: 'UK / EU (35x45mm)', w: 35, h: 45 },
+            { id: 'in', name: 'India (51x51mm)', w: 51, h: 51 },
+            { id: 'cn', name: 'China (33x48mm)', w: 33, h: 48 },
+            { id: 'jp', name: 'Japan (30x40mm)', w: 30, h: 40 },
+            { id: 'ca', name: 'Canada (50x70mm)', w: 50, h: 70 },
+            { id: 'shengen', name: 'Schengen (35x45mm)', w: 35, h: 45 },
+            { id: 'custom', name: 'Custom Size...', w: 0, h: 0 }
+        ];
+
+        const PAPERS = [
+            { id: '4x6', name: '4x6 Inch', w: 101.6, h: 152.4 },
+            { id: 'a4', name: 'A4', w: 210, h: 297 },
+            { id: 'letter', name: 'US Letter', w: 215.9, h: 279.4 }
+        ];
+
+        // --- STATE ---
+        const state = {
+            img: null,
+            maskCanvas: null,
+            maskCtx: null,
+            
+            // History
+            maskHistory: [],
+            historyStep: -1,
+            
+            // Params
+            standard: DB[0],
+            paper: PAPERS[0],
+            custom: { w: 50, h: 50 },
+            
+            // Geo
+            scale: 1,
+            rotate: 0,
+            pos: { x: 0, y: 0 },
+            flip: false,
+
+            // Color
+            bright: 0,
+            contrast: 0,
+            temp: 0,
+            sat: 0,
+
+            // Background
+            bgColor: '#FFFFFF',
+            brushSize: 20,
+            isErasingMode: false,   // Tool active
+            toolMode: 'erase',  // 'erase' or 'restore'
+
+            // Export
+            targetKB: 550, // >500 means unlimited
+            finalQuality: 0.95,
+            addBorder: false
+        };
+
+        // --- DOM ---
+        const $ = (id) => document.getElementById(id);
+        const canvas = $('main-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        // --- INIT ---
+        function init() {
+            // Fill Dropdowns
+            const sel = $('country-select');
+            DB.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.text = c.name;
+                sel.add(opt);
+            });
+
+            const paperDiv = $('paper-options');
+            PAPERS.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = `py-2 px-1 text-[10px] font-bold uppercase rounded border transition-all ${state.paper.id === p.id ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-400 border-slate-700 hover:border-slate-500'}`;
+                btn.textContent = p.name;
+                btn.onclick = () => { state.paper = p; updatePaperUI(); renderSheet(); };
+                paperDiv.appendChild(btn);
+            });
+
+            // Listeners
+            $('file-input').onchange = handleUpload;
+            $('upload-zone').onclick = () => $('file-input').click();
+            $('reupload-btn').onclick = () => $('file-input').click();
+            $('reset-all-btn').onclick = resetAll;
+            $('empty-state').onclick = () => $('file-input').click();
+            
+            $('country-select').onchange = (e) => {
+                const val = e.target.value;
+                if(val === 'custom') {
+                    $('custom-dims').style.display = 'grid';
+                    updateCustom();
+                } else {
+                    $('custom-dims').style.display = 'none';
+                    state.standard = DB.find(x => x.id === val);
+                    updateBadge();
+                    render();
+                }
+            };
+            
+            $('cust-w').oninput = updateCustom;
+            $('cust-h').oninput = updateCustom;
+
+            // Tabs
+            setupTabs();
+            
+            // Geo Inputs
+            linkInput('input-scale', 'val-scale', v => { state.scale = parseFloat(v); render(); }, 'x');
+            linkInput('input-rotate', 'val-rotate', v => { state.rotate = parseInt(v); render(); }, '°');
+            $('btn-flip').onclick = () => { state.flip = !state.flip; render(); };
+            $('btn-fit').onclick = fitToCanvas;
+
+            // Color Inputs
+            linkInput('input-bright', 'val-bright', v => { state.bright = parseInt(v); render(); });
+            linkInput('input-contrast', 'val-contrast', v => { state.contrast = parseInt(v); render(); });
+            linkInput('input-temp', 'val-temp', v => { state.temp = parseInt(v); render(); });
+            linkInput('input-sat', 'val-sat', v => { state.sat = parseInt(v); render(); });
+            $('btn-auto-fix').onclick = autoEnhance;
+
+            // BG Eraser Inputs
+            $('tool-eraser').onclick = () => setTool('erase');
+            $('tool-restore').onclick = () => setTool('restore');
+            linkInput('input-brush', 'val-brush', v => {
+                state.brushSize = parseInt(v);
+                updateCursorSize();
+            }, 'px');
+            
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.color-btn').forEach(b => b.style.transform = 'scale(1)');
+                    btn.style.transform = 'scale(1.2)';
+                    state.bgColor = btn.dataset.color;
+                    render();
+                }
+            });
+
+            // Target Size
+            $('input-target-size').oninput = (e) => {
+                const v = parseInt(e.target.value);
+                state.targetKB = v;
+                $('target-val').textContent = v > 500 ? "Unlimited" : `${v} KB`;
+                if(state.img) estimateSize();
+            };
+            
+            // Border Toggle
+            $('chk-border').onchange = (e) => {
+                state.addBorder = e.target.checked;
+                renderSheet();
+            };
+
+            // Canvas Interaction
+            setupCanvasInteraction();
+            
+            // Buttons
+            $('btn-download-digital').onclick = downloadDigital;
+            $('btn-download-print').onclick = downloadSheet;
+            $('btn-download-digital-mob').onclick = downloadDigital;
+            $('btn-download-print-mob').onclick = downloadSheet;
+            
+            $('toggle-guide').onclick = () => {
+                $('guide-layer').classList.toggle('hidden');
+                $('toggle-guide').classList.toggle('opacity-50');
+            };
+            
+            // Shortcuts Modal
+            const modal = $('modal-shortcuts');
+            $('btn-shortcuts').onclick = () => modal.showModal();
+            $('btn-close-modal').onclick = () => modal.close();
+            
+            // Undo/Redo Buttons
+            $('btn-undo').onclick = undo;
+            $('btn-redo').onclick = redo;
+
+            // KEYBOARD SHORTCUTS
+            window.addEventListener('keydown', handleShortcuts);
+
+            lucide.createIcons();
+            updateBadge();
+        }
+
+        // --- SHORTCUTS & HISTORY HANDLER ---
+        function handleShortcuts(e) {
+            if (!state.img) return;
+
+            // Undo/Redo (Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) redo();
+                else undo();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+                e.preventDefault();
+                redo();
+                return;
+            }
+
+            // Tools
+            if (e.key === 'e') { $('tool-eraser').click(); return; }
+            if (e.key === 'r') { $('tool-restore').click(); return; }
+
+            // Brush Size ([ / ])
+            if (e.key === '[') {
+                state.brushSize = Math.max(5, state.brushSize - 5);
+                updateBrushUI();
+                return;
+            }
+            if (e.key === ']') {
+                state.brushSize = Math.min(100, state.brushSize + 5);
+                updateBrushUI();
+                return;
+            }
+
+            // Nudge (Arrows)
+            // Shift = 10px, Normal = 1px
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+                const step = e.shiftKey ? 10 : 1;
+                const delta = step / state.scale; 
+                if (e.key === 'ArrowUp') state.pos.y -= delta;
+                if (e.key === 'ArrowDown') state.pos.y += delta;
+                if (e.key === 'ArrowLeft') state.pos.x -= delta;
+                if (e.key === 'ArrowRight') state.pos.x += delta;
+                render();
+            }
+        }
+
+        function updateBrushUI() {
+            $('input-brush').value = state.brushSize;
+            $('val-brush').textContent = state.brushSize + 'px';
+            if(state.isErasingMode) updateCursorSize();
+        }
+
+        function saveHistory() {
+            if (!state.maskCanvas) return;
+            // Remove any redo steps ahead of current
+            if (state.historyStep < state.maskHistory.length - 1) {
+                state.maskHistory = state.maskHistory.slice(0, state.historyStep + 1);
+            }
+            // Push current state
+            if (state.maskHistory.length > 20) state.maskHistory.shift();
+            
+            state.maskHistory.push(state.maskCtx.getImageData(0, 0, state.maskCanvas.width, state.maskCanvas.height));
+            state.historyStep = state.maskHistory.length - 1;
+        }
+
+        function undo() {
+            if (state.historyStep > 0) {
+                state.historyStep--;
+                restoreHistoryState();
+            }
+        }
+
+        function redo() {
+            if (state.historyStep < state.maskHistory.length - 1) {
+                state.historyStep++;
+                restoreHistoryState();
+            }
+        }
+
+        function restoreHistoryState() {
+            const imgData = state.maskHistory[state.historyStep];
+            if (imgData) {
+                state.maskCtx.putImageData(imgData, 0, 0);
+                render();
+            }
+        }
+
+        function autoEnhance() {
+            if(!state.img) return;
+            // Simple preset for "Auto"
+            state.bright = 10;
+            state.contrast = 15;
+            state.sat = 5;
+            
+            // Update UI
+            $('input-bright').value = 10; $('val-bright').textContent = '10';
+            $('input-contrast').value = 15; $('val-contrast').textContent = '15';
+            $('input-sat').value = 5; $('val-sat').textContent = '5';
+            render();
+        }
+
+        function setupTabs() {
+            const tabs = ['geo', 'color', 'bg'];
+            tabs.forEach(t => {
+                $(`tab-${t}`).onclick = () => {
+                    tabs.forEach(x => {
+                        $(`tab-${x}`).classList.remove('text-blue-400', 'border-b-2', 'border-blue-500', 'bg-slate-800');
+                        $(`tab-${x}`).classList.add('text-slate-500');
+                        $(`panel-${x}`).classList.add('hidden');
+                    });
+                    $(`tab-${t}`).classList.add('text-blue-400', 'border-b-2', 'border-blue-500', 'bg-slate-800');
+                    $(`tab-${t}`).classList.remove('text-slate-500');
+                    $(`panel-${t}`).classList.remove('hidden');
+                    
+                    // Specific logic
+                    if(t === 'bg') {
+                        state.isErasingMode = true;
+                        canvas.style.cursor = 'none'; // Custom cursor for brush
+                        $('canvas-wrapper').classList.add('ring-blue-500');
+                        $('brush-cursor').classList.add('active');
+                        updateCursorSize();
+                    } else {
+                        state.isErasingMode = false;
+                        canvas.style.cursor = 'crosshair';
+                        $('canvas-wrapper').classList.remove('ring-blue-500');
+                        $('brush-cursor').classList.remove('active');
+                    }
+                };
+            });
+        }
+        
+        function updateCursorSize() {
+             const cursor = $('brush-cursor');
+             const size = state.brushSize * 2; // Screen Diameter
+             cursor.style.width = `${size}px`;
+             cursor.style.height = `${size}px`;
+        }
+
+        function linkInput(inputId, labelId, callback, suffix='') {
+            $(inputId).oninput = (e) => {
+                $(labelId).textContent = e.target.value + suffix;
+                callback(e.target.value);
+            };
+        }
+
+        function updateCustom() {
+            const w = parseFloat($('cust-w').value) || 50;
+            const h = parseFloat($('cust-h').value) || 50;
+            state.standard = { id: 'custom', name: 'Custom', w, h };
+            state.custom = { w, h };
+            updateBadge();
+            render();
+        }
+
+        function updateBadge() {
+            $('dims-badge').textContent = `${state.standard.w}x${state.standard.h}mm`;
+        }
+        
+        function updatePaperUI() {
+            // Refresh buttons style
+             const btns = $('paper-options').children;
+             for(let i=0; i<btns.length; i++) {
+                 if(PAPERS[i].id === state.paper.id) {
+                     btns[i].className = "py-2 px-1 text-[10px] font-bold uppercase rounded border transition-all bg-blue-600 text-white border-blue-500";
+                 } else {
+                     btns[i].className = "py-2 px-1 text-[10px] font-bold uppercase rounded border transition-all bg-slate-900 text-slate-400 border-slate-700 hover:border-slate-500";
+                 }
+             }
+        }
+
+        function handleUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            $('file-meta').textContent = `${(file.size/1024).toFixed(1)} KB`;
+            $('file-name').textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.img = img;
+                    $('thumb-img').src = img.src;
+                    
+                    // Init Mask Canvas
+                    state.maskCanvas = document.createElement('canvas');
+                    state.maskCanvas.width = img.width;
+                    state.maskCanvas.height = img.height;
+                    state.maskCtx = state.maskCanvas.getContext('2d');
+                    state.maskCtx.fillStyle = '#000';
+                    state.maskCtx.fillRect(0,0,img.width, img.height);
+                    
+                    // Clear History
+                    state.maskHistory = [];
+                    state.historyStep = -1;
+                    saveHistory(); // Initial state (full black mask)
+
+                    $('upload-zone').classList.add('hidden');
+                    $('file-preview').classList.remove('hidden');
+                    $('empty-state').classList.add('hidden');
+                    
+                    fitToCanvas();
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function fitToCanvas() {
+            // Reset transforms to fit image nicely
+            state.scale = 1;
+            state.pos = { x: 0, y: 0 };
+            $('input-scale').value = 1;
+            $('val-scale').textContent = '1.0x';
+            render();
+        }
+
+        // --- RENDERING PIPELINE ---
+        
+        function getDPI() { return 300; } // Standard
+        function mmToPx(mm) { return Math.round(mm * getDPI() / 25.4); }
+
+        function render() {
+            if(!state.img) return;
+
+            const w = mmToPx(state.standard.w);
+            const h = mmToPx(state.standard.h);
+            
+            canvas.width = w;
+            canvas.height = h;
+            
+            // Clear canvas first
+            ctx.clearRect(0, 0, w, h);
+            
+            // 1. Setup Transforms for Image Layer
+            ctx.save();
+            ctx.translate(w/2, h/2);
+            ctx.rotate(state.rotate * Math.PI / 180);
+            ctx.scale(state.flip ? -state.scale : state.scale, state.scale);
+            ctx.translate(state.pos.x, state.pos.y);
+
+            // Filter chain
+            let filterString = `brightness(${100 + state.bright}%) contrast(${100 + state.contrast}%) saturate(${100 + state.sat}%)`;
+            if(state.temp > 0) filterString += ` sepia(${state.temp}%)`; 
+            
+            ctx.filter = filterString;
+
+            const drawW = state.img.width;
+            const drawH = state.img.height;
+            const offsetX = -drawW / 2;
+            const offsetY = -drawH / 2;
+            
+            // 2. Draw Image
+            ctx.drawImage(state.img, offsetX, offsetY, drawW, drawH);
+            
+            // 3. Apply Mask (Cuts the image only)
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.drawImage(state.maskCanvas, offsetX, offsetY, drawW, drawH);
+            
+            ctx.restore(); // Remove transforms to draw background normally
+
+            // 4. Fill Background Color BEHIND the cutout image
+            ctx.globalCompositeOperation = 'destination-over'; 
+            ctx.fillStyle = state.bgColor;
+            ctx.fillRect(0, 0, w, h);
+            
+            // Reset for next frame
+            ctx.globalCompositeOperation = 'source-over'; 
+            
+            // Debounce secondary updates
+            clearTimeout(state.renderTimer);
+            state.renderTimer = setTimeout(() => {
+                estimateSize();
+                renderSheet();
+            }, 100);
+        }
+
+        // --- BACKGROUND ERASER TOOL ---
+        
+        function setTool(mode) {
+            state.toolMode = mode;
+            $('tool-eraser').className = mode === 'erase' ? 'flex-1 py-2 bg-blue-600 text-white rounded text-xs font-bold shadow-lg' : 'flex-1 py-2 bg-slate-800 text-slate-400 border border-slate-700 rounded text-xs';
+            $('tool-restore').className = mode === 'restore' ? 'flex-1 py-2 bg-blue-600 text-white rounded text-xs font-bold shadow-lg' : 'flex-1 py-2 bg-slate-800 text-slate-400 border border-slate-700 rounded text-xs';
+        }
+
+        function setupCanvasInteraction() {
+            let isDown = false;
+            let lastX, lastY;
+
+            const getLoc = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
+            };
+
+            const paintMask = (cx, cy) => {
+                if(!state.img || !state.maskCanvas) return;
+                
+                // Get canvas-to-screen ratio for correct brush sizing
+                const rect = canvas.getBoundingClientRect();
+                const scaleRatio = canvas.width / rect.width; 
+
+                // Inverse the transforms
+                const w = canvas.width;
+                const h = canvas.height;
+                
+                // 1. Center relative
+                let x = cx - w/2;
+                let y = cy - h/2;
+                
+                // 2. Un-Rotate 
+                const rad = -state.rotate * Math.PI / 180;
+                const rx = x * Math.cos(rad) - y * Math.sin(rad);
+                const ry = x * Math.sin(rad) + y * Math.cos(rad);
+                
+                // 3. Un-Scale
+                const sX = state.flip ? -state.scale : state.scale;
+                const sY = state.scale;
+                
+                const sx = rx / sX;
+                const sy = ry / sY;
+                
+                // 4. Subtract Pos
+                const fx = sx - state.pos.x;
+                const fy = sy - state.pos.y;
+                
+                // Image Coords
+                const imgX = fx + state.img.width/2;
+                const imgY = fy + state.img.height/2;
+                
+                // Draw
+                const mCtx = state.maskCtx;
+                mCtx.beginPath();
+                
+                // Radius in Image Pixels
+                const brushRadius = (state.brushSize * scaleRatio) / state.scale;
+                
+                mCtx.arc(imgX, imgY, brushRadius, 0, Math.PI * 2); 
+                
+                if(state.toolMode === 'erase') {
+                    mCtx.globalCompositeOperation = 'destination-out'; 
+                    mCtx.fillStyle = 'rgba(0,0,0,1)';
+                } else {
+                    mCtx.globalCompositeOperation = 'source-over'; 
+                    mCtx.fillStyle = '#000';
+                }
+                
+                mCtx.fill();
+                render();
+            };
+
+            const updateCursorPos = (e) => {
+                if(!state.isErasingMode) return;
+                const cursor = $('brush-cursor');
+                const rect = canvas.getBoundingClientRect();
+                const top = e.clientY - rect.top;
+                const left = e.clientX - rect.left;
+                cursor.style.top = `${top}px`;
+                cursor.style.left = `${left}px`;
+            };
+
+            canvas.onpointerdown = (e) => {
+                isDown = true;
+                const loc = getLoc(e);
+                lastX = loc.x;
+                lastY = loc.y;
+                canvas.setPointerCapture(e.pointerId);
+                
+                if(state.isErasingMode) {
+                    saveHistory(); 
+                    paintMask(loc.x, loc.y);
+                }
+            };
+
+            canvas.onpointermove = (e) => {
+                updateCursorPos(e);
+                
+                if(!isDown) return;
+                const loc = getLoc(e);
+                
+                if(state.isErasingMode) {
+                    paintMask(loc.x, loc.y);
+                } else {
+                    // Pan Logic (Already Corrected)
+                    const screenDx = e.movementX * (canvas.width / canvas.clientWidth); 
+                    const screenDy = e.movementY * (canvas.height / canvas.clientHeight);
+
+                    const rRad = -state.rotate * Math.PI / 180;
+                    const dX = screenDx * Math.cos(rRad) - screenDy * Math.sin(rRad);
+                    const dY = screenDx * Math.sin(rRad) + screenDy * Math.cos(rRad);
+                    
+                    const s = state.scale;
+                    
+                    state.pos.x += dX / s;
+                    state.pos.y += dY / s;
+                    
+                    render();
+                }
+                lastX = loc.x;
+                lastY = loc.y;
+            };
+
+            canvas.onpointerup = (e) => { 
+                isDown = false; 
+            };
+            
+            canvas.onpointerleave = () => { $('brush-cursor').classList.remove('active'); };
+            canvas.onpointerenter = () => { if(state.isErasingMode) $('brush-cursor').classList.add('active'); };
+        }
+
+        function resetAll() {
+            state.scale = 1;
+            state.rotate = 0;
+            state.pos = { x: 0, y: 0 };
+            state.flip = false;
+            state.bright = 0;
+            state.contrast = 0;
+            state.temp = 0;
+            state.sat = 0;
+            state.bgColor = '#FFFFFF';
+            state.brushSize = 20;
+            state.addBorder = false;
+            
+            $('input-scale').value = 1; $('val-scale').textContent = '1.0x';
+            $('input-rotate').value = 0; $('val-rotate').textContent = '0°';
+            $('input-bright').value = 0; $('val-bright').textContent = '0';
+            $('input-contrast').value = 0; $('val-contrast').textContent = '0';
+            $('input-temp').value = 0; $('val-temp').textContent = '0';
+            $('input-sat').value = 0; $('val-sat').textContent = '0';
+            $('chk-border').checked = false;
+            
+            if(state.maskCtx && state.img) {
+                state.maskCtx.fillStyle = '#000';
+                state.maskCtx.fillRect(0, 0, state.img.width, state.img.height);
+            }
+            render();
+        }
+
+        // --- OUTPUT LOGIC ---
+        
+        async function estimateSize() {
+             if (!state.img) return;
+             
+             // Smart Compression Binary Search if Target Set
+             let low = 0.1, high = 1.0;
+             let bestQ = 0.9;
+             const targetBytes = state.targetKB * 1024;
+             
+             // If unlimited
+             if(state.targetKB > 500) {
+                 state.finalQuality = 0.95;
+                 bestQ = 0.95;
+             } else {
+                 // Try to find highest quality that fits
+                 for(let i=0; i<5; i++) { // 5 iterations is usually enough approx
+                     const mid = (low + high) / 2;
+                     const url = canvas.toDataURL('image/jpeg', mid);
+                     const bytes = Math.round((url.length - 23) * 0.75);
+                     
+                     if(bytes < targetBytes) {
+                         bestQ = mid;
+                         low = mid; // Try higher
+                     } else {
+                         high = mid; // Too big
+                     }
+                 }
+                 state.finalQuality = bestQ;
+             }
+             
+             // Calc Final
+             const url = canvas.toDataURL('image/jpeg', state.finalQuality);
+             const sizeKb = Math.round(((url.length - 23) * 0.75) / 1024);
+             
+             $('est-size').textContent = `~${sizeKb} KB`;
+             $('est-size').className = sizeKb > state.targetKB && state.targetKB <= 500 
+                ? "text-sm font-mono text-red-500 font-bold" 
+                : "text-sm font-mono text-emerald-400 font-bold";
+        }
+
+        function renderSheet() {
+            if(!state.img) return;
+            const pCanvas = $('sheet-preview');
+            const pCtx = pCanvas.getContext('2d');
+            
+            // Paper size in px
+            const pw = mmToPx(state.paper.w);
+            const ph = mmToPx(state.paper.h);
+            
+            // We scale down for preview to save memory/perf
+            const previewScale = 0.5;
+            pCanvas.width = pw * previewScale;
+            pCanvas.height = ph * previewScale;
+            pCtx.scale(previewScale, previewScale);
+            
+            pCtx.fillStyle = '#fff';
+            pCtx.fillRect(0,0,pw,ph);
+            
+            // Grid logic
+            const photoW = canvas.width;
+            const photoH = canvas.height;
+            const gap = mmToPx(2); // 2mm gap
+            const margin = mmToPx(5);
+            
+            const availW = pw - (margin*2);
+            const availH = ph - (margin*2);
+            
+            const cols = Math.floor((availW + gap) / (photoW + gap));
+            const rowsReal = Math.floor((availH + gap) / (photoH + gap));
+            
+            const gridW = cols * photoW + (cols-1)*gap;
+            const gridH = rowsReal * photoH + (rowsReal-1)*gap;
+            
+            const startX = (pw - gridW)/2;
+            const startY = (ph - gridH)/2;
+            
+            let count = 0;
+            for(let r=0; r<rowsReal; r++) {
+                for(let c=0; c<cols; c++) {
+                    const x = startX + c*(photoW+gap);
+                    const y = startY + r*(photoH+gap);
+                    pCtx.drawImage(canvas, x, y);
+                    
+                    if(state.addBorder) {
+                        pCtx.strokeStyle = '#000';
+                        pCtx.lineWidth = 2; // Thicker for visibility on downscale
+                        pCtx.strokeRect(x,y,photoW, photoH);
+                    } else {
+                        // Crop Marks
+                        pCtx.strokeStyle = '#ccc';
+                        pCtx.lineWidth = 1;
+                        pCtx.strokeRect(x,y,photoW, photoH);
+                    }
+                    count++;
+                }
+            }
+            $('sheet-count').textContent = `${count} photos`;
+        }
+
+        function downloadDigital() {
+            if(!state.img) return;
+            const link = document.createElement('a');
+            link.download = `passport_photo_${state.standard.id}.jpg`;
+            link.href = canvas.toDataURL('image/jpeg', state.finalQuality);
+            link.click();
+        }
+
+        function downloadSheet() {
+            if(!state.img) return;
+            // Re-render sheet at full res
+            const tempC = document.createElement('canvas');
+            const pw = mmToPx(state.paper.w);
+            const ph = mmToPx(state.paper.h);
+            tempC.width = pw;
+            tempC.height = ph;
+            const tCtx = tempC.getContext('2d');
+            
+            tCtx.fillStyle = '#fff';
+            tCtx.fillRect(0,0,pw,ph);
+            
+             // Grid logic repeat
+            const photoW = canvas.width;
+            const photoH = canvas.height;
+            const gap = mmToPx(2);
+            const margin = mmToPx(5);
+            
+            const availW = pw - (margin*2);
+            const availH = ph - (margin*2);
+            
+            const cols = Math.floor((availW + gap) / (photoW + gap));
+            const rowsReal = Math.floor((availH + gap) / (photoH + gap));
+            
+            const gridW = cols * photoW + (cols-1)*gap;
+            const gridH = rowsReal * photoH + (rowsReal-1)*gap;
+            
+            const startX = (pw - gridW)/2;
+            const startY = (ph - gridH)/2;
+            
+            for(let r=0; r<rowsReal; r++) {
+                for(let c=0; c<cols; c++) {
+                    const x = startX + c*(photoW+gap);
+                    const y = startY + r*(photoH+gap);
+                    tCtx.drawImage(canvas, x, y);
+                    
+                    if(state.addBorder) {
+                        tCtx.strokeStyle = '#000';
+                        tCtx.lineWidth = 1; // 1px fine border
+                        tCtx.strokeRect(x,y,photoW, photoH);
+                    } else {
+                        // Marks (faint gray)
+                        tCtx.strokeStyle = '#ddd';
+                        tCtx.lineWidth = 2;
+                        tCtx.setLineDash([5,5]);
+                        tCtx.strokeRect(x,y,photoW, photoH);
+                        tCtx.setLineDash([]);
+                    }
+                }
+            }
+            
+            const link = document.createElement('a');
+            link.download = `print_sheet_${state.paper.name}.jpg`;
+            link.href = tempC.toDataURL('image/jpeg', 0.95);
+            link.click();
+        }
+
+        init();
+    </script>
+</body>
+</html>

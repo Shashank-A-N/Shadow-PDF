@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image & Text Editor</title>
+    
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Load React and React-DOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- 3. Load Babel to transpile JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 4. Load External Libraries -->
+    <!-- Tesseract.js (OCR) -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <!-- React-Draggable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-draggable/4.4.6/react-draggable.min.js"></script>
+    <!-- React-Resizable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-resizable/3.0.5/react-resizable.min.js"></script>
+    <!-- html2canvas (for downloading) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- React Image Crop -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-image-crop/10.0.9/ReactCrop.min.js"></script>
+    <!-- React Image Crop CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/react-image-crop/10.0.9/ReactCrop.min.css" />
+
+    <!-- 5. Custom CSS -->
+    <style>
+        /* Styles for react-resizable handles */
+        .react-resizable {
+            position: relative;
+        }
+        .react-resizable-handle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            bottom: 0;
+            right: 0;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2IDYiIHN0eWxlPSJiYWNrZ3JvdW5kLWNvbG9yOndoaXRlIiB3aWR0aD0iNiIgaGVpZ2h0PSI2Ij48Zz48cGF0aCBkPSJNNiA2SDBWNUg1VjBINloiIGZpbGw9ImJsYWNrIi8+PC9nPjwvc3ZnPg==');
+            background-position: bottom right;
+            padding: 0 3px 3px 0;
+            background-repeat: no-repeat;
+            background-origin: content-box;
+            box-sizing: border-box;
+            cursor: se-resize;
+        }
+        
+        /* Styles for ReactImageCrop */
+        .ReactCrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        
+        /* Custom styles for range inputs (sliders) */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #ddd;
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #0d6efd;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: #0d6efd;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        /* Ensure drawing canvas overlays perfectly */
+        #drawingCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* Pass clicks through unless drawing */
+            z-index: 5; /* Below text overlays, above image */
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- This is where the React app will be mounted -->
+    <div id="root"></div>
+
+    <!-- 6. Your React App Code (as type="text/babel") -->
+    <script type="text/babel">
+        // Import React components from the 'window' object
+        const { useState, useEffect, useRef, useCallback, useMemo, useReducer } = window.React;
+        const { createRoot } = window.ReactDOM;
+
+        // Load external libraries from 'window'
+        const { Tesseract } = window;
+        const Draggable = window.ReactDraggable;
+        const { Resizable } = window.ReactResizable;
+        const ReactCrop = window.ReactCrop;
+
+        // --- 1. Gemini API Service ---
+        // This service will handle all calls to the Gemini and Imagen APIs.
+        const GeminiService = {
+          /**
+           * Fetches data from the Gemini API with exponential backoff retry logic.
+           * @param {string} apiUrl - The API endpoint to call.
+           * @param {object} payload - The request body.
+           * @param {number} retries - The number of retries.
+           * @param {number} delay - The initial delay in ms.
+           * @returns {Promise<object>} - The JSON response from the API.
+           */
+          async fetchWithRetry(apiUrl, payload, retries = 3, delay = 1000) {
+            for (let i = 0; i < retries; i++) {
+              try {
+                const response = await fetch(apiUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+              } catch (error) {
+                console.warn(`API call failed (attempt ${i + 1}/${retries}). Retrying in ${delay}ms...`);
+                if (i === retries - 1) {
+                    console.error("Final API call attempt failed.", error);
+                    throw error; // Re-throw the last error
+                }
+                await new Promise(res => setTimeout(res, delay));
+                delay *= 2; // Exponential backoff
+              }
+            }
+          },
+
+          /**
+           * Generates an image using Imagen 3.
+           * @param {string} prompt - The text prompt for image generation.
+           * @returns {Promise<string>} - A base64-encoded image URL.
+           */
+          async generateImage(prompt) {
+            const apiKey = ""; // Leave as-is
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+            const payload = {
+              instances: [{ prompt: prompt }],
+              parameters: { "sampleCount": 1 }
+            };
+
+            const result = await this.fetchWithRetry(apiUrl, payload);
+            
+            if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+              return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+            } else {
+              console.error('Image generation failed or returned invalid data:', result);
+              throw new Error('Failed to generate image. The response was empty.');
+            }
+          },
+
+          /**
+           * Removes text from an image using AI inpainting.
+           * @param {string} base64ImageData - The base64 data of the image.
+           * @param {string} mimeType - The mime type of the image (e.g., "image/jpeg").
+           * @returns {Promise<string>} - A base64-encoded image URL of the inpainted image.
+           */
+          async removeTextFromImage(base64ImageData, mimeType) {
+            const apiKey = ""; // Leave as-is
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+            const payload = {
+              contents: [{
+                parts: [
+                  { text: "Remove all text from this image and inpaint the background naturally where the text was." },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64ImageData
+                    }
+                  }
+                ]
+              }],
+              generationConfig: {
+                responseModalities: ['IMAGE']
+              },
+            };
+
+            const result = await this.fetchWithRetry(apiUrl, payload);
+            const base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+
+            if (!base64Data) {
+              console.error('Text removal failed or returned invalid data:', result);
+              throw new Error('Failed to remove text. The AI model did not return an image.');
+            }
+            
+            return `data:image/png;base64,${base64Data}`;
+          }
+        };
+
+        // --- 2. Custom Hooks & State Management ---
+
+        /**
+         * @typedef {object} AppState
+         * @property {object | null} originalImage - The first image loaded.
+         * @property {string | null} editedImage - The current working image (e.g., after AI remove or crop).
+         * @property {Array<object>} textOverlays - All text overlays.
+         * @property {object} filters - CSS filter values.
+         * @property {string | null} drawingData - Base64 data URL of the drawing canvas.
+         */
+         
+        /**
+         * Initial state for the application.
+         * @type {AppState}
+         */
+        const initialAppState = {
+            originalImage: null,
+            editedImage: null,
+            textOverlays: [],
+            filters: {
+                brightness: 100,
+                contrast: 100,
+                grayscale: 0,
+                sepia: 0,
+                blur: 0,
+            },
+            drawingData: null, // NEW: For drawing canvas
+        };
+
+        /**
+         * Custom hook to manage application state with undo/redo functionality.
+         * @param {AppState} initialState - The starting state.
+         * @returns {{
+         * state: AppState,
+         * setState: (action: AppState | function, saveToHistory?: boolean) => void,
+         * setHistory: (history: AppState[], index: number) => void,
+         * undo: () => void,
+         * redo: () => void,
+         * canUndo: boolean,
+         * canRedo: boolean,
+         * getFullHistory: () => {history: AppState[], index: number}
+         * }}
+         */
+        const useHistory = (initialState) => {
+            const [history, setHistoryState] = useState([initialState]);
+            const [index, setIndex] = useState(0);
+            
+            const state = useMemo(() => history[index], [history, index]);
+            
+            const setState = (action, saveToHistory = true) => {
+                const newState = typeof action === 'function' ? action(state) : action;
+                
+                if (saveToHistory) {
+                    const newHistory = history.slice(0, index + 1);
+                    newHistory.push(newState);
+                    setHistoryState(newHistory);
+                    setIndex(newHistory.length - 1);
+                } else {
+                    // Just replace the current state without saving to history
+                    const newHistory = [...history];
+                    newHistory[index] = newState;
+                    setHistoryState(newHistory);
+                }
+            };
+
+            const setHistory = (newHistory, newIndex) => {
+                setHistoryState(newHistory);
+                setIndex(newIndex);
+            };
+            
+            const undo = () => {
+                if (index > 0) {
+                    setIndex(index - 1);
+                }
+            };
+            
+            const redo = () => {
+                if (index < history.length - 1) {
+                    setIndex(index + 1);
+                }
+            };
+            
+            const getFullHistory = () => ({ history, index });
+            
+            return {
+                state,
+                setState,
+                setHistory, // NEW: For loading project
+                undo,
+                redo,
+                canUndo: index > 0,
+                canRedo: index < history.length - 1,
+                getFullHistory, // NEW: For saving project
+            };
+        };
+
+
+        // --- 3. Draggable and Resizable Text Overlay Component ---
+
+        /**
+         * A component for a single text overlay that is draggable and resizable.
+         * @param {object} props - Component props.
+         */
+        const TextOverlay = ({
+          id,
+          text,
+          position,
+          size,
+          onDrag,
+          onDragStop,
+          onResize,
+          onResizeStop,
+          onClick,
+          onTextChange,
+          isSelected,
+          styleProps,
+          zoom // NEW: Pass zoom scale for react-draggable
+        }) => {
+          const [internalText, setInternalText] = useState(text);
+
+          useEffect(() => {
+            setInternalText(text);
+          }, [text]);
+
+          const handleChange = (e) => {
+            setInternalText(e.target.value);
+            onTextChange(id, e.target.value); // This one should save to history
+          };
+
+          const handleDrag = (e, data) => {
+            onDrag(id, { x: data.x, y: data.y }); // Transient update
+          };
+
+          const handleDragStop = (e, data) => {
+            onDragStop(id, { x: data.x, y: data.y }); // Save to history
+          };
+
+          const handleResize = (e, { size: newSize }) => {
+            onResize(id, { width: newSize.width, height: newSize.height }); // Transient
+          };
+          
+          const handleResizeStop = (e, { size: newSize }) => {
+            onResizeStop(id, { width: newSize.width, height: newSize.height }); // Save
+          };
+
+          const boxStyle = {
+            border: isSelected ? '2px solid #0d6efd' : '2px dashed rgba(255, 255, 255, 0.5)',
+            boxSizing: 'border-box',
+            zIndex: 10,
+            ...styleProps, // Apply dynamic styles (color, fontSize, etc.)
+            textShadow: styleProps.textShadow, // NEW: Apply text shadow
+            opacity: styleProps.opacity, // NEW: Apply opacity
+          };
+
+          const inputStyle = {
+            width: '100%',
+            height: '100%',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            boxSizing: 'border-box',
+            padding: '4px',
+            color: 'inherit',
+            fontFamily: 'inherit',
+            fontSize: 'inherit',
+            fontWeight: 'inherit',
+            textAlign: 'inherit',
+          };
+
+          if (!Draggable || !Resizable) {
+            return <div className="text-red-500">Error: Missing Draggable/Resizable libraries.</div>;
+          }
+
+          return (
+            <Draggable
+              handle=".drag-handle"
+              bounds="parent"
+              position={position}
+              onDrag={handleDrag}
+              onStop={handleDragStop}
+              scale={zoom} // NEW: Pass zoom scale
+            >
+              <Resizable
+                width={size.width}
+                height={size.height}
+                onResize={handleResize}
+                onResizeStop={handleResizeStop}
+                minConstraints={[50, 20]}
+                maxConstraints={[800, 400]}
+              >
+                <div id={id} style={boxStyle} onClick={() => onClick(id)} className="text-overlay">
+                  <div 
+                    className="drag-handle" 
+                    style={{ 
+                      cursor: 'move', 
+                      width: '100%', 
+                      height: '10px', 
+                      position: 'absolute', 
+                      top: 0, 
+                      left: 0, 
+                      zIndex: 1 
+                    }}
+                  />
+                  <textarea
+                    value={internalText}
+                    onChange={handleChange}
+                    onBlur={() => onTextChange(id, internalText, true)} // Save on blur
+                    style={inputStyle}
+                  />
+                </div>
+              </Resizable>
+            </Draggable>
+          );
+        };
+
+
+        // --- 4. UI Components ---
+
+        /**
+         * A simple loading spinner overlay.
+         */
+        const Spinner = () => (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="w-16 h-16 border-4 border-t-blue-500 border-gray-200 rounded-full animate-spin"></div>
+          </div>
+        );
+
+        /**
+         * A modal dialog for notifications.
+         */
+        const Modal = ({ message, onClose }) => (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[100]">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+              <h3 className="text-lg font-semibold mb-4">Notification</h3>
+              <p className="text-gray-700 mb-6">{message}</p>
+              <button
+                onClick={onClose}
+                className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        );
+
+        /**
+         * The file upload component.
+         */
+        const ImageUploader = ({ onImageUpload }) => (
+          <div className="w-full p-6 border-2 border-dashed border-gray-300 rounded-lg text-center bg-gray-50">
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">Start by uploading an image</h3>
+            <p className="text-gray-500 mb-4">Upload a JPG, PNG, or WEBP file.</p>
+            <input
+              type="file"
+              id="imageUpload"
+              accept="image/*"
+              onChange={onImageUpload}
+              className="block w-full text-sm text-gray-500
+                         file:mr-4 file:py-2 file:px-4
+                         file:rounded-full file:border-0
+                         file:text-sm file:font-semibold
+                         file:bg-blue-50 file:text-blue-700
+                         hover:file:bg-blue-100 transition cursor-pointer"
+            />
+          </div>
+        );
+
+        /**
+         * A reusable slider component for the filter controls.
+         */
+        const FilterSlider = ({ label, value, min, max, onChange, onReset }) => (
+            <div>
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700">{label}</label>
+                    <button onClick={onReset} className="text-xs text-blue-600 hover:underline">Reset</button>
+                </div>
+                <input
+                    type="range"
+                    min={min}
+                    max={max}
+                    value={value}
+                    onChange={onChange}
+                    className="w-full"
+                />
+            </div>
+        );
+        
+        /**
+         * A reusable icon button for toolbars.
+         * @param {object} props - Component props.
+         */
+        const IconButton = ({ children, onClick, disabled, title, isActive = false }) => (
+            <button
+                onClick={onClick}
+                disabled={disabled}
+                title={title}
+                className={`flex items-center justify-center p-2 rounded-lg
+                            ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}
+                            hover:bg-gray-300 transition 
+                            disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed`}
+            >
+                {children}
+            </button>
+        );
+        
+        /**
+         * SVG Icons
+         */
+        const Icons = {
+            Undo: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>,
+            Redo: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 0 9 9 9 9 0 0 0 6-2.3L21 13"/></svg>,
+            ZoomIn: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
+            ZoomOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
+            ZoomReset: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3L9 9"/><path d="M15 15L21 21"/><path d="M21 3L15 9"/><path d="M9 15L3 21"/></svg>,
+            Pen: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
+            Eraser: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 20L4 4m16 0L4 20"/></svg>, // Simple 'X' as eraser
+            Select: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3l7 19 2.5-7.5L19 12l-16-9z"/></svg>,
+            Duplicate: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>,
+            BringForward: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="11 17 6 12 11 7"></polyline><polyline points="18 17 13 12 18 7"></polyline></svg>, // Using chevron-up
+            SendBackward: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="13 7 18 12 13 17"></polyline><polyline points="6 7 11 12 6 17"></polyline></svg>, // Using chevron-down
+        };
+
+
+        // --- 5. Helper Utilities ---
+
+        /**
+         * Utility function to get base64 data from a data URL.
+         * @param {string} url - The data URL (e.g., "data:image/png;base64,...").
+         * @returns {string} - The base64-encoded data.
+         */
+        const getBase64FromUrl = (url) => {
+            return url.split(',')[1];
+        };
+        
+        /**
+         * Applies filters to a canvas context.
+         * @param {CanvasRenderingContext2D} ctx - The canvas context.
+         * @param {object} filters - The filters object.
+         */
+        const applyCanvasFilters = (ctx, filters) => {
+            ctx.filter = `brightness(${filters.brightness}%) contrast(${filters.contrast}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) blur(${filters.blur}px)`;
+        };
+
+        /**
+         * Generates a CSS filter string from the filter object.
+         * @param {object} filters - The filters object.
+         * @returns {string} - The CSS filter string.
+         */
+        const getCssFilterString = (filters) => {
+            return `brightness(${filters.brightness}%) contrast(${filters.contrast}%) grayscale(${filters.grayscale}%) sepia(${filters.sepia}%) blur(${filters.blur}px)`;
+        };
+        
+        /**
+         * Creates a cropped image from a source image and crop dimensions.
+         * @param {string} imageSrc - The base64 data URL of the source image.
+         * @param {object} crop - The crop object from react-image-crop (in pixels).
+         * @param {object} filters - The filters to apply *before* cropping.
+         * @returns {Promise<string>} - A new data URL of the cropped image.
+         */
+        const getCroppedImg = (imageSrc, crop, filters) => {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.src = imageSrc;
+                image.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const scaleX = image.naturalWidth / image.width;
+                    const scaleY = image.naturalHeight / image.height;
+                    
+                    const cropX = crop.x * scaleX;
+                    const cropY = crop.y * scaleY;
+                    const cropWidth = crop.width * scaleX;
+                    const cropHeight = crop.height * scaleY;
+                    
+                    canvas.width = cropWidth;
+                    canvas.height = cropHeight;
+                    
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Apply filters *before* drawing the cropped section
+                    applyCanvasFilters(ctx, filters);
+                    
+                    ctx.drawImage(
+                        image,
+                        cropX,
+                        cropY,
+                        cropWidth,
+                        cropHeight,
+                        0,
+                        0,
+                        cropWidth,
+                        cropHeight
+                    );
+                    
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                image.onerror = (error) => {
+                    reject(error);
+                };
+            });
+        };
+        
+        /**
+         * Draws an image onto a canvas, clearing it first.
+         * @param {HTMLCanvasElement} canvas - The canvas to draw on.
+         * @param {string} dataUrl - The base64 data URL of the image to draw.
+         */
+        const drawImageOnCanvas = (canvas, dataUrl) => {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (dataUrl) {
+                const img = new Image();
+                img.src = dataUrl;
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0);
+                };
+            }
+        };
+
+
+        // --- 6. Refactored Child Components ---
+
+        /**
+         * Component for the main toolbar (left side).
+         * @param {object} props - Component props.
+         */
+        const Toolbar = ({ 
+            state, 
+            isLoading, 
+            isCropping, 
+            crop,
+            canUndo, 
+            canRedo, 
+            undo, 
+            redo,
+            handleImageUpload,
+            handleRunOCR,
+            handleAiTextRemove,
+            setIsCropping,
+            onConfirmCrop,
+            addTextOverlay,
+            handleDownload,
+            handleSaveProject, // NEW
+            handleLoadProject, // NEW
+            zoom, // NEW
+            onZoomChange, // NEW
+        }) => {
+            const { originalImage, editedImage } = state;
+            const currentImageSrc = editedImage || originalImage?.url;
+
+            return (
+                <div className="w-full lg:w-64 bg-white shadow rounded-lg p-4 flex-shrink-0 space-y-3">
+                    <h2 className="text-xl font-semibold mb-2 border-b pb-2">Tools</h2>
+                    <ImageUploader onImageUpload={handleImageUpload} />
+                    
+                    {/* Project Save/Load */}
+                    <div className="flex gap-2">
+                        <IconButton onClick={handleSaveProject} disabled={isLoading} title="Save Project">
+                            Save
+                        </IconButton>
+                        <IconButton onClick={handleLoadProject} disabled={isLoading} title="Load Project">
+                            Load
+                        </IconButton>
+                    </div>
+
+                    {/* Undo/Redo Controls */}
+                    <div className="flex gap-2">
+                        <IconButton onClick={undo} disabled={!canUndo || isLoading} title="Undo">
+                            <Icons.Undo />
+                        </IconButton>
+                        <IconButton onClick={redo} disabled={!canRedo || isLoading} title="Redo">
+                            <Icons.Redo />
+                        </IconButton>
+                    </div>
+                    
+                    {/* Zoom Controls */}
+                    <div className="p-2 border rounded-lg bg-gray-50">
+                        <label className="text-sm font-medium text-gray-700">Zoom ({Math.round(zoom * 100)}%)</label>
+                        <div className="flex gap-2 mt-2">
+                            <IconButton onClick={() => onZoomChange(zoom - 0.1)} disabled={zoom <= 0.2 || isLoading} title="Zoom Out">
+                                <Icons.ZoomOut />
+                            </IconButton>
+                            <IconButton onClick={() => onZoomChange(1)} disabled={zoom === 1 || isLoading} title="Reset Zoom">
+                                <Icons.ZoomReset />
+                            </IconButton>
+                            <IconButton onClick={() => onZoomChange(zoom + 0.1)} disabled={zoom >= 3 || isLoading} title="Zoom In">
+                                <Icons.ZoomIn />
+                            </IconButton>
+                        </div>
+                    </div>
+
+                    {/* AI Tools */}
+                    <button
+                        onClick={handleRunOCR}
+                        disabled={!originalImage || isLoading}
+                        className="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition disabled:bg-gray-300"
+                    >
+                        Find Text (OCR)
+                    </button>
+                    <button
+                        onClick={handleAiTextRemove}
+                        disabled={!originalImage || isLoading}
+                        className="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition disabled:bg-gray-300"
+                    >
+                        AI Text Remover
+                    </button>
+                    
+                    {/* Crop Controls */}
+                    {!isCropping ? (
+                        <button
+                            onClick={() => setIsCropping(true)}
+                            disabled={!currentImageSrc || isLoading}
+                            className="w-full bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 transition disabled:bg-gray-300"
+                        >
+                            Crop Image
+                        </button>
+                    ) : (
+                        <div className="space-y-2 p-2 border border-purple-300 rounded-lg bg-purple-50">
+                            <button
+                                onClick={onConfirmCrop}
+                                disabled={!crop || isLoading}
+                                className="w-full bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 transition disabled:bg-gray-300"
+                            >
+                                Confirm Crop
+                            </button>
+                            <button
+                                onClick={() => setIsCropping(false)}
+                                className="w-full bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Add Text & Download */}
+                    <button
+                        onClick={addTextOverlay}
+                        disabled={!currentImageSrc || isLoading}
+                        className="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-300"
+                    >
+                        Add New Text
+                    </button>
+                    <button
+                        onClick={handleDownload}
+                        disabled={!currentImageSrc || isLoading}
+                        className="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition disabled:bg-gray-300"
+                    >
+                        Download Image
+                    </button>
+                </div>
+            );
+        };
+        
+        /**
+         * Component for the central canvas/editor area.
+         * @param {object} props - Component props.
+         */
+        const CanvasArea = ({
+            state,
+            editorRef,
+            imageRef,
+            drawingCanvasRef, // NEW
+            isCropping,
+            isLoading,
+            crop,
+            zoom, // NEW
+            modalMessage,
+            ocrBoxes,
+            selectedOverlayId,
+            setSelectedOverlayId,
+            onCropChange,
+            onDrag,
+            onDragStop,
+            onResize,
+            onResizeStop,
+            onTextChange,
+            onDrawStart, // NEW
+            onDrawMove, // NEW
+            onDrawEnd, // NEW
+            drawTool, // NEW
+        }) => {
+            const { originalImage, editedImage, textOverlays, filters, drawingData } = state;
+            const currentImageSrc = editedImage || originalImage?.url;
+            const cssFilterString = useMemo(() => getCssFilterString(filters), [filters]);
+            
+            // Effect to re-draw the drawing canvas when state changes (e.g., undo/redo)
+            useEffect(() => {
+                if (drawingCanvasRef.current) {
+                    drawImageOnCanvas(drawingCanvasRef.current, drawingData);
+                }
+            }, [drawingData, drawingCanvasRef]);
+
+            return (
+                <div className="flex-grow bg-gray-200 rounded-lg p-4 overflow-auto relative min-h-[500px]">
+                    {isLoading && !modalMessage && <Spinner />}
+                    
+                    {/* This outer div controls zoom */}
+                    <div 
+                        style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+                        className="transition-transform duration-100"
+                    >
+                        <div 
+                            ref={editorRef} 
+                            className="relative w-full h-auto mx-auto" 
+                            style={{ maxWidth: '1000px' }}
+                            // Clicks on the editor background deselect any overlay
+                            onClick={() => setSelectedOverlayId(null)}
+                            // NEW: Drawing Event Handlers
+                            onMouseDown={e => drawTool !== 'select' ? onDrawStart(e) : null}
+                            onMouseMove={e => drawTool !== 'select' ? onDrawMove(e) : null}
+                            onMouseUp={e => drawTool !== 'select' ? onDrawEnd(e) : null}
+                            onMouseLeave={e => drawTool !== 'select' ? onDrawEnd(e) : null} // Stop drawing if mouse leaves
+                        >
+                          {/* Base Image Wrapper (for CSS filters) */}
+                          <div style={{ filter: cssFilterString }}>
+                            {/* The actual image */}
+                            <img
+                                ref={imageRef}
+                                src={currentImageSrc}
+                                className="w-full h-auto rounded shadow-md"
+                                style={{ 
+                                    display: currentImageSrc ? 'block' : 'none', 
+                                    pointerEvents: isCropping ? 'none' : 'auto',
+                                }}
+                            />
+                            
+                            {/* React Crop UI (conditionally rendered) */}
+                            {currentImageSrc && isCropping && (
+                                <ReactCrop
+                                    crop={crop}
+                                    onChange={onCropChange}
+                                    aspect={null} // Free crop
+                                    className="absolute top-0 left-0 right-0 bottom-0"
+                                >
+                                    {/* This img is *only* for the crop UI */}
+                                    <img
+                                        src={currentImageSrc}
+                                        style={{ 
+                                            width: '100%', 
+                                            height: 'auto',
+                                            filter: cssFilterString, // Show filters while cropping
+                                        }}
+                                        alt="Crop Preview"
+                                    />
+                                </ReactCrop>
+                            )}
+                          </div>
+                          
+                          {/* NEW: Drawing Canvas */}
+                          <canvas
+                            id="drawingCanvas"
+                            ref={drawingCanvasRef}
+                            width={originalImage?.width || 1000} // Match image dimensions
+                            height={originalImage?.height || 1000}
+                            style={{ 
+                                width: '100%', 
+                                height: '100%',
+                                pointerEvents: drawTool !== 'select' ? 'auto' : 'none',
+                                cursor: drawTool !== 'select' ? 'crosshair' : 'default'
+                            }}
+                          />
+
+                          {/* OCR Boxes (if any) */}
+                          {!isCropping && ocrBoxes.map((bbox, index) => (
+                            <div
+                              key={index}
+                              className="absolute border-2 border-red-500"
+                              style={{
+                                left: `${bbox.x0}px`,
+                                top: `${bbox.y0}px`,
+                                width: `${bbox.x1 - bbox.x0}px`,
+                                height: `${bbox.x1 - bbox.y0}px`,
+                                pointerEvents: 'none',
+                                zIndex: 15, // Show over drawing
+                              }}
+                            />
+                          ))}
+
+                          {/* Draggable Text Overlays */}
+                          {!isCropping && textOverlays.map((overlay, index) => (
+                            <TextOverlay
+                              key={overlay.id}
+                              {...overlay}
+                              styleProps={{ ...overlay.styleProps, zIndex: 20 + index }} // Layering
+                              isSelected={overlay.id === selectedOverlayId}
+                              zoom={zoom} // Pass zoom
+                              onDrag={onDrag}
+                              onDragStop={onDragStop}
+                              onResize={onResize}
+                              onResizeStop={onResizeStop}
+                              onClick={(id) => {
+                                  setSelectedOverlayId(id);
+                              }}
+                              onTextChange={onTextChange}
+                            />
+                          ))}
+                        </div>
+                    </div>
+                    
+                    {!currentImageSrc && (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                            Upload an image to begin editing.
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        /**
+         * Component for the properties panel (right side).
+         * @param {object} props - Component props.
+         */
+        const PropertiesSidebar = ({
+            state,
+            selectedOverlay,
+            updateOverlayStyle,
+            deleteSelectedOverlay,
+            handleFilterChange,
+            resetFilter,
+            drawTool, // NEW
+            setDrawTool, // NEW
+            drawColor, // NEW
+            setDrawColor, // NEW
+            drawWidth, // NEW
+            setDrawWidth, // NEW
+            clearDrawing, // NEW
+            duplicateSelectedOverlay, // NEW
+            bringOverlayForward, // NEW
+            sendOverlayBackward, // NEW
+        }) => {
+            const [propertiesTab, setPropertiesTab] = useState('style'); // 'style', 'filters', or 'draw'
+            const { filters } = state;
+
+            return (
+                <div className="w-full lg:w-72 bg-white shadow rounded-lg p-4 flex-shrink-0">
+                    {/* Properties Tabs */}
+                    <div className="flex border-b mb-4">
+                        <button
+                            onClick={() => setPropertiesTab('style')}
+                            className={`flex-1 py-2 font-semibold ${propertiesTab === 'style' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                        >
+                            Style
+                        </button>
+                        <button
+                            onClick={() => setPropertiesTab('filters')}
+                            className={`flex-1 py-2 font-semibold ${propertiesTab === 'filters' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                        >
+                            Filters
+                        </button>
+                        <button
+                            onClick={() => setPropertiesTab('draw')}
+                            className={`flex-1 py-2 font-semibold ${propertiesTab === 'draw' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                        >
+                            Draw
+                        </button>
+                    </div>
+
+                    {/* Style Panel */}
+                    <div style={{ display: propertiesTab === 'style' ? 'block' : 'none' }}>
+                        <h2 className="text-xl font-semibold mb-4">Text Properties</h2>
+                        {selectedOverlay ? (
+                          <div className="space-y-4">
+                            {/* Layer Controls */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Layer</label>
+                                <div className="flex gap-2">
+                                    <IconButton onClick={duplicateSelectedOverlay} title="Duplicate"><Icons.Duplicate /></IconButton>
+                                    <IconButton onClick={bringOverlayForward} title="Bring Forward"><Icons.BringForward /></IconButton>
+                                    <IconButton onClick={sendOverlayBackward} title="Send Backward"><Icons.SendBackward /></IconButton>
+                                </div>
+                            </div>
+                            
+                            {/* Style Controls */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Text Color</label>
+                              <input
+                                type="color"
+                                value={selectedOverlay.styleProps.color}
+                                onChange={(e) => updateOverlayStyle('color', e.target.value)}
+                                className="mt-1 w-full h-10 rounded-md border border-gray-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Background Color</label>
+                              <input
+                                type="color"
+                                value={selectedOverlay.styleProps.backgroundColor}
+                                onChange={(e) => updateOverlayStyle('backgroundColor', e.target.value)}
+                                className="mt-1 w-full h-10 rounded-md border border-gray-300"
+                              />
+                            </div>
+                            {/* NEW: Opacity */}
+                            <FilterSlider
+                                label={`Opacity (${Math.round(selectedOverlay.styleProps.opacity * 100)}%)`}
+                                min="0" max="1" step="0.01" value={selectedOverlay.styleProps.opacity}
+                                onChange={(e) => updateOverlayStyle('opacity', parseFloat(e.target.value))}
+                                onReset={() => updateOverlayStyle('opacity', 1)}
+                            />
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Font Size (px)</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={parseInt(selectedOverlay.styleProps.fontSize)}
+                                onChange={(e) => updateOverlayStyle('fontSize', `${e.target.value}px`)}
+                                className="mt-1 w-full rounded-md border border-gray-300 p-2"
+                              />
+                            </div>
+                            {/* NEW: Text Shadow */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Text Shadow</label>
+                              <input
+                                type="text"
+                                placeholder="e.g., 2px 2px 4px #000"
+                                value={selectedOverlay.styleProps.textShadow}
+                                onChange={(e) => updateOverlayStyle('textShadow', e.target.value)}
+                                className="mt-1 w-full rounded-md border border-gray-300 p-2"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Font Family</label>
+                              <select
+                                value={selectedOverlay.styleProps.fontFamily}
+                                onChange={(e) => updateOverlayStyle('fontFamily', e.target.value)}
+                                className="mt-1 w-full rounded-md border border-gray-300 p-2"
+                              >
+                                <option value="Arial">Arial</option>
+                                <option value="Verdana">Verdana</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                                <option value="Courier New">Courier New</option>
+                                <option value="Georgia">Georgia</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Font Weight</label>
+                              <select
+                                value={selectedOverlay.styleProps.fontWeight}
+                                onChange={(e) => updateOverlayStyle('fontWeight', e.target.value)}
+                                className="mt-1 w-full rounded-md border border-gray-300 p-2"
+                              >
+                                <option value="normal">Normal</option>
+                                <option value="bold">Bold</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Text Align</label>
+                              <select
+                                value={selectedOverlay.styleProps.textAlign}
+                                onChange={(e) => updateOverlayStyle('textAlign', e.target.value)}
+                                className="mt-1 w-full rounded-md border border-gray-300 p-2"
+                              >
+                                <option value="left">Left</option>
+                                <option value="center">Center</option>
+                                <option value="right">Right</option>
+                              </select>
+                            </div>
+                            <button
+                                onClick={deleteSelectedOverlay}
+                                className="w-full bg-gray-200 text-red-600 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition"
+                            >
+                                Delete Textbox
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500">Add a text box or select one to see its properties.</p>
+                        )}
+                    </div>
+
+                    {/* Filters Panel */}
+                    <div style={{ display: propertiesTab === 'filters' ? 'block' : 'none' }}>
+                        <h2 className="text-xl font-semibold mb-4">Image Filters</h2>
+                        <div className="space-y-4">
+                            <FilterSlider
+                                label="Brightness"
+                                min="0" max="200" value={filters.brightness}
+                                onChange={(e) => handleFilterChange('brightness', e.target.value)}
+                                onReset={() => resetFilter('brightness')}
+                            />
+                            <FilterSlider
+                                label="Contrast"
+                                min="0" max="200" value={filters.contrast}
+                                onChange={(e) => handleFilterChange('contrast', e.target.value)}
+                                onReset={() => resetFilter('contrast')}
+                            />
+                            <FilterSlider
+                                label="Grayscale"
+                                min="0" max="100" value={filters.grayscale}
+                                onChange={(e) => handleFilterChange('grayscale', e.target.value)}
+                                onReset={() => resetFilter('grayscale')}
+                            />
+                            <FilterSlider
+                                label="Sepia"
+                                min="0" max="100" value={filters.sepia}
+                                onChange={(e) => handleFilterChange('sepia', e.target.value)}
+                                onReset={() => resetFilter('sepia')}
+                            />
+                            <FilterSlider
+                                label="Blur (px)"
+                                min="0" max="10" value={filters.blur}
+                                onChange={(e) => handleFilterChange('blur', e.target.value)}
+                                onReset={() => resetFilter('blur')}
+                            />
+                        </div>
+                    </div>
+                    
+                    {/* NEW: Draw Panel */}
+                    <div style={{ display: propertiesTab === 'draw' ? 'block' : 'none' }}>
+                        <h2 className="text-xl font-semibold mb-4">Drawing Tools</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Tool</label>
+                                <div className="flex gap-2">
+                                    <IconButton onClick={() => setDrawTool('select')} title="Select" isActive={drawTool === 'select'}><Icons.Select /></IconButton>
+                                    <IconButton onClick={() => setDrawTool('pen')} title="Pen" isActive={drawTool === 'pen'}><Icons.Pen /></IconButton>
+                                    <IconButton onClick={() => setDrawTool('eraser')} title="Eraser" isActive={drawTool === 'eraser'}><Icons.Eraser /></IconButton>
+                                </div>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Draw Color</label>
+                              <input
+                                type="color"
+                                value={drawColor}
+                                onChange={(e) => setDrawColor(e.target.value)}
+                                className="mt-1 w-full h-10 rounded-md border border-gray-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Line Width (px)</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                value={drawWidth}
+                                onChange={(e) => setDrawWidth(parseInt(e.target.value))}
+                                className="mt-1 w-full rounded-md border border-gray-300 p-2"
+                              />
+                            </div>
+                            <button
+                                onClick={clearDrawing}
+                                className="w-full bg-gray-200 text-red-600 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition"
+                            >
+                                Clear Drawing
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        /**
+         * Component for the "Generate" tab.
+         * @param {object} props - Component props.
+         */
+        const GenerateTab = ({ isLoading, setIsLoading, setModalMessage }) => {
+            const [prompt, setPrompt] = useState("");
+            const [generatedImage, setGeneratedImage] = useState(null);
+            
+            /**
+             * Generates a new image in the "Generate" tab.
+             */
+            const handleGenerateImage = async () => {
+              if (!prompt) {
+                setModalMessage("Please enter a prompt.");
+                return;
+              }
+              setIsLoading(true);
+              setGeneratedImage(null);
+              try {
+                const imageUrl = await GeminiService.generateImage(prompt);
+                setGeneratedImage(imageUrl);
+              } catch (error) {
+                console.error("Image Generation Error:", error);
+                setModalMessage(`Error: ${error.message}`);
+              } finally {
+                setIsLoading(false);
+              }
+            };
+            
+            return (
+                <div className="max-w-2xl mx-auto w-full">
+                  <div className="bg-white shadow rounded-lg p-6 space-y-4">
+                    <h2 className="text-2xl font-semibold mb-4">AI Image Generator</h2>
+                    <div>
+                      <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
+                        Enter your prompt
+                      </label>
+                      <textarea
+                        id="prompt"
+                        rows="4"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., A cute cat wearing a tiny wizard hat, photorealistic"
+                      />
+                    </div>
+                    <button
+                      onClick={handleGenerateImage}
+                      disabled={isLoading}
+                      className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-300"
+                    >
+                      {isLoading ? "Generating..." : "Generate Image"}
+                    </button>
+                  </div>
+
+                  <div className="mt-6 bg-white shadow rounded-lg p-4 min-h-[300px] flex items-center justify-center">
+                    {isLoading && <Spinner />}
+                    {generatedImage ? (
+                      <img src={generatedImage} alt="AI generated" className="max-w-full h-auto rounded-md shadow-md" />
+                    ) : (
+                      !isLoading && <p className="text-gray-500">Your generated image will appear here.</p>
+                    )}
+                  </div>
+                </div>
+            );
+        };
+        
+        /**
+         * Component for the main "Edit" tab UI.
+         * @param {object} props - Component props.
+         */
+        const EditorTab = (props) => {
+            return (
+                <div className="flex flex-col lg:flex-row gap-4 h-full">
+                    <Toolbar {...props} />
+                    <CanvasArea {...props} />
+                    <PropertiesSidebar {...props} />
+                </div>
+            );
+        };
+
+
+        // --- 7. Main Application Component ---
+
+        const App = () => {
+          // --- Main State ---
+          const { state, setState, setHistory, undo, redo, canUndo, canRedo, getFullHistory } = useHistory(initialAppState);
+          const { originalImage, editedImage, textOverlays, filters, drawingData } = state;
+          
+          // --- UI / Mode State (not part of undo/redo) ---
+          const [tab, setTab] = useState('edit'); // 'edit' or 'generate'
+          const [selectedOverlayId, setSelectedOverlayId] = useState(null);
+          const [isLoading, setIsLoading] = useState(false);
+          const [modalMessage, setModalMessage] = useState(null);
+          const [tesseractWorker, setTesseractWorker] = useState(null);
+          const [ocrBoxes, setOcrBoxes] = useState([]);
+          const [isCropping, setIsCropping] = useState(false);
+          const [crop, setCrop] = useState(); // react-image-crop state
+          const [zoom, setZoom] = useState(1); // NEW: Zoom state
+          
+          // --- Drawing State (not part of undo/redo) ---
+          const [drawTool, setDrawTool] = useState('select'); // 'select', 'pen', 'eraser'
+          const [drawColor, setDrawColor] = useState('#FF0000');
+          const [drawWidth, setDrawWidth] = useState(5);
+          const [isDrawing, setIsDrawing] = useState(false);
+          
+          // --- Refs ---
+          const editorRef = useRef(null); // Ref for the main editor area for download
+          const imageRef = useRef(null); // Ref for the image element
+          const drawingCanvasRef = useRef(null); // NEW: Ref for drawing canvas
+          const lastDrawPoint = useRef(null); // NEW: Ref for smooth drawing
+
+          /**
+           * Tesseract.js worker initialization.
+           */
+          useEffect(() => {
+            async function initTesseract() {
+              if (window.Tesseract) {
+                const worker = await Tesseract.createWorker('eng');
+                setTesseractWorker(worker);
+              } else {
+                console.error("Tesseract.js not loaded");
+              }
+            }
+            initTesseract();
+            return () => {
+              tesseractWorker?.terminate();
+            };
+          }, []);
+          
+          /**
+           * Effect to resize drawing canvas when image changes.
+           */
+          useEffect(() => {
+            if (drawingCanvasRef.current && originalImage) {
+                drawingCanvasRef.current.width = originalImage.width;
+                drawingCanvasRef.current.height = originalImage.height;
+                // Redraw existing data if any
+                drawImageOnCanvas(drawingCanvasRef.current, drawingData);
+            }
+          }, [originalImage, drawingData]); // Rerun when image or drawing data changes
+
+          // --- File and Image Handlers ---
+          
+          /**
+           * Handles the user uploading a new image.
+           * Resets the application state and history.
+           */
+          const handleImageUpload = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const newImage = {
+                        url: event.target.result,
+                        mimeType: file.type,
+                        width: img.naturalWidth,
+                        height: img.naturalHeight
+                    };
+                    // Reset the entire history to this new image
+                    setState({
+                        ...initialAppState,
+                        originalImage: newImage,
+                        editedImage: newImage.url, // Start with the original image
+                    }, true);
+                    setOcrBoxes([]);
+                    setSelectedOverlayId(null);
+                    setIsCropping(false);
+                    setZoom(1); // Reset zoom
+                };
+            };
+            reader.readAsDataURL(file);
+          };
+
+          // --- AI Feature Handlers ---
+
+          /**
+           * Runs Tesseract OCR on the *original* image to find text.
+           */
+          const handleRunOCR = async () => {
+            if (!originalImage || !tesseractWorker) {
+              setModalMessage("Please upload an image first.");
+              return;
+            }
+            setIsLoading(true);
+            setModalMessage("Running OCR to find text... This may take a moment.");
+            try {
+              const { data: { lines } } = await tesseractWorker.recognize(originalImage.url);
+              setOcrBoxes(lines.map(line => line.bbox));
+              setModalMessage(`OCR complete! Found ${lines.length} lines of text. Red boxes show detected text.`);
+            } catch (error) {
+              console.error("OCR Error:", error);
+              setModalMessage("An error occurred during text detection.");
+            } finally {
+              setIsLoading(false);
+            }
+          };
+
+          /**
+           * Runs the AI text remover on the *original* image.
+           * This creates a new "editedImage" and saves to history.
+           */
+          const handleAiTextRemove = async () => {
+            if (!originalImage) {
+              setModalMessage("Please upload an image first.");
+              return;
+            }
+            setIsLoading(true);
+            setModalMessage("AI is removing text... This is a complex task and may take a minute.");
+            try {
+              const base64Data = getBase64FromUrl(originalImage.url);
+              const cleanedImageUrl = await GeminiService.removeTextFromImage(base64Data, originalImage.mimeType);
+              
+              setState(prevState => ({
+                  ...prevState,
+                  editedImage: cleanedImageUrl, // Set the new AI-cleaned image
+                  ocrBoxes: [], // Clear old OCR boxes
+              }), true);
+              
+              setModalMessage("AI text removal complete!");
+            } catch (error) {
+              console.error("AI Text Removal Error:", error);
+              setModalMessage(`Error: ${error.message}`);
+            } finally {
+              setIsLoading(false);
+            }
+          };
+          
+          // --- Project Save/Load Handlers (NEW) ---
+          
+          /**
+           * Saves the entire application state (including history) to LocalStorage.
+           */
+          const handleSaveProject = () => {
+            try {
+                const historyData = getFullHistory();
+                const dataToSave = JSON.stringify(historyData);
+                localStorage.setItem('aiEditorProject', dataToSave);
+                setModalMessage("Project saved successfully!");
+            } catch (error) {
+                console.error("Save Project Error:", error);
+                setModalMessage("Error saving project. The project might be too large for local storage.");
+            }
+          };
+          
+          /**
+           * Loads the application state (including history) from LocalStorage.
+           */
+          const handleLoadProject = () => {
+            try {
+                const savedData = localStorage.getItem('aiEditorProject');
+                if (!savedData) {
+                    setModalMessage("No saved project found.");
+                    return;
+                }
+                const { history: loadedHistory, index: loadedIndex } = JSON.parse(savedData);
+                if (loadedHistory && loadedIndex != null) {
+                    setHistory(loadedHistory, loadedIndex); // Use history hook's setter
+                    setModalMessage("Project loaded successfully!");
+                } else {
+                    throw new Error("Invalid project file format.");
+                }
+            } catch (error) {
+                console.error("Load Project Error:", error);
+                setModalMessage("Error loading project. The saved file may be corrupt.");
+            }
+          };
+
+          // --- Text Overlay Handlers ---
+          
+          /**
+           * Adds a new default text overlay to the canvas.
+           * Saves to history.
+           */
+          const addTextOverlay = () => {
+            const newId = `text_${Date.now()}`;
+            const newOverlay = {
+              id: newId,
+              text: "New Text",
+              position: { x: 50, y: 50 },
+              size: { width: 150, height: 40 },
+              styleProps: {
+                color: '#000000',
+                fontSize: '16px',
+                fontFamily: 'Arial',
+                fontWeight: 'normal',
+                textAlign: 'left',
+                backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                opacity: 1, // NEW
+                textShadow: '', // NEW
+              }
+            };
+            
+            setState(prev => ({
+                ...prev,
+                textOverlays: [...prev.textOverlays, newOverlay]
+            }), true);
+            setSelectedOverlayId(newId);
+          };
+
+          /**
+           * Updates the style of the selected overlay.
+           * Saves to history.
+           * @param {string} prop - The style property to change (e.g., "color").
+           * @param {string} value - The new value for the style.
+           */
+          const updateOverlayStyle = (prop, value) => {
+            if (!selectedOverlayId) return;
+            setState(prev => ({
+                ...prev,
+                textOverlays: prev.textOverlays.map(overlay =>
+                    overlay.id === selectedOverlayId
+                      ? { ...overlay, styleProps: { ...overlay.styleProps, [prop]: value } }
+                      : overlay
+                )
+            }), true);
+          };
+          
+          /**
+           * Updates text overlay content.
+           * Saves to history.
+           * @param {string} id - The ID of the overlay.
+           * @param {string} text - The new text content.
+           */
+          const onTextChange = (id, text) => {
+             setState(prev => ({
+                ...prev,
+                textOverlays: prev.textOverlays.map(overlay =>
+                    overlay.id === id ? { ...overlay, text } : overlay
+                )
+            }), true); // Save this change
+          };
+
+          /**
+           * Updates overlay position *without* saving to history (for smooth dragging).
+           * @param {string} id - The ID of the overlay.
+           * @param {object} position - The new {x, y} position.
+           */
+          const onDrag = (id, position) => {
+            setState(prev => ({
+                ...prev,
+                textOverlays: prev.textOverlays.map(overlay => 
+                    overlay.id === id ? { ...overlay, position } : overlay
+                )
+            }), false); // Do NOT save to history
+          };
+
+          /**
+           * Saves the final overlay position to history.
+           * @param {string} id - The ID of the overlay.
+           * @param {object} position - The final {x, y} position.
+           */
+          const onDragStop = (id, position) => {
+            setState(prev => ({
+                ...prev,
+                textOverlays: prev.textOverlays.map(overlay => 
+                    overlay.id === id ? { ...overlay, position } : overlay
+                )
+            }), true); // SAVE to history
+          };
+
+          /**
+           * Updates overlay size *without* saving to history (for smooth resizing).
+           * @param {string} id - The ID of the overlay.
+           * @param {object} size - The new {width, height} size.
+           */
+          const onResize = (id, size) => {
+            setState(prev => ({
+                ...prev,
+                textOverlays: prev.textOverlays.map(overlay => 
+                    overlay.id === id ? { ...overlay, size } : overlay
+                )
+            }), false); // Do NOT save to history
+          };
+
+          /**
+           * Saves the final overlay size to history.
+           * @param {string} id - The ID of the overlay.
+           * @param {object} size - The final {width, height} size.
+           */
+          const onResizeStop = (id, size) => {
+            setState(prev => ({
+                ...prev,
+                textOverlays: prev.textOverlays.map(overlay => 
+                    overlay.id === id ? { ...overlay, size } : overlay
+                )
+            }), true); // SAVE to history
+          };
+          
+          /**
+           * Deletes the currently selected text overlay.
+           * Saves to history.
+           */
+          const deleteSelectedOverlay = () => {
+            if (!selectedOverlayId) return;
+            setState(prev => ({
+                ...prev,
+                textOverlays: prev.textOverlays.filter(overlay => overlay.id !== selectedOverlayId)
+            }), true);
+            setSelectedOverlayId(null);
+          };
+          
+          // --- NEW: Layer Control Handlers ---
+
+          /**
+           * Duplicates the selected overlay.
+           * Saves to history.
+           */
+          const duplicateSelectedOverlay = () => {
+            if (!selectedOverlayId) return;
+            const overlayToCopy = textOverlays.find(o => o.id === selectedOverlayId);
+            if (!overlayToCopy) return;
+            
+            const newId = `text_${Date.now()}`;
+            const newOverlay = {
+                ...overlayToCopy,
+                id: newId,
+                position: { 
+                    x: overlayToCopy.position.x + 20, 
+                    y: overlayToCopy.position.y + 20 
+                }
+            };
+            
+            setState(prev => ({
+                ...prev,
+                textOverlays: [...prev.textOverlays, newOverlay]
+            }), true);
+            setSelectedOverlayId(newId);
+          };
+
+          /**
+           * Moves the selected overlay one step forward in the layer stack.
+           * Saves to history.
+           */
+          const bringOverlayForward = () => {
+            if (!selectedOverlayId) return;
+            const index = textOverlays.findIndex(o => o.id === selectedOverlayId);
+            if (index < textOverlays.length - 1) { // Not already at front
+                const newOverlays = [...textOverlays];
+                const [item] = newOverlays.splice(index, 1);
+                newOverlays.splice(index + 1, 0, item);
+                setState(prev => ({ ...prev, textOverlays: newOverlays }), true);
+            }
+          };
+
+          /**
+           * Moves the selected overlay one step backward in the layer stack.
+           * Saves to history.
+           */
+          const sendOverlayBackward = () => {
+            if (!selectedOverlayId) return;
+            const index = textOverlays.findIndex(o => o.id === selectedOverlayId);
+            if (index > 0) { // Not already at back
+                const newOverlays = [...textOverlays];
+                const [item] = newOverlays.splice(index, 1);
+                newOverlays.splice(index - 1, 0, item);
+                setState(prev => ({ ...prev, textOverlays: newOverlays }), true);
+            }
+          };
+
+          const selectedOverlay = textOverlays.find(o => o.id === selectedOverlayId);
+          
+          // --- Filter Handlers ---
+          
+          /**
+           * Updates a specific filter value.
+           * Saves to history.
+           * @param {string} filterName - The name of the filter (e.g., "brightness").
+           * @param {string | number} value - The new value.
+           */
+          const handleFilterChange = (filterName, value) => {
+              setState(prev => ({
+                  ...prev,
+                  filters: { ...prev.filters, [filterName]: value }
+              }), true);
+          };
+
+          /**
+           * Resets a specific filter to its default value.
+           * Saves to history.
+           * @param {string} filterName - The name of the filter.
+           */
+          const resetFilter = (filterName) => {
+              handleFilterChange(filterName, initialAppState.filters[filterName]);
+          };
+
+          // --- Crop Handlers ---
+
+          /**
+           * Confirms the crop operation.
+           * This is a destructive action that creates a new `editedImage`.
+           * Saves to history.
+           */
+          const onConfirmCrop = async () => {
+            if (!crop || !imageRef.current) {
+                setModalMessage("Please select a crop area first.");
+                return;
+            }
+            
+            setIsLoading(true);
+            setModalMessage("Applying crop...");
+            
+            try {
+                const croppedImageSrc = await getCroppedImg(
+                    editedImage || originalImage.url, 
+                    crop,
+                    filters // Apply filters *before* cropping
+                );
+                
+                // This crop is a destructive edit. It becomes the new "base" image.
+                // We reset filters, drawings, and text overlays.
+                setState(prev => ({
+                    ...initialAppState,
+                    originalImage: prev.originalImage, // Keep original for reference
+                    editedImage: croppedImageSrc,
+                }), true);
+                
+                setIsCropping(false);
+                setCrop(undefined);
+                setModalMessage(null);
+                
+            } catch (error) {
+                console.error("Cropping Error:", error);
+                setModalMessage("An error occurred during cropping.");
+            } finally {
+                setIsLoading(false);
+            }
+          };
+          
+          // --- NEW: Drawing Handlers ---
+          
+          /**
+           * Gets the mouse position relative to the canvas, adjusted for zoom.
+           * @param {MouseEvent} e - The mouse event.
+           * @returns {{x: number, y: number}} - The coordinates on the canvas.
+           */
+          const getDrawCoordinates = (e) => {
+              if (!drawingCanvasRef.current) return null;
+              
+              const canvas = drawingCanvasRef.current;
+              const rect = canvas.getBoundingClientRect(); // Position on screen
+              
+              // 1. Mouse position on screen
+              const clientX = e.clientX;
+              const clientY = e.clientY;
+              
+              // 2. Position relative to scaled-down canvas on screen
+              const scaleX = rect.width / canvas.width;
+              const scaleY = rect.height / canvas.height;
+              
+              const x = (clientX - rect.left) / scaleX;
+              const y = (clientY - rect.top) / scaleY;
+              
+              return { x, y };
+          };
+
+          /**
+           * Starts the drawing process.
+           * @param {MouseEvent} e - The mouse down event.
+           */
+          const onDrawStart = (e) => {
+              const coords = getDrawCoordinates(e);
+              if (!coords) return;
+              
+              setIsDrawing(true);
+              const ctx = drawingCanvasRef.current.getContext('2d');
+              ctx.beginPath();
+              ctx.moveTo(coords.x, coords.y);
+              
+              // Apply styles
+              ctx.strokeStyle = drawTool === 'eraser' ? '#FFFFFF' : drawColor;
+              ctx.lineWidth = drawWidth;
+              ctx.lineCap = 'round';
+              ctx.globalCompositeOperation = drawTool === 'eraser' ? 'destination-out' : 'source-over';
+              
+              ctx.lineTo(coords.x, coords.y); // Draw a dot for a single click
+              ctx.stroke();
+              
+              lastDrawPoint.current = coords;
+          };
+
+          /**
+           * Draws a line as the mouse moves.
+           * @param {MouseEvent} e - The mouse move event.
+           */
+          const onDrawMove = (e) => {
+              if (!isDrawing || !lastDrawPoint.current) return;
+              
+              const coords = getDrawCoordinates(e);
+              if (!coords) return;
+              
+              const ctx = drawingCanvasRef.current.getContext('2d');
+              ctx.beginPath();
+              ctx.moveTo(lastDrawPoint.current.x, lastDrawPoint.current.y);
+              ctx.lineTo(coords.x, coords.y);
+              ctx.stroke();
+              
+              lastDrawPoint.current = coords;
+          };
+
+          /**
+           * Finishes the drawing and saves the state to history.
+           * @param {MouseEvent} e - The mouse up event.
+           */
+          const onDrawEnd = (e) => {
+              if (!isDrawing) return;
+              setIsDrawing(false);
+              lastDrawPoint.current = null;
+              
+              // Save the new drawing data to history
+              const newDrawingData = drawingCanvasRef.current.toDataURL();
+              setState(prev => ({
+                  ...prev,
+                  drawingData: newDrawingData
+              }), true);
+          };
+          
+          /**
+           * Clears the drawing canvas and saves to history.
+           */
+          const clearDrawing = () => {
+              const canvas = drawingCanvasRef.current;
+              const ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              setState(prev => ({
+                  ...prev,
+                  drawingData: null
+              }), true);
+          };
+
+          // --- Download Handler ---
+          
+          /**
+           * Downloads the final composed image from the editor.
+           * Uses html2canvas to capture CSS filters and overlays.
+           */
+          const handleDownload = async () => {
+            if (!editorRef.current) {
+                setModalMessage("Error: Could not find editor content.");
+                return;
+            }
+            if (!window.html2canvas) {
+                setModalMessage("Error: html2canvas library not loaded. Cannot download.");
+                return;
+            }
+
+            setIsLoading(true);
+            setModalMessage("Generating final image...");
+            
+            // Set zoom to 1 for accurate capture
+            const oldZoom = zoom;
+            setZoom(1);
+            
+            // Wait for zoom to apply
+            await new Promise(res => setTimeout(res, 100));
+
+            try {
+                // Hide borders and controls during capture
+                document.querySelectorAll('.drag-handle, .react-resizable-handle').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.text-overlay').forEach(el => el.style.border = 'none');
+                if(isCropping) setIsCropping(false); // Hide crop UI
+                
+                const canvas = await window.html2canvas(editorRef.current, {
+                    useCORS: true,
+                    logging: true,
+                    backgroundColor: null, // Transparent background
+                });
+
+                // Restore borders and controls
+                document.querySelectorAll('.drag-handle, .react-resizable-handle').forEach(el => el.style.display = '');
+                textOverlays.forEach(overlay => {
+                    const el = document.getElementById(overlay.id);
+                    if (el) {
+                        el.style.border = overlay.id === selectedOverlayId 
+                            ? '2px solid #0d6efd' 
+                            : '2px dashed rgba(255, 255, 255, 0.5)';
+                    }
+                });
+
+                const dataUrl = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = 'edited-image.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                setModalMessage(null);
+
+            } catch (error) {
+                console.error("Download Error:", error);
+                setModalMessage("An error occurred during download.");
+            } finally {
+                setIsLoading(false);
+                setZoom(oldZoom); // Restore zoom
+            }
+          };
+
+          // --- 8. Main App Return ---
+          return (
+            <div className="bg-gray-100 min-h-screen p-4 font-sans">
+              {(isLoading && modalMessage) && <Modal message={modalMessage} onClose={() => setModalMessage(null)} />}
+              {(!isLoading && modalMessage) && <Modal message={modalMessage} onClose={() => setModalMessage(null)} />}
+
+              <div className="max-w-[90rem] mx-auto">
+                {/* --- Header and Tabs --- */}
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-4">
+                  <h1 className="text-3xl font-bold text-gray-800">AI Image & Text Editor</h1>
+                  <div className="flex space-x-2 bg-gray-200 p-1 rounded-lg mt-4 sm:mt-0">
+                    <button
+                      onClick={() => setTab('edit')}
+                      className={`px-4 py-2 font-semibold rounded-md ${tab === 'edit' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}
+                    >
+                      Editor
+                    </button>
+                    <button
+                      onClick={() => setTab('generate')}
+                      className={`px-4 py-2 font-semibold rounded-md ${tab === 'generate' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}
+                    >
+                      Generate
+                    </button>
+                  </div>
+                </div>
+
+                {/* --- Main Content Area --- */}
+                <div className="h-[80vh]">
+                    {tab === 'edit' ? 
+                        <EditorTab 
+                            state={state}
+                            editorRef={editorRef}
+                            imageRef={imageRef}
+                            drawingCanvasRef={drawingCanvasRef}
+                            isLoading={isLoading}
+                            isCropping={isCropping}
+                            crop={crop}
+                            zoom={zoom}
+                            modalMessage={modalMessage}
+                            ocrBoxes={ocrBoxes}
+                            selectedOverlayId={selectedOverlayId}
+                            selectedOverlay={selectedOverlay}
+                            canUndo={canUndo}
+                            canRedo={canRedo}
+                            undo={undo}
+                            redo={redo}
+                            drawTool={drawTool}
+                            drawColor={drawColor}
+                            drawWidth={drawWidth}
+                            handleImageUpload={handleImageUpload}
+                            handleRunOCR={handleRunOCR}
+                            handleAiTextRemove={handleAiTextRemove}
+                            setIsCropping={setIsCropping}
+                            onConfirmCrop={onConfirmCrop}
+                            addTextOverlay={addTextOverlay}
+                            handleDownload={handleDownload}
+                            handleSaveProject={handleSaveProject}
+                            handleLoadProject={handleLoadProject}
+                            onZoomChange={setZoom}
+                            setSelectedOverlayId={setSelectedOverlayId}
+                            onCropChange={(c, percentCrop) => setCrop(c)}
+                            onDrag={onDrag}
+                            onDragStop={onDragStop}
+                            onResize={onResize}
+                            onResizeStop={onResizeStop}
+                            onTextChange={onTextChange}
+                            updateOverlayStyle={updateOverlayStyle}
+                            deleteSelectedOverlay={deleteSelectedOverlay}
+                            handleFilterChange={handleFilterChange}
+                            resetFilter={resetFilter}
+                            onDrawStart={onDrawStart}
+                            onDrawMove={onDrawMove}
+                            onDrawEnd={onDrawEnd}
+                            setDrawTool={setDrawTool}
+                            setDrawColor={setDrawColor}
+                            setDrawWidth={setDrawWidth}
+                            clearDrawing={clearDrawing}
+                            duplicateSelectedOverlay={duplicateSelectedOverlay}
+                            bringOverlayForward={bringOverlayForward}
+                            sendOverlayBackward={sendOverlayBackward}
+                        /> 
+                        : 
+                        <GenerateTab 
+                            isLoading={isLoading}
+                            setIsLoading={setIsLoading}
+                            setModalMessage={setModalMessage}
+                        />
+                    }
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // --- Mount the App ---
+        const container = document.getElementById('root');
+        if (container) {
+          const root = createRoot(container);
+          root.render(<App />);
+        } else {
+          console.error('Root element not found. Please add <div id="root"></div> to your HTML.');
+        }
+    </script>
+</body>
+</html>

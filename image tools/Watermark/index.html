@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Watermark Pro - Responsive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Lato:wght@400;700&family=Lobster&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Oswald:wght@500&family=Playfair+Display:wght@700&family=Roboto:wght@400;700&family=Dancing+Script:wght@700&family=Pacifico&family=Bebas+Neue&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #e5e7eb;
+            overscroll-behavior: none;
+        }
+
+        .canvas-bg {
+            background-image: linear-gradient(45deg, #374151 25%, transparent 25%), linear-gradient(-45deg, #374151 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #374151 75%), linear-gradient(-45deg, transparent 75%, #374151 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        /* Mobile-friendly scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            height: 24px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 0 2px #1f2937;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #4b5563;
+            border-radius: 2px;
+        }
+
+        /* Accordion Animation */
+        details>summary {
+            list-style: none;
+        }
+
+        details>summary::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            transition: transform 0.2s;
+        }
+
+        details[open]>summary::after {
+            transform: rotate(180deg);
+        }
+
+        /* Checkbox */
+        .custom-checkbox {
+            appearance: none;
+            background-color: #374151;
+            width: 1.25em;
+            height: 1.25em;
+            border: 2px solid #6b7280;
+            border-radius: 0.25em;
+            display: grid;
+            place-content: center;
+        }
+
+        .custom-checkbox::before {
+            content: "";
+            width: 0.65em;
+            height: 0.65em;
+            transform: scale(0);
+            transition: 100ms transform ease-in-out;
+            box-shadow: inset 1em 1em white;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        .custom-checkbox:checked {
+            background-color: #4f46e5;
+            border-color: #4f46e5;
+        }
+
+        .custom-checkbox:checked::before {
+            transform: scale(1);
+        }
+    </style>
+</head>
+
+<body class="h-screen w-full flex flex-col overflow-hidden text-[11px] md:text-sm leading-tight">
+
+    <!-- Header -->
+    <header
+        class="bg-gray-900 border-b border-gray-700 px-3 md:px-4 py-2 flex justify-between items-center z-30 shadow-md shrink-0 h-12 md:h-16">
+        <div class="flex items-center gap-2 md:gap-3">
+            <div class="bg-indigo-600 text-white p-1.5 md:p-2 rounded-lg shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-wand-magic-sparkles text-xs md:text-lg"></i>
+            </div>
+            <!-- Title hidden on small screens -->
+            <div class="hidden sm:block">
+                <h1 class="text-sm md:text-xl font-bold tracking-tight text-white leading-tight">Watermark<span
+                        class="text-indigo-400">Pro</span></h1>
+            </div>
+        </div>
+        <div class="flex gap-2 items-center">
+            <!-- Mobile: Icons Only. Desktop: Icon + Text -->
+            <button onclick="document.getElementById('mainImageUpload').click()"
+                class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 p-1.5 md:px-4 md:py-2 rounded-lg font-medium transition flex items-center gap-2">
+                <i class="fa-solid fa-folder-plus text-xs md:text-base"></i> <span class="hidden md:inline">Add</span>
+            </button>
+
+            <div id="actionButtons"
+                class="flex gap-2 opacity-50 pointer-events-none transition-opacity border-l border-gray-700 pl-2">
+                <button id="clearAllBtn" class="text-red-400 hover:bg-red-900/30 p-1.5 md:px-3 rounded-lg transition"
+                    title="Clear All">
+                    <i class="fa-solid fa-trash text-xs md:text-base"></i>
+                </button>
+                <button id="downloadBtn"
+                    class="bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 p-1.5 md:px-4 md:py-2 rounded-lg font-medium transition"
+                    title="Save Current">
+                    <i class="fa-solid fa-image text-xs md:text-base"></i> <span class="hidden md:inline">Save</span>
+                </button>
+                <button id="openExportModalBtn"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white p-1.5 md:px-4 md:py-2 rounded-lg font-medium shadow-lg shadow-indigo-900/50 transition flex items-center gap-2">
+                    <i class="fa-solid fa-file-export text-xs md:text-base"></i> <span
+                        class="hidden md:inline">Export</span>
+                </button>
+            </div>
+            <input type="file" id="mainImageUpload" class="hidden" accept="image/*" multiple>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <!-- Mobile: Col (Canvas Top, Controls Bottom). Desktop: Row (Controls Left, Canvas Right) -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <!-- Controls Sidebar -->
+        <!-- Update: Mobile uses overflow-y-auto on parent to let header scroll away. Desktop uses flex-col with inner scroll. -->
+        <aside
+            class="w-full md:w-80 bg-gray-900 border-t md:border-t-0 md:border-r border-gray-700 flex-shrink-0 z-20 flex flex-col h-[55%] md:h-full order-3 md:order-1 shadow-[0_-5px_15px_rgba(0,0,0,0.3)] md:shadow-none overflow-y-auto md:overflow-hidden"
+            id="sidebar">
+
+            <!-- Mode Switcher (Relative on mobile to scroll away, Sticky on Desktop) -->
+            <div class="p-2 md:p-3 border-b border-gray-700 bg-gray-900 shrink-0 relative md:sticky md:top-0 z-10">
+                <div class="bg-gray-800 p-1 rounded-lg flex text-[10px] md:text-xs font-bold">
+                    <button id="modeText"
+                        class="flex-1 py-1.5 rounded shadow bg-gray-600 text-white transition">TEXT</button>
+                    <button id="modeImage"
+                        class="flex-1 py-1.5 rounded text-gray-400 hover:text-white transition">LOGO</button>
+                    <button id="modeSignature"
+                        class="flex-1 py-1.5 rounded text-gray-400 hover:text-white transition"><i
+                            class="fa-solid fa-signature"></i></button>
+                    <button id="modeQR" class="flex-1 py-1.5 rounded text-gray-400 hover:text-white transition"><i
+                            class="fa-solid fa-qrcode"></i></button>
+                </div>
+            </div>
+
+            <!-- Scrollable Controls Wrapper (Mobile expands, Desktop constrained) -->
+            <div class="p-3 space-y-4 pb-20 md:pb-4 md:flex-1 md:overflow-y-auto custom-scrollbar">
+
+                <!-- Text Inputs -->
+                <div id="textControls">
+                    <textarea id="watermarkText" rows="2"
+                        class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-xs md:text-sm text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2 placeholder-gray-500 resize-none"
+                        placeholder="Watermark text...">My Watermark</textarea>
+
+                    <div
+                        class="text-[10px] text-gray-500 mb-3 flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide py-1">
+                        <span class="font-semibold">Tags:</span>
+                        <button class="bg-gray-800 px-2 rounded hover:text-indigo-400"
+                            onclick="insertTag('[year]')">[year]</button>
+                        <button class="bg-gray-800 px-2 rounded hover:text-indigo-400"
+                            onclick="insertTag('[date]')">[date]</button>
+                        <button class="bg-gray-800 px-2 rounded hover:text-indigo-400"
+                            onclick="insertTag('[name]')">[name]</button>
+                    </div>
+
+                    <div class="flex gap-2 mb-2">
+                        <select id="fontFamily"
+                            class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs md:text-sm text-white focus:outline-none">
+                            <option value="Inter">Inter</option>
+                            <option value="Roboto">Roboto</option>
+                            <option value="Open Sans">Open Sans</option>
+                            <option value="Lato">Lato</option>
+                            <option value="Montserrat">Montserrat</option>
+                            <option value="Oswald">Oswald</option>
+                            <option value="Playfair Display">Playfair</option>
+                            <option value="Lobster">Lobster</option>
+                            <option value="Dancing Script">Dancing</option>
+                            <option value="Pacifico">Pacifico</option>
+                            <option value="Bebas Neue">Bebas</option>
+                        </select>
+                        <div class="relative w-10 h-10 overflow-hidden rounded border border-gray-600 shrink-0">
+                            <input type="color" id="textColor" value="#ffffff"
+                                class="absolute -top-2 -left-2 w-16 h-16 cursor-pointer border-0 p-0">
+                        </div>
+                    </div>
+
+                    <!-- Text Style Toggles -->
+                    <div class="flex gap-1 bg-gray-800 rounded-lg p-1 border border-gray-700">
+                        <button class="flex-1 py-1.5 rounded hover:bg-gray-700 text-gray-400 toggle-btn transition"
+                            data-prop="isBold"><i class="fa-solid fa-bold"></i></button>
+                        <button class="flex-1 py-1.5 rounded hover:bg-gray-700 text-gray-400 toggle-btn transition"
+                            data-prop="isItalic"><i class="fa-solid fa-italic"></i></button>
+                        <div class="w-px bg-gray-600 my-1 mx-1"></div>
+                        <button
+                            class="flex-1 py-1.5 rounded hover:bg-gray-700 text-gray-400 align-btn bg-gray-600 text-white"
+                            data-align="left"><i class="fa-solid fa-align-left"></i></button>
+                        <button class="flex-1 py-1.5 rounded hover:bg-gray-700 text-gray-400 align-btn"
+                            data-align="center"><i class="fa-solid fa-align-center"></i></button>
+                        <button class="flex-1 py-1.5 rounded hover:bg-gray-700 text-gray-400 align-btn"
+                            data-align="right"><i class="fa-solid fa-align-right"></i></button>
+                    </div>
+                </div>
+
+                <!-- Image Controls -->
+                <div id="imageControls" class="hidden">
+                    <label
+                        class="flex items-center gap-3 w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 cursor-pointer hover:bg-gray-750 transition border-dashed border-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-indigo-400 text-lg"></i>
+                        <span class="text-xs truncate flex-1 text-gray-300" id="logoFileName">Upload Logo File</span>
+                        <input type="file" id="watermarkImageUpload" class="hidden" accept="image/*">
+                    </label>
+
+                    <div class="mt-3 bg-gray-800/50 p-2.5 rounded-lg border border-gray-700">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase mb-2 flex justify-between">
+                            <span>Magic Eraser</span>
+                            <span class="text-indigo-400">BETA</span>
+                        </label>
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-wand-magic-sparkles text-gray-500"></i>
+                            <input type="range" id="logoTolerance" min="0" max="100" value="0" class="flex-1">
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-1 text-right">Remove background</p>
+                    </div>
+                </div>
+
+                <!-- QR Controls -->
+                <div id="qrControls" class="hidden">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">QR Link /
+                                Text</label>
+                            <input type="text" id="qrTextContent" value="https://example.com"
+                                class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-xs md:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                                placeholder="https://...">
+                        </div>
+                        <div
+                            class="flex gap-2 items-center justify-between bg-gray-800 p-2 rounded border border-gray-700">
+                            <label class="text-xs font-semibold text-gray-300">QR Color</label>
+                            <input type="color" id="qrColor" value="#000000"
+                                class="h-6 w-8 rounded cursor-pointer bg-transparent border-0 p-0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Signature Controls -->
+                <div id="signatureControls" class="hidden">
+                    <button id="openSignatureModalBtn"
+                        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-lg font-bold shadow-lg transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-pen-nib"></i> Draw Signature
+                    </button>
+                    <div id="signatureStatus"
+                        class="text-xs text-green-400 mt-2 hidden text-center bg-green-900/20 py-1 rounded border border-green-900">
+                        <i class="fa-solid fa-check"></i> Signature Active</div>
+                </div>
+
+                <!-- Accordions -->
+                <div class="space-y-2">
+
+                    <!-- Presets -->
+                    <details class="sidebar-section bg-gray-800/30 rounded-lg border border-gray-700">
+                        <summary
+                            class="p-2.5 text-[10px] md:text-xs font-bold text-gray-400 uppercase cursor-pointer hover:bg-gray-800 hover:text-white flex justify-between items-center select-none">
+                            Presets</summary>
+                        <div class="p-3 pt-0 border-t border-gray-700/50">
+                            <div class="flex gap-2 mb-2 mt-3">
+                                <input type="text" id="presetName" placeholder="Name..."
+                                    class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-white">
+                                <button id="savePresetBtn"
+                                    class="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-500"><i
+                                        class="fa-solid fa-floppy-disk text-xs"></i></button>
+                            </div>
+                            <div id="presetList" class="space-y-1 max-h-32 overflow-y-auto custom-scrollbar"></div>
+                        </div>
+                    </details>
+
+                    <!-- Image Tuner -->
+                    <details class="sidebar-section bg-gray-800/30 rounded-lg border border-gray-700">
+                        <summary
+                            class="p-2.5 text-[10px] md:text-xs font-bold text-gray-400 uppercase cursor-pointer hover:bg-gray-800 hover:text-white flex justify-between items-center select-none">
+                            Image Adjustments</summary>
+                        <div class="p-3 pt-0 border-t border-gray-700/50 space-y-3 mt-2">
+                            <div class="space-y-3">
+                                <!-- Tuner sliders (Brightness, Contrast etc) -->
+                                <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
+                                    <label class="text-[10px] text-gray-400 uppercase">Brightness</label>
+                                    <span id="valBrightness" class="text-[10px] text-gray-500 font-mono">100%</span>
+                                    <input type="range" id="filterBrightness" min="0" max="200" value="100"
+                                        class="col-span-2 w-full">
+                                </div>
+                                <div class="grid grid-cols-[1fr_auto] gap-2 items-center">
+                                    <label class="text-[10px] text-gray-400 uppercase">Contrast</label>
+                                    <span id="valContrast" class="text-[10px] text-gray-500 font-mono">100%</span>
+                                    <input type="range" id="filterContrast" min="0" max="200" value="100"
+                                        class="col-span-2 w-full">
+                                </div>
+                                <button id="resetFiltersBtn"
+                                    class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-1.5 rounded text-xs mt-2">Reset
+                                    Adjustments</button>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Appearance -->
+                    <details class="sidebar-section bg-gray-800/30 rounded-lg border border-gray-700" open>
+                        <summary
+                            class="p-2.5 text-[10px] md:text-xs font-bold text-gray-400 uppercase cursor-pointer hover:bg-gray-800 hover:text-white flex justify-between items-center select-none">
+                            Appearance</summary>
+                        <div class="p-3 pt-0 border-t border-gray-700/50 mt-2 space-y-3">
+
+                            <!-- Opacity -->
+                            <div>
+                                <label class="text-[10px] text-gray-400 uppercase block mb-1">Opacity & Mode</label>
+                                <div class="flex gap-2">
+                                    <input type="range" id="opacity" min="0" max="1" step="0.01" value="0.9"
+                                        class="flex-1">
+                                    <select id="blendMode"
+                                        class="bg-gray-800 border border-gray-600 rounded px-1 text-[10px] text-white w-20">
+                                        <option value="source-over">Normal</option>
+                                        <option value="multiply">Multiply</option>
+                                        <option value="screen">Screen</option>
+                                        <option value="overlay">Overlay</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Size & Rotation -->
+                            <div>
+                                <label class="text-[10px] text-gray-400 uppercase block mb-1">Transform</label>
+                                <div class="flex items-center gap-3 mb-2">
+                                    <i class="fa-solid fa-maximize text-gray-500 w-4"></i>
+                                    <input type="range" id="size" min="5" max="300" value="40" class="flex-1">
+                                    <input type="number" id="textSizeNumber"
+                                        class="w-10 bg-transparent text-right border-none text-xs text-gray-400 focus:ring-0 p-0"
+                                        value="40">
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <i class="fa-solid fa-rotate text-gray-500 w-4"></i>
+                                    <input type="range" id="rotation" min="0" max="360" value="0" class="flex-1">
+                                </div>
+                            </div>
+
+                        </div>
+                    </details>
+
+                    <!-- Effects (Text Only) -->
+                    <details class="sidebar-section bg-gray-800/30 rounded-lg border border-gray-700"
+                        id="textEffectsSection">
+                        <summary
+                            class="p-2.5 text-[10px] md:text-xs font-bold text-gray-400 uppercase cursor-pointer hover:bg-gray-800 hover:text-white flex justify-between items-center select-none">
+                            Effects</summary>
+                        <div class="p-3 pt-0 border-t border-gray-700/50 mt-2 space-y-3">
+                            <!-- Shadow -->
+                            <div class="flex flex-col gap-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] md:text-xs text-gray-300">Drop Shadow</span>
+                                    <input type="checkbox" id="shadowEnabled" class="custom-checkbox w-3.5 h-3.5"
+                                        checked>
+                                </div>
+                                <div class="pl-2 border-l-2 border-gray-700 space-y-2">
+                                    <div class="flex gap-2 items-center">
+                                        <input type="color" id="shadowColor" value="#000000"
+                                            class="h-5 w-6 rounded border-0 p-0">
+                                        <input type="range" id="shadowBlur" min="0" max="50" value="5" class="flex-1"
+                                            title="Blur">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Box -->
+                            <div class="flex flex-col gap-2 border-t border-gray-700 pt-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] md:text-xs text-gray-300">Background Box</span>
+                                    <input type="checkbox" id="bgEnabled" class="custom-checkbox w-3.5 h-3.5">
+                                </div>
+                                <div class="pl-2 border-l-2 border-gray-700 space-y-2">
+                                    <div class="flex gap-2 items-center">
+                                        <input type="color" id="bgColor" value="#000000"
+                                            class="h-5 w-6 rounded border-0 p-0">
+                                        <span class="text-[10px] text-gray-500 w-6">Pad</span>
+                                        <input type="range" id="bgPadding" min="0" max="100" value="20" class="flex-1">
+                                    </div>
+                                    <div class="flex gap-2 items-center">
+                                        <i class="fa-solid fa-droplet text-gray-500 text-xs w-6 text-center"></i>
+                                        <input type="range" id="bgBlur" min="0" max="20" value="0" class="flex-1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Position -->
+                    <details class="sidebar-section bg-gray-800/30 rounded-lg border border-gray-700">
+                        <summary
+                            class="p-2.5 text-[10px] md:text-xs font-bold text-gray-400 uppercase cursor-pointer hover:bg-gray-800 hover:text-white flex justify-between items-center select-none">
+                            Position</summary>
+                        <div class="p-3 pt-0 border-t border-gray-700/50 mt-2">
+                            <div
+                                class="flex items-center justify-between mb-3 bg-gray-900 p-1.5 rounded border border-gray-700">
+                                <span class="text-[10px] font-semibold text-gray-300">Pattern Mode</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="patternMode" class="sr-only peer">
+                                    <div
+                                        class="w-7 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600">
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div id="singlePositionControls" class="grid grid-cols-3 gap-2">
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="tl"><i class="fa-solid fa-arrow-up-left"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="tc"><i class="fa-solid fa-arrow-up"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="tr"><i class="fa-solid fa-arrow-up-right"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="cl"><i class="fa-solid fa-arrow-left"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="cc"><i class="fa-regular fa-square"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="cr"><i class="fa-solid fa-arrow-right"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="bl"><i class="fa-solid fa-arrow-down-left"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="bc"><i class="fa-solid fa-arrow-down"></i></button>
+                                <button
+                                    class="pos-btn bg-gray-800 hover:bg-indigo-600 border border-gray-600 rounded p-2 text-gray-400 hover:text-white transition"
+                                    data-pos="br"><i class="fa-solid fa-arrow-down-right"></i></button>
+                            </div>
+
+                            <div id="patternControls" class="hidden space-y-2">
+                                <div><label class="text-[10px] uppercase text-gray-500">Gap X</label><input type="range"
+                                        id="gapX" min="10" max="500" value="100" class="w-full"></div>
+                                <div><label class="text-[10px] uppercase text-gray-500">Gap Y</label><input type="range"
+                                        id="gapY" min="10" max="500" value="100" class="w-full"></div>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Canvas & Thumbnails Area -->
+        <!-- Mobile: Order 2 (Top), Height 45%. Desktop: Order 2 (Right), Height 100% -->
+        <div class="flex-1 flex flex-col bg-gray-800 relative overflow-hidden h-[45%] md:h-full order-2 md:order-2"
+            id="dropZone">
+
+            <!-- Canvas Wrapper -->
+            <div class="flex-1 flex items-center justify-center p-4 overflow-hidden relative canvas-bg">
+                <!-- Empty State -->
+                <div id="emptyState" class="text-center px-6">
+                    <div class="bg-gray-700/50 p-6 rounded-full inline-flex items-center justify-center shadow-lg mb-4">
+                        <i class="fa-solid fa-cloud-arrow-up text-4xl text-indigo-400 animate-pulse"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-white mb-1">Add Images</h2>
+                    <p class="text-gray-400 mb-4 text-xs">JPG, PNG, WEBP</p>
+                    <label for="mainImageUpload"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-full font-bold shadow-lg transition cursor-pointer text-sm inline-block">
+                        Choose Files
+                    </label>
+                </div>
+
+                <canvas id="canvas"
+                    class="hidden shadow-2xl bg-gray-900 border border-gray-700 max-w-full max-h-full object-contain"></canvas>
+
+                <!-- Loading Overlay -->
+                <div id="processingOverlay"
+                    class="absolute inset-0 bg-gray-900/90 z-50 hidden flex flex-col items-center justify-center text-white backdrop-blur-sm">
+                    <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-500 mb-4"></i>
+                    <p id="processingStatus" class="text-gray-400 font-mono text-xs">Preparing...</p>
+                    <div class="w-48 h-1.5 bg-gray-700 rounded-full mt-4 overflow-hidden">
+                        <div id="progressBar" class="h-full bg-indigo-500 w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thumbnail Strip -->
+            <!-- Mobile: Height 16 (64px). Desktop: Height 24 (96px) -->
+            <div id="bottomBar" class="bg-gray-900 border-t border-gray-700 z-20 flex flex-col hidden flex-shrink-0">
+                <div
+                    class="flex justify-between items-center px-3 py-1.5 border-b border-gray-800 text-[10px] md:text-xs text-gray-400 bg-gray-900/50">
+                    <div class="flex items-center gap-2">
+                        <label class="flex items-center gap-1.5 cursor-pointer hover:text-white">
+                            <input type="checkbox" id="selectAllCheck" class="custom-checkbox w-3.5 h-3.5" checked>
+                            <span>All</span>
+                        </label>
+                        <span class="text-gray-600">|</span>
+                        <span id="selectionCount">0 selected</span>
+                    </div>
+                    <div id="batchCounter" class="font-mono">
+                        <span id="currentIndex">1</span>/<span id="totalIndex">1</span>
+                    </div>
+                </div>
+                <div id="thumbnailStrip"
+                    class="h-16 md:h-24 flex items-center gap-2 px-2 overflow-x-auto scrollbar-hide"></div>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div id="exportModal"
+            class="absolute inset-0 z-50 bg-gray-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+            <div
+                class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-xs md:max-w-sm p-4 transform transition-all">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm md:text-lg font-bold text-white flex items-center gap-2">Export Batch</h2>
+                    <button id="closeExportModal" class="text-gray-400 hover:text-white"><i
+                            class="fa-solid fa-xmark text-sm"></i></button>
+                </div>
+                <div class="space-y-3">
+                    <div class="bg-indigo-900/20 border border-indigo-500/20 rounded-lg p-2.5 flex items-center gap-3">
+                        <div class="bg-indigo-600 rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-check text-white text-[10px]"></i></div>
+                        <div class="text-[10px] md:text-xs">
+                            <div class="font-semibold text-white">Selected Images</div>
+                            <div class="text-gray-400">Processing <span id="modalSelectionCount"
+                                    class="font-bold text-indigo-400">0</span> images.</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Format</label>
+                            <select id="exportFormat"
+                                class="w-full bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none">
+                                <option value="image/jpeg">JPG</option>
+                                <option value="image/png">PNG</option>
+                                <option value="image/webp">WebP</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quality</label>
+                            <div class="flex items-center gap-2 bg-gray-900 border border-gray-600 rounded px-2 py-1.5">
+                                <input type="number" id="exportQuality" min="10" max="100" value="90"
+                                    class="w-full bg-transparent text-xs text-white focus:outline-none">
+                                <span class="text-gray-500 text-[10px]">%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Naming</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="filePrefix" placeholder="prefix_"
+                                class="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none">
+                            <input type="text" id="fileSuffix" placeholder="_wm"
+                                class="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-5 flex gap-3">
+                    <button id="cancelExport"
+                        class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium text-xs">Cancel</button>
+                    <button id="confirmExport"
+                        class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg font-bold text-xs shadow-lg">Start
+                        Export</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signature Modal -->
+        <div id="signatureModal"
+            class="absolute inset-0 z-50 bg-gray-900/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+            <div
+                class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col h-3/4 md:h-auto">
+                <h3 class="text-lg font-bold text-white mb-3">Draw Signature</h3>
+                <div class="bg-white rounded-lg cursor-crosshair relative overflow-hidden flex-1 md:h-64 w-full touch-none"
+                    id="sigContainer">
+                    <canvas id="sigCanvas" class="w-full h-full"></canvas>
+                    <div class="absolute bottom-2 right-2 text-[10px] text-gray-400 pointer-events-none select-none">
+                        Sign Here</div>
+                </div>
+                <div class="flex justify-between items-center mt-4 shrink-0">
+                    <button id="clearSigBtn" class="text-red-400 hover:text-red-300 text-xs font-medium"><i
+                            class="fa-solid fa-eraser"></i> Clear</button>
+                    <div class="flex gap-3">
+                        <button id="closeSigModal"
+                            class="text-gray-400 hover:text-white text-xs font-medium">Cancel</button>
+                        <button id="useSigBtn"
+                            class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-lg">Use</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Logic (Same logic, preserved and connected) -->
+    <script>
+        const state = {
+            images: [], activeIndex: 0, mode: 'text',
+            text: 'Watermark', font: 'Inter', textColor: '#ffffff', size: 40, align: 'center', isBold: false, isItalic: false, lineHeight: 1.2, letterSpacing: 0,
+            qrText: 'https://example.com', qrColor: '#000000',
+            strokeEnabled: false, strokeColor: '#000000', strokeWidth: 1,
+            shadowEnabled: true, shadowColor: '#000000', shadowBlur: 5, shadowX: 2, shadowY: 2,
+            bgEnabled: false, bgColor: '#000000', bgPadding: 20, bgRadius: 5, bgBlur: 0,
+            watermarkImage: null, signatureImage: null, logoTolerance: 0,
+            filterBrightness: 100, filterContrast: 100, filterSaturate: 100, filterGrayscale: 0,
+            opacity: 0.9, rotation: 0, blendMode: 'source-over',
+            patternMode: false, x: 0.5, y: 0.5, gapX: 100, gapY: 100, patternOffset: 0,
+            exportFormat: 'image/jpeg', exportQuality: 0.9, filePrefix: '', fileSuffix: '_wm',
+            isDragging: false
+        };
+
+        const dom = {
+            canvas: document.getElementById('canvas'),
+            sidebar: document.getElementById('sidebar'),
+            emptyState: document.getElementById('emptyState'),
+            bottomBar: document.getElementById('bottomBar'),
+            exportModal: document.getElementById('exportModal'),
+            sigModal: document.getElementById('signatureModal'),
+            sigCanvas: document.getElementById('sigCanvas'),
+            presetList: document.getElementById('presetList'),
+            textInput: document.getElementById('watermarkText'),
+        };
+
+        const ctx = dom.canvas.getContext('2d');
+        const sigCtx = dom.sigCanvas.getContext('2d');
+        let isSigning = false;
+        let processedLogoCache = null;
+        let lastProcessedTolerance = -1;
+
+        function init() {
+            bindEvents();
+            loadPresets();
+            window.addEventListener('resize', () => { if (state.images.length) draw(); resizeSigCanvas(); });
+        }
+
+        function bindEvents() {
+            document.getElementById('mainImageUpload').addEventListener('change', (e) => handleUpload(e.target.files));
+            document.getElementById('watermarkImageUpload').addEventListener('change', (e) => handleLogoUpload(e.target.files[0]));
+
+            const dz = document.getElementById('dropZone');
+            dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('bg-gray-700'); });
+            dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('bg-gray-700'); });
+            dz.addEventListener('drop', (e) => { e.preventDefault(); dz.classList.remove('bg-gray-700'); handleUpload(e.dataTransfer.files); });
+
+            ['modeText', 'modeImage', 'modeSignature', 'modeQR'].forEach(id => {
+                document.getElementById(id).onclick = () => setMode(id.replace('mode', '').toLowerCase());
+            });
+
+            bindInput('watermarkText', 'text');
+            bindInput('fontFamily', 'font');
+            bindInput('textColor', 'textColor');
+            bindInput('size', 'size', true);
+            bindInput('textSizeNumber', 'size', true);
+            bindInput('qrTextContent', 'qrText');
+            bindInput('qrColor', 'qrColor');
+            bindInput('logoTolerance', 'logoTolerance', true);
+            bindInput('filterBrightness', 'filterBrightness', true);
+            bindInput('filterContrast', 'filterContrast', true);
+            bindInput('filterSaturate', 'filterSaturate', true);
+            bindInput('filterGrayscale', 'filterGrayscale', true);
+            document.getElementById('resetFiltersBtn').onclick = resetFilters;
+
+            bindInput('opacity', 'opacity', true);
+            bindInput('rotation', 'rotation', true);
+            bindInput('blendMode', 'blendMode');
+            bindCheckbox('shadowEnabled');
+            bindInput('shadowColor', 'shadowColor');
+            bindInput('shadowBlur', 'shadowBlur', true);
+            bindInput('shadowX', 'shadowX', true);
+            bindInput('shadowY', 'shadowY', true);
+            bindCheckbox('strokeEnabled');
+            bindInput('strokeColor', 'strokeColor');
+            bindInput('strokeWidth', 'strokeWidth', true);
+            bindCheckbox('bgEnabled');
+            bindInput('bgColor', 'bgColor');
+            bindInput('bgPadding', 'bgPadding', true);
+            bindInput('bgRadius', 'bgRadius', true);
+            bindInput('bgBlur', 'bgBlur', true);
+
+            bindCheckbox('patternMode');
+            bindInput('gapX', 'gapX', true);
+            bindInput('gapY', 'gapY', true);
+            // Removed posX/posY manual inputs from this mobile version to save space (drag is preferred)
+
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const prop = btn.dataset.prop;
+                    state[prop] = !state[prop];
+                    btn.classList.toggle('bg-gray-600', state[prop]);
+                    btn.classList.toggle('text-white', state[prop]);
+                    draw();
+                });
+            });
+
+            document.querySelectorAll('.align-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.align = btn.dataset.align;
+                    document.querySelectorAll('.align-btn').forEach(b => {
+                        b.classList.remove('bg-gray-600', 'text-white');
+                        b.classList.add('text-gray-400');
+                    });
+                    btn.classList.remove('text-gray-400');
+                    btn.classList.add('bg-gray-600', 'text-white');
+                    draw();
+                });
+            });
+
+            document.querySelectorAll('.pos-btn').forEach(btn => {
+                btn.addEventListener('click', () => { setPos(btn.dataset.pos); });
+            });
+
+            document.getElementById('openSignatureModalBtn').onclick = openSigModal;
+            document.getElementById('closeSigModal').onclick = () => dom.sigModal.classList.add('hidden');
+            document.getElementById('useSigBtn').onclick = saveSignature;
+            document.getElementById('clearSigBtn').onclick = clearSigCanvas;
+
+            dom.sigCanvas.addEventListener('mousedown', startSig);
+            dom.sigCanvas.addEventListener('mousemove', drawSig);
+            dom.sigCanvas.addEventListener('mouseup', stopSig);
+            dom.sigCanvas.addEventListener('touchstart', (e) => startSig(e.touches[0]));
+            dom.sigCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); drawSig(e.touches[0]); });
+            dom.sigCanvas.addEventListener('touchend', stopSig);
+
+            document.getElementById('savePresetBtn').onclick = savePreset;
+            document.getElementById('downloadBtn').onclick = downloadSingle;
+            document.getElementById('openExportModalBtn').onclick = openExportModal;
+            document.getElementById('clearAllBtn').onclick = clearBatch;
+            document.getElementById('closeExportModal').onclick = closeExportModal;
+            document.getElementById('cancelExport').onclick = closeExportModal;
+            document.getElementById('confirmExport').onclick = downloadBatch;
+            document.getElementById('selectAllCheck').addEventListener('change', toggleSelectAll);
+
+            bindInput('exportFormat', 'exportFormat');
+            bindInput('filePrefix', 'filePrefix');
+            bindInput('fileSuffix', 'fileSuffix');
+            document.getElementById('exportQuality').addEventListener('input', (e) => state.exportQuality = e.target.value / 100);
+
+            dom.canvas.addEventListener('mousedown', startDrag);
+            window.addEventListener('mousemove', doDrag);
+            window.addEventListener('mouseup', stopDrag);
+            dom.canvas.addEventListener('touchstart', (e) => startDrag(e.touches[0]));
+            window.addEventListener('touchmove', (e) => { if (state.isDragging) e.preventDefault(); doDrag(e.touches[0]); }, { passive: false });
+            window.addEventListener('touchend', stopDrag);
+        }
+
+        function bindInput(id, prop, isNumber = false) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', (e) => {
+                state[prop] = isNumber ? parseFloat(e.target.value) : e.target.value;
+                if (prop.startsWith('filter')) updateTunerUI(prop, state[prop]);
+                if (prop === 'size') {
+                    if (id === 'size') document.getElementById('textSizeNumber').value = state[prop];
+                    if (id === 'textSizeNumber') document.getElementById('size').value = state[prop];
+                }
+                draw();
+            });
+        }
+        function bindCheckbox(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', (e) => {
+                state[id] = e.target.checked;
+                if (id === 'patternMode') togglePatternUI();
+                draw();
+            });
+        }
+        function setMode(m) {
+            state.mode = m;
+            ['modeText', 'modeImage', 'modeSignature', 'modeQR'].forEach(id => {
+                const btn = document.getElementById(id);
+                const active = (id.toLowerCase().includes(m));
+                btn.className = active ? 'flex-1 py-1.5 rounded shadow bg-gray-600 text-white transition' : 'flex-1 py-1.5 rounded text-gray-400 hover:text-white transition';
+            });
+            document.getElementById('textControls').classList.toggle('hidden', m !== 'text');
+            document.getElementById('textEffectsSection').classList.toggle('hidden', m !== 'text');
+            document.getElementById('imageControls').classList.toggle('hidden', m !== 'image');
+            document.getElementById('signatureControls').classList.toggle('hidden', m !== 'signature');
+            document.getElementById('qrControls').classList.toggle('hidden', m !== 'qr');
+            draw();
+        }
+        function togglePatternUI() {
+            document.getElementById('singlePositionControls').classList.toggle('hidden', state.patternMode);
+            document.getElementById('patternControls').classList.toggle('hidden', !state.patternMode);
+        }
+        function insertTag(tag) {
+            const ta = dom.textInput;
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            state.text = ta.value.substring(0, start) + tag + ta.value.substring(end);
+            ta.value = state.text;
+            draw();
+        }
+        function resetFilters() {
+            state.filterBrightness = 100; state.filterContrast = 100; state.filterSaturate = 100; state.filterGrayscale = 0;
+            ['filterBrightness', 'filterContrast', 'filterSaturate', 'filterGrayscale'].forEach(id => {
+                document.getElementById(id).value = state[id];
+                updateTunerUI(id, state[id]);
+            });
+            draw();
+        }
+        function updateTunerUI(prop, val) {
+            const map = { filterBrightness: 'valBrightness', filterContrast: 'valContrast', filterSaturate: 'valSaturation', filterGrayscale: 'valGrayscale' };
+            if (document.getElementById(map[prop])) document.getElementById(map[prop]).innerText = val + '%';
+        }
+        function openSigModal() { dom.sigModal.classList.remove('hidden'); resizeSigCanvas(); clearSigCanvas(); }
+        function resizeSigCanvas() {
+            const rect = document.getElementById('sigContainer').getBoundingClientRect();
+            dom.sigCanvas.width = rect.width; dom.sigCanvas.height = rect.height;
+        }
+        function startSig(e) { isSigning = true; sigCtx.beginPath(); const rect = dom.sigCanvas.getBoundingClientRect(); const x = (e.clientX || e.touches[0].clientX) - rect.left; const y = (e.clientY || e.touches[0].clientY) - rect.top; sigCtx.moveTo(x, y); }
+        function drawSig(e) { if (!isSigning) return; const rect = dom.sigCanvas.getBoundingClientRect(); const x = (e.clientX || e.touches[0].clientX) - rect.left; const y = (e.clientY || e.touches[0].clientY) - rect.top; sigCtx.lineTo(x, y); sigCtx.strokeStyle = "#000"; sigCtx.lineWidth = 3; sigCtx.stroke(); }
+        function stopSig() { isSigning = false; }
+        function clearSigCanvas() { sigCtx.clearRect(0, 0, dom.sigCanvas.width, dom.sigCanvas.height); }
+        function saveSignature() { const dataUrl = dom.sigCanvas.toDataURL('image/png'); const img = new Image(); img.onload = () => { state.signatureImage = img; document.getElementById('signatureStatus').classList.remove('hidden'); dom.sigModal.classList.add('hidden'); draw(); }; img.src = dataUrl; }
+
+        async function handleUpload(files) {
+            if (!files.length) return;
+            const newImages = Array.from(files).filter(f => f.type.startsWith('image/'));
+            for (const file of newImages) {
+                const url = URL.createObjectURL(file);
+                const img = await loadImage(url);
+                state.images.push({ file, url, img, name: file.name.split('.')[0], selected: true });
+            }
+            if (state.images.length === newImages.length) setActive(0); else renderThumbnails();
+            updateUI();
+        }
+        function handleLogoUpload(file) {
+            if (!file) return; const url = URL.createObjectURL(file);
+            loadImage(url).then(img => { state.watermarkImage = img; document.getElementById('logoFileName').textContent = file.name; processedLogoCache = null; lastProcessedTolerance = -1; setMode('image'); draw(); });
+        }
+        function loadImage(src) { return new Promise(resolve => { const img = new Image(); img.onload = () => resolve(img); img.src = src; }); }
+        function setActive(idx) { state.activeIndex = idx; renderThumbnails(); updateUI(); draw(); }
+        function updateUI() {
+            const hasImgs = state.images.length > 0;
+            dom.emptyState.classList.toggle('hidden', hasImgs);
+            dom.canvas.classList.toggle('hidden', !hasImgs);
+            dom.sidebar.classList.toggle('hidden', !hasImgs); // On mobile flex/hidden toggling needs care
+            if (hasImgs) {
+                dom.sidebar.classList.remove('hidden');
+                dom.sidebar.classList.add('flex');
+                dom.bottomBar.classList.remove('hidden');
+                dom.bottomBar.classList.add('flex');
+            } else {
+                dom.sidebar.classList.add('hidden');
+                dom.bottomBar.classList.add('hidden');
+            }
+            document.getElementById('actionButtons').classList.toggle('opacity-50', !hasImgs);
+            document.getElementById('actionButtons').classList.toggle('pointer-events-none', !hasImgs);
+            if (hasImgs) {
+                document.getElementById('totalIndex').innerText = state.images.length;
+                document.getElementById('currentIndex').innerText = state.activeIndex + 1;
+                updateSelectionCount();
+            }
+        }
+        function renderThumbnails() {
+            const strip = document.getElementById('thumbnailStrip'); strip.innerHTML = '';
+            state.images.forEach((img, idx) => {
+                const isActive = idx === state.activeIndex;
+                const div = document.createElement('div');
+                div.className = `relative group flex-shrink-0 h-12 w-12 md:h-16 md:w-16 rounded-md overflow-hidden cursor-pointer border-2 transition-all ${isActive ? 'border-indigo-500 opacity-100 ring-2 ring-indigo-500/50' : 'border-gray-600 opacity-60 hover:opacity-100'}`;
+                div.onclick = () => setActive(idx);
+                const thumb = document.createElement('img'); thumb.src = img.url; thumb.className = 'w-full h-full object-cover';
+                const checkWrapper = document.createElement('div'); checkWrapper.className = 'absolute top-0.5 left-0.5 z-10'; checkWrapper.innerHTML = `<input type="checkbox" class="custom-checkbox w-3 h-3 md:w-4 md:h-4 shadow-md bg-gray-900/50 border-white/50" ${img.selected ? 'checked' : ''}>`;
+                checkWrapper.onclick = (e) => { e.stopPropagation(); img.selected = !img.selected; checkWrapper.querySelector('input').checked = img.selected; updateSelectionCount(); checkSelectAllState(); };
+                const del = document.createElement('button'); del.innerHTML = '<i class="fa-solid fa-xmark"></i>'; del.className = 'absolute top-0.5 right-0.5 bg-red-500 text-white w-4 h-4 rounded-full text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md z-10';
+                del.onclick = (e) => { e.stopPropagation(); state.images.splice(idx, 1); if (state.images.length === 0) clearBatch(); else setActive(Math.min(state.activeIndex, state.images.length - 1)); };
+                div.append(thumb, checkWrapper, del); strip.appendChild(div);
+            });
+            checkSelectAllState();
+        }
+        function updateSelectionCount() { const count = state.images.filter(i => i.selected).length; document.getElementById('selectionCount').textContent = `${count} selected`; document.getElementById('modalSelectionCount').textContent = count; }
+        function toggleSelectAll(e) { const isChecked = e.target.checked; state.images.forEach(img => img.selected = isChecked); renderThumbnails(); updateSelectionCount(); }
+        function checkSelectAllState() { document.getElementById('selectAllCheck').checked = state.images.length > 0 && state.images.every(img => img.selected); }
+        function clearBatch() { state.images = []; state.activeIndex = 0; updateUI(); }
+
+        function parseSmartTags(text) {
+            const now = new Date(); const currentImg = state.images[state.activeIndex]; let res = text;
+            res = res.replace(/\[year\]/gi, now.getFullYear()); res = res.replace(/\[date\]/gi, now.toLocaleDateString()); res = res.replace(/\[name\]/gi, currentImg ? currentImg.name : 'image');
+            return res;
+        }
+        function draw(targetCtx = ctx, targetW = 0, targetH = 0, imgObj = null) {
+            const img = imgObj || state.images[state.activeIndex]?.img; if (!img) return;
+            const w = targetW || img.width; const h = targetH || img.height; const c = targetCtx.canvas;
+            if (!targetW) { c.width = w; c.height = h; }
+            targetCtx.filter = `brightness(${state.filterBrightness}%) contrast(${state.filterContrast}%) saturate(${state.filterSaturate}%) grayscale(${state.filterGrayscale}%)`;
+            targetCtx.drawImage(img, 0, 0, w, h); targetCtx.filter = 'none';
+            targetCtx.save(); targetCtx.globalAlpha = state.opacity; targetCtx.globalCompositeOperation = state.blendMode;
+            if (state.patternMode) drawPattern(targetCtx, w, h); else drawSingleWatermark(targetCtx, w, h);
+            targetCtx.restore();
+            if (state.isDragging && !targetW) drawGuides(targetCtx, w, h);
+        }
+        function drawGuides(ctx, w, h) {
+            const x = state.x * w; const y = state.y * h; const threshold = 10; ctx.strokeStyle = '#6366f1'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+            if (Math.abs(x - w / 2) < threshold) { ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke(); }
+            if (Math.abs(y - h / 2) < threshold) { ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke(); }
+            ctx.setLineDash([]);
+        }
+        function drawPattern(ctx, w, h) {
+            const scaleBase = w / 1000; const gapX = state.gapX * scaleBase * 2; const gapY = state.gapY * scaleBase * 2; const off = (state.patternOffset / 100) * gapX;
+            for (let y = -gapY; y < h + gapY; y += gapY) { const xOffset = (Math.round(y / gapY) % 2 !== 0) ? off : 0; for (let x = -gapX; x < w + gapX; x += gapX) { drawContent(ctx, x + xOffset, y, w); } }
+        }
+        function drawSingleWatermark(ctx, w, h) { drawContent(ctx, state.x * w, state.y * h, w); }
+        function drawContent(ctx, x, y, canvasWidth) {
+            ctx.save(); ctx.translate(x, y); ctx.rotate(state.rotation * Math.PI / 180);
+            const scale = canvasWidth / 1000; const size = state.size * 2 * scale;
+            if (state.mode === 'text') { const finalText = parseSmartTags(state.text); drawText(ctx, size, finalText); }
+            else if (state.mode === 'image' && state.watermarkImage) { let imgToDraw = state.watermarkImage; if (state.logoTolerance > 0) { imgToDraw = getProcessedLogo(state.watermarkImage, state.logoTolerance); } drawImage(ctx, canvasWidth, imgToDraw); }
+            else if (state.mode === 'signature' && state.signatureImage) { drawImage(ctx, canvasWidth, state.signatureImage); }
+            else if (state.mode === 'qr') { drawQR(ctx, size, state.qrText, state.qrColor); }
+            ctx.restore();
+        }
+        function getProcessedLogo(img, tolerance) {
+            if (processedLogoCache && lastProcessedTolerance === tolerance) return processedLogoCache;
+            const tempCanvas = document.createElement('canvas'); tempCanvas.width = img.width; tempCanvas.height = img.height; const tempCtx = tempCanvas.getContext('2d'); tempCtx.drawImage(img, 0, 0);
+            const imageData = tempCtx.getImageData(0, 0, img.width, img.height); const data = imageData.data; const tol = tolerance * 2.55;
+            for (let i = 0; i < data.length; i += 4) { const r = data[i], g = data[i + 1], b = data[i + 2]; if (r > 255 - tol && g > 255 - tol && b > 255 - tol) { data[i + 3] = 0; } }
+            tempCtx.putImageData(imageData, 0, 0); processedLogoCache = tempCanvas; lastProcessedTolerance = tolerance; return tempCanvas;
+        }
+        function drawQR(ctx, size, text, color) { const qrSize = size * 4; const qr = new QRious({ value: text, size: qrSize, foreground: color, backgroundAlpha: 0 }); ctx.drawImage(qr.canvas, -qrSize / 2, -qrSize / 2); }
+        function drawText(ctx, fontSize, text) {
+            ctx.font = `${state.isItalic ? 'italic ' : ''}${state.isBold ? 'bold ' : ''}${fontSize}px "${state.font}"`; ctx.textAlign = state.align; ctx.textBaseline = 'middle';
+            const lines = text.split('\n'); const lineHeightPx = fontSize * state.lineHeight; const totalHeight = lines.length * lineHeightPx; const startY = -(totalHeight / 2) + (lineHeightPx / 2);
+            if (state.bgEnabled) {
+                let maxWidth = 0; lines.forEach(line => { const m = ctx.measureText(line); const w = m.width + (line.length * state.letterSpacing * (fontSize / 100)); if (w > maxWidth) maxWidth = w; });
+                const pad = state.bgPadding * (fontSize / 40); const bgW = maxWidth + (pad * 2); const bgH = totalHeight + (pad * 2);
+                ctx.fillStyle = state.bgColor; if (state.bgBlur > 0) ctx.globalAlpha = state.opacity * 0.5;
+                roundRect(ctx, -bgW / 2, -totalHeight / 2 - pad, bgW, bgH, state.bgRadius * (fontSize / 40)); ctx.fill(); ctx.globalAlpha = state.opacity;
+            }
+            lines.forEach((line, i) => {
+                const ly = startY + (i * lineHeightPx); ctx.save(); if (state.letterSpacing > 0) ctx.letterSpacing = `${state.letterSpacing}px`;
+                if (state.shadowEnabled) { ctx.shadowColor = state.shadowColor; ctx.shadowBlur = state.shadowBlur * (fontSize / 20); ctx.shadowOffsetX = state.shadowX * (fontSize / 20); ctx.shadowOffsetY = state.shadowY * (fontSize / 20); }
+                if (state.strokeEnabled) { ctx.lineWidth = state.strokeWidth * (fontSize / 40); ctx.strokeStyle = state.strokeColor; ctx.strokeText(line, 0, ly); }
+                ctx.fillStyle = state.textColor; ctx.fillText(line, 0, ly); ctx.restore();
+            });
+        }
+        function drawImage(ctx, canvasWidth, img) {
+            const baseW = canvasWidth * 0.3; const scale = (state.size / 50) * (baseW / img.width); const w = img.width * scale; const h = img.height * scale;
+            if (state.shadowEnabled) { ctx.shadowColor = state.shadowColor; ctx.shadowBlur = state.shadowBlur; ctx.shadowOffsetX = state.shadowX; ctx.shadowOffsetY = state.shadowY; }
+            ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        }
+        function roundRect(ctx, x, y, w, h, r) { if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2; ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+        function savePreset() {
+            const name = document.getElementById('presetName').value; if (!name) return alert('Enter a preset name');
+            const data = { ...state }; delete data.images; delete data.watermarkImage; delete data.signatureImage; delete data.activeIndex;
+            const presets = JSON.parse(localStorage.getItem('wm_presets') || '{}'); presets[name] = data; localStorage.setItem('wm_presets', JSON.stringify(presets)); loadPresets();
+        }
+        function loadPresets() {
+            const presets = JSON.parse(localStorage.getItem('wm_presets') || '{}'); const list = dom.presetList; list.innerHTML = '';
+            if (Object.keys(presets).length === 0) { list.innerHTML = '<div class="text-center text-gray-500 italic text-xs py-2">No saved presets</div>'; return; }
+            Object.keys(presets).forEach(name => {
+                const div = document.createElement('div'); div.className = 'flex justify-between items-center bg-gray-900/50 p-2 rounded hover:bg-gray-700/50 group text-xs transition';
+                div.innerHTML = `<span class="text-gray-300 cursor-pointer flex-1 truncate">${name}</span> <button class="text-red-400 opacity-0 group-hover:opacity-100 transition"><i class="fa-solid fa-trash"></i></button>`;
+                div.querySelector('span').onclick = () => applyPreset(presets[name]);
+                div.querySelector('button').onclick = () => { delete presets[name]; localStorage.setItem('wm_presets', JSON.stringify(presets)); loadPresets(); };
+                list.appendChild(div);
+            });
+        }
+        function applyPreset(data) { Object.assign(state, data); resetFilters(); draw(); }
+
+        function setPos(pos) {
+            switch (pos) {
+                case 'tl': state.x = 0.1; state.y = 0.1; break; case 'tc': state.x = 0.5; state.y = 0.1; break; case 'tr': state.x = 0.9; state.y = 0.1; break;
+                case 'cl': state.x = 0.1; state.y = 0.5; break; case 'cc': state.x = 0.5; state.y = 0.5; break; case 'cr': state.x = 0.9; state.y = 0.5; break;
+                case 'bl': state.x = 0.1; state.y = 0.9; break; case 'bc': state.x = 0.5; state.y = 0.9; break; case 'br': state.x = 0.9; state.y = 0.9; break;
+            } draw();
+        }
+        function startDrag(e) { if (state.patternMode || !state.images.length) return; state.isDragging = true; doDrag(e); }
+        function doDrag(e) {
+            if (!state.isDragging) return; const rect = dom.canvas.getBoundingClientRect();
+            const cx = (e.clientX || e.touches[0].clientX) - rect.left; const cy = (e.clientY || e.touches[0].clientY) - rect.top;
+            let nx = cx / rect.width; let ny = cy / rect.height; if (Math.abs(nx - 0.5) < 0.02) nx = 0.5; if (Math.abs(ny - 0.5) < 0.02) ny = 0.5;
+            state.x = Math.max(0, Math.min(1, nx)); state.y = Math.max(0, Math.min(1, ny)); draw();
+        }
+        function stopDrag() { state.isDragging = false; draw(); }
+
+        function openExportModal() { if (!state.images.length) return; dom.exportModal.classList.remove('hidden'); updateSelectionCount(); }
+        function closeExportModal() { dom.exportModal.classList.add('hidden'); }
+        function downloadSingle() {
+            if (!state.images.length) return; const link = document.createElement('a'); const img = state.images[state.activeIndex];
+            const ext = state.exportFormat.split('/')[1]; link.download = `${state.filePrefix}${img.name}${state.fileSuffix}.${ext}`;
+            link.href = dom.canvas.toDataURL(state.exportFormat, state.exportQuality); link.click();
+        }
+        async function downloadBatch() {
+            const targetImages = state.images.filter(i => i.selected); if (!targetImages.length) return alert("No images selected.");
+            closeExportModal(); document.getElementById('processingOverlay').classList.remove('hidden');
+            const zip = new JSZip(); const folder = zip.folder("watermarked_images"); const offCanvas = document.createElement('canvas'); const offCtx = offCanvas.getContext('2d'); const ext = state.exportFormat.split('/')[1];
+            try {
+                for (let i = 0; i < targetImages.length; i++) {
+                    const item = targetImages[i]; document.getElementById('processingStatus').innerText = `Processing ${item.name} (${i + 1}/${targetImages.length})`; document.getElementById('progressBar').style.width = `${((i + 1) / targetImages.length) * 100}%`;
+                    const tempIdx = state.activeIndex; state.activeIndex = state.images.indexOf(item); draw(offCtx, 0, 0, item.img); state.activeIndex = tempIdx;
+                    const blob = await new Promise(r => offCanvas.toBlob(r, state.exportFormat, state.exportQuality)); const filename = `${state.filePrefix}${item.name}${state.fileSuffix}.${ext}`; folder.file(filename, blob); await new Promise(r => setTimeout(r, 10));
+                }
+                document.getElementById('processingStatus').innerText = "Compressing ZIP..."; const content = await zip.generateAsync({ type: "blob" }); saveAs(content, `batch_watermark_${Date.now()}.zip`);
+            } catch (e) { console.error(e); alert("Batch export failed."); } finally { document.getElementById('processingOverlay').classList.add('hidden'); document.getElementById('progressBar').style.width = '0'; }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

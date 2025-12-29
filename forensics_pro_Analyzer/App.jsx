@@ -1,0 +1,2231 @@
+/**
+ * FORENSICS PRO Analyzer (v3)
+ *
+ * This advanced, single-file React application provides a comprehensive suite
+ * of forensic analyses for image authenticity. It's designed to be an all-in-one,
+ * in-browser tool with no server-side processing.
+ *
+ * --- NEW FEATURES (v3) ---
+ * 1.  **Pixel Loupe (Magnifier):** On the "Original" tab, a loupe follows the
+ * mouse showing 10x zoom and exact RGB/Hex pixel values.
+ * 2.  **Color Histogram Visualization:** A new "Histogram" tab renders the
+ * R, G, B, and Luminance distributions on a canvas.
+ * 3.  **JPEG Ghost (Quantization Table Plot):** A new "JPEG Ghost" tab loads
+ * Chart.js to plot the 64 DCT coefficients, a true forensic test for
+ * double-compression and non-standard save operations.
+ * 4.  **Improved Clone Detection:** The algorithm is now more sensitive, using
+ * smaller, overlapping blocks to find more subtle forgeries.
+ *
+ * --- EXISTING FEATURES ---
+ * 1.  Responsive & Themed (Light/Dark mode)
+ * 2.  Robust Metadata Analysis (exifr -> exif-js -> piexifjs waterfall)
+ * 3.  Interactive ELA (Error Level Analysis)
+ * 4.  LSB (Steganography) Analysis
+ * 5.  Noise Analysis & String/Hex Dumping
+ * 6.  JSON Report Generation
+ */
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+
+// --- SVG Icons (kept small for brevity) ---
+const IconUpload = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-6 w-6">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+);
+const IconImage = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>);
+const IconInfo = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>);
+const IconContrast = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><circle cx="12" cy="12" r="10" /><path d="M12 18a6 6 0 0 0 0-12v12z" /></svg>);
+const IconLayers = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>);
+const IconActivity = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>);
+const IconGrid = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>);
+const IconShield = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>);
+const IconDownload = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>);
+const IconString = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="10" x2="20" y2="10" /><line x1="4" y1="14" x2="20" y2="14" /><line x1="4" y1="18" x2="20" y2="18" /></svg>);
+const IconHistogram = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><path d="M3 3v18h18" /><path d="M7 12v6" /><path d="M12 8v10" /><path d="M17 5v13" /></svg>);
+const IconGhost = () => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5"><path d="M12 2a10 10 0 0 0-10 10c0 5 4.5 10 10 10s10-5 10-10A10 10 0 0 0 12 2z" /><path d="M10 16.5a2.5 2.5 0 1 1 5 0" /><path d="M10 10a2 2 0 1 1 4 0 2 2 0 0 1-4 0" /><path d="M16 10a2 2 0 1 0-4 0 2 2 0 0 0 4 0" /></svg>);
+const IconSpinner = () => (<svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-inherit" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>);
+const IconAlert = () => (<svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.332-.266 3.001-1.742 3.001H4.42c-1.476 0-2.492-1.669-1.742-3.001l5.58-9.92zM10 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>);
+const IconCheck = () => (<svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>);
+
+// --- Helper Functions ---
+
+/**
+ * Loads an external script dynamically.
+ * @param {string} src - The URL of the script to load.
+ * @param {number} [timeout=6000] - Timeout in milliseconds.
+ * @returns {Promise<void>} A promise that resolves on load or rejects on error/timeout.
+ */
+const loadScript = (src, timeout = 6000) => {
+  return new Promise((resolve, reject) => {
+    try {
+      if (typeof document === 'undefined') {
+        reject(new Error('Document is unavailable'));
+        return;
+      }
+      // If script is already loaded, resolve immediately
+      if (document.querySelector(`script[src="${src}"]`)) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      let timer = setTimeout(() => {
+        script.onerror = null;
+        script.onload = null;
+        reject(new Error('Script load timeout'));
+      }, timeout);
+      script.onload = () => { clearTimeout(timer); resolve(); };
+      script.onerror = (e) => { clearTimeout(timer); reject(new Error(`Failed to load script: ${src}`)); };
+      document.head.appendChild(script);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+/**
+ * Reads a File object and returns a Data URL.
+ * @param {File} file - The file to read.
+ * @returns {Promise<string>} A promise that resolves with the data URL.
+ */
+const fileToDataURL = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+};
+
+
+/**
+ * Applies a convolution kernel to image data (grayscale).
+ * @param {ImageData} pixels - The source image data.
+ * @param {number} width - Image width.
+ * @param {number} height - Image height.
+ * @param {number[][]} kernel - The convolution kernel (e.g., 3x3 array).
+ * @returns {Float32Array} The convolved pixel data.
+ */
+const convolve = (pixels, width, height, kernel) => {
+  try {
+    const kernelSize = kernel.length;
+    const halfKernel = Math.floor(kernelSize / 2);
+    const src = pixels.data;
+    const sw = pixels.width;
+    const sh = pixels.height;
+    const output = new Float32Array(sw * sh);
+
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        let sum = 0;
+        for (let ky = 0; ky < kernelSize; ky++) {
+          for (let kx = 0; kx < kernelSize; kx++) {
+            const px = Math.min(sw - 1, Math.max(0, x + kx - halfKernel));
+            const py = Math.min(sh - 1, Math.max(0, y + ky - halfKernel));
+            const i = (py * sw + px) * 4;
+            const val = src[i]; // grayscale assumption
+            sum += val * kernel[ky][kx];
+          }
+        }
+        output[y * sw + x] = sum;
+      }
+    }
+    return output;
+  } catch (err) {
+    // Return an empty array smoothly on error
+    return new Float32Array(0);
+  }
+};
+
+/**
+ * Formats metadata values for display (e.g., shutter speed, aperture).
+ * @param {string} key - The metadata tag name.
+ * @param {*} value - The metadata value.
+ * @returns {string} The formatted value.
+ */
+const formatMetadataValue = (key, value) => {
+  if (value === null || typeof value === 'undefined') return 'N/A';
+  if (key === 'ExposureTime' && typeof value === 'number' && value < 1) {
+    return `1/${Math.round(1 / value)}s`;
+  }
+  if (key === 'FNumber' && typeof value === 'number') {
+    return `f/${value.toFixed(1)}`;
+  }
+  if ((String(key).toLowerCase().includes('date') || String(key).toLowerCase().includes('time')) && value instanceof Date) {
+    return value.toLocaleString();
+  }
+  return String(value);
+};
+
+/**
+ * Calculates the SHA-256 hash of a file.
+ * @param {File} file - The file to hash.
+ * @returns {Promise<string>} The hex-encoded hash string or "unavailable".
+ */
+const calculateHash = async (file) => {
+  try {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (err) {
+    return 'unavailable';
+  }
+};
+
+/**
+ * Minimalist JPEG DQT (Quantization Table) parser.
+ * @param {ArrayBuffer} arrayBuffer - The JPEG file buffer.
+ * @returns {{tables: Array, estimatedQuality: number|null}}
+ */
+const parseJpegQuantization = (arrayBuffer) => {
+  try {
+    const view = new DataView(arrayBuffer);
+    let offset = 0;
+    const length = view.byteLength;
+    // Must start with 0xFFD8
+    if (view.getUint8(0) !== 0xFF || view.getUint8(1) !== 0xD8) return { tables: [], estimatedQuality: null };
+
+    offset = 2;
+    const tables = [];
+    while (offset < length) {
+      if (view.getUint8(offset) !== 0xFF) break;
+      const marker = view.getUint8(offset + 1);
+      offset += 2;
+      // EOI
+      if (marker === 0xD9) break;
+      // Standalone markers
+      if (marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) continue;
+      // Read segment length
+      if (offset + 2 > length) break;
+      const segLen = view.getUint16(offset);
+      if (segLen < 2) break;
+      if (marker === 0xDB) { // DQT
+        let pos = offset + 2;
+        const end = pos + segLen - 2;
+        while (pos < end) {
+          const pq_tq = view.getUint8(pos); pos++;
+          const pq = pq_tq >> 4; // precision (0=8bit,1=16bit)
+          const tq = pq_tq & 0x0F; // table ID
+          const table = [];
+          for (let i = 0; i < 64; i++) {
+            if (pq === 0) {
+              if (pos >= length) break;
+              table.push(view.getUint8(pos)); pos++;
+            } else {
+              if (pos + 1 >= length) break;
+              table.push(view.getUint16(pos)); pos += 2;
+            }
+          }
+          if (table.length === 64) {
+            const avg = table.reduce((a, b) => a + b, 0) / table.length;
+            tables.push({ id: tq, precision: pq ? 16 : 8, avg, values: table }); // <-- Store full table
+          }
+        }
+      }
+      offset += segLen;
+    }
+    // Heuristic quality estimation: smaller avg quant => higher quality.
+    let estimatedQuality = null;
+    if (tables.length > 0) {
+      const avgOverall = tables.reduce((a, b) => a + b.avg, 0) / tables.length;
+      // map avgOverall to the roughly inverse quality scale
+      let q = Math.round(Math.max(1, Math.min(100, Math.round(5000 / avgOverall))));
+      estimatedQuality = q;
+    }
+    return { tables, estimatedQuality };
+  } catch (err) {
+    return { tables: [], estimatedQuality: null };
+  }
+};
+
+/**
+ * A hook to detect if the device is mobile based on screen width.
+ * @returns {boolean} True if the screen width is mobile-sized.
+ */
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  return isMobile;
+};
+
+// --- Subcomponents (kept concise) ---
+const TabButton = ({ label, icon, isActive, onClick, badge }) => (
+  <button
+    onClick={onClick}
+    className={`
+      relative flex items-center px-3 sm:px-4 py-3 font-medium text-sm
+      border-b-2 transition-all duration-200
+      whitespace-nowrap
+      ${isActive ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400 hover:border-gray-500 hover:text-gray-200'}
+      dark:text-gray-300 dark:hover:text-gray-100
+      ${isActive ? 'dark:border-blue-400 dark:text-blue-300' : 'dark:border-transparent dark:text-gray-400 dark:hover:border-gray-500 dark:hover:text-gray-200'}
+    `}
+  >
+    <div className="sm:mr-2">{icon}</div>
+    <span className="hidden sm:inline">{label}</span>
+    {badge && (
+      <span className="ml-2 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full animate-pulse">
+        {badge}
+      </span>
+    )}
+  </button>
+);
+
+const ThreatBadge = ({ level }) => {
+  const configs = {
+    critical: { bg: 'bg-red-100 dark:bg-red-900/50', border: 'border-red-500 dark:border-red-700', text: 'text-red-800 dark:text-red-300', label: 'CRITICAL' },
+    high: { bg: 'bg-orange-100 dark:bg-orange-900/50', border: 'border-orange-500 dark:border-orange-700', text: 'text-orange-800 dark:text-orange-300', label: 'HIGH' },
+    medium: { bg: 'bg-yellow-100 dark:bg-yellow-900/50', border: 'border-yellow-500 dark:border-yellow-700', text: 'text-yellow-800 dark:text-yellow-300', label: 'MEDIUM' },
+    low: { bg: 'bg-blue-100 dark:bg-blue-900/50', border: 'border-blue-500 dark:border-blue-700', text: 'text-blue-800 dark:text-blue-300', label: 'LOW' },
+    safe: { bg: 'bg-green-100 dark:bg-green-900/50', border: 'border-green-500 dark:border-green-700', text: 'text-green-800 dark:text-green-300', label: 'SAFE' }
+  };
+  const config = configs[level] || configs.safe;
+  return (
+    <div className={`inline-flex items-center px-3 py-1 rounded-full ${config.bg} border ${config.border}`}>
+      <span className={`text-xs font-bold ${config.text}`}>{config.label}</span>
+    </div>
+  );
+};
+
+const MetadataTable = ({ data, libUsed }) => {
+  const [copied, setCopied] = useState(false);
+  if (!data) return null;
+  if (data.error) return <p className="text-red-500 dark:text-red-400">{data.error}</p>;
+
+  const entries = Object.entries(data);
+  if (entries.length === 0) return <p className="text-gray-600 dark:text-gray-400">No EXIF metadata found in this image.</p>;
+
+  const filteredEntries = entries.filter(([key, value]) => {
+    return key !== 'Thumbnail' && (typeof value !== 'object' || value === null || value.constructor === Object);
+  });
+
+  const copyToClipboard = () => {
+    try {
+      const text = filteredEntries.map(([k, v]) => `${k}: ${formatMetadataValue(k, v)}`).join('\n');
+      // Use the 'execCommand' fallback for clipboard
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";  // Avoid scrolling to bottom
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // noop
+    }
+  };
+
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-2">
+        {libUsed && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 italic px-3 py-1 bg-gray-100 dark:bg-gray-900 rounded-full">
+            Parsed with: {libUsed}
+          </span>
+        )}
+        <button
+          onClick={copyToClipboard}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors"
+        >
+          {copied ? 'Copied!' : 'Copy All'}
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-100 dark:bg-gray-800">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tag</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Value</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800/50 divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredEntries.map(([key, value]) => (
+              <tr key={key} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">{key}</td>
+                <td className="px-6 py-4 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 break-all font-mono text-xs">
+                  {formatMetadataValue(key, value)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const FileDropzone = ({ onFileChange }) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); };
+  const handleDragIn = (e) => { handleDrag(e); if (e.dataTransfer?.items?.length) setIsDragging(true); };
+  const handleDragOut = (e) => { handleDrag(e); setIsDragging(false); };
+  const handleDrop = (e) => { handleDrag(e); setIsDragging(false); if (e.dataTransfer?.files?.length) onFileChange(e.dataTransfer.files); };
+  const handleChange = (e) => { if (e.target?.files?.length) onFileChange(e.target.files); };
+  const triggerFileInput = () => fileInputRef.current?.click();
+
+  return (
+    <div
+      className={`
+        w-full p-10 border-2 border-dashed rounded-xl transition-all duration-300
+        flex flex-col items-center justify-center text-center cursor-pointer
+        ${isDragging ? 
+          'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-105' : 
+          'border-gray-400 bg-gray-50 dark:border-gray-600 dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10'
+        }
+      `}
+      onDragEnter={handleDragIn}
+      onDragLeave={handleDragOut}
+      onDragOver={handleDrag}
+      onDrop={handleDrop}
+      onClick={triggerFileInput}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/tiff"
+        onChange={handleChange}
+        className="hidden"
+      />
+      <div className={`transition-transform duration-300 text-blue-500 dark:text-gray-200 ${isDragging ? 'scale-110' : ''}`}>
+        <IconUpload />
+      </div>
+      <p className="mt-3 text-xl font-bold text-gray-800 dark:text-gray-200">
+        Drop your image here
+      </p>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">or click to browse files</p>
+      <p className="text-xs text-gray-500 dark:text-gray-500 mt-3 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        Supports: JPEG • PNG • WEBP • TIFF
+      </p>
+      <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+        Note: JPEG/JPG files provide the most data (ELA, JPEG Ghost) for analysis.
+      </p>
+    </div>
+  );
+};
+
+const ProgressBar = ({ progress, label }) => (
+  <div className="mb-4">
+    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
+      <span>{label}</span>
+      <span>{progress}%</span>
+    </div>
+    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+      <div
+        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300 ease-out"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  </div>
+);
+
+// --- NEW: Pixel Loupe Component ---
+const PixelLoupe = ({
+  imageSrc,
+  imageCanvas,
+  parentRef,
+  loupeSize = 150,
+  zoomLevel = 10,
+}) => {
+  const [mousePos, setMousePos] = useState(null);
+  const [pixelData, setPixelData] = useState(null);
+  const canvasRef = useRef(null);
+  const loupeSizeHalf = loupeSize / 2;
+  const gridPixelSize = loupeSize / zoomLevel;
+
+  const updateLoupe = useCallback((e) => {
+    if (!parentRef.current || !imageCanvas) return;
+
+    const rect = parentRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Convert view coordinates to image-native coordinates
+    const img = parentRef.current;
+    const nativeX = Math.floor((x / img.clientWidth) * img.naturalWidth);
+    const nativeY = Math.floor((y / img.clientHeight) * img.naturalHeight);
+
+    if (nativeX < 0 || nativeX >= img.naturalWidth || nativeY < 0 || nativeY >= img.naturalHeight) {
+      setMousePos(null);
+      return;
+    }
+
+    setMousePos({ x: e.clientX, y: e.clientY });
+
+    // Update pixel data readout
+    const ctx = imageCanvas.getContext('2d');
+    const p = ctx.getImageData(nativeX, nativeY, 1, 1).data;
+    const toHex = (c) => c.toString(16).padStart(2, '0');
+    setPixelData({
+      rgb: `rgb(${p[0]}, ${p[1]}, ${p[2]})`,
+      hex: `#${toHex(p[0])}${toHex(p[1])}${toHex(p[2])}`,
+      pos: `(x:${nativeX}, y:${nativeY})`,
+    });
+
+    // Update canvas
+    const loupeCtx = canvasRef.current.getContext('2d');
+    loupeCtx.imageSmoothingEnabled = false;
+    loupeCtx.clearRect(0, 0, loupeSize, loupeSize);
+
+    // Calculate source rect
+    const srcSize = loupeSize / zoomLevel;
+    const srcX = nativeX - srcSize / 2;
+    const srcY = nativeY - srcSize / 2;
+
+    // Draw the zoomed-in image
+    loupeCtx.drawImage(
+      imageCanvas,
+      srcX, srcY, srcSize, srcSize, // Source rect
+      0, 0, loupeSize, loupeSize     // Dest rect
+    );
+
+    // Draw grid
+    loupeCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    loupeCtx.lineWidth = 0.5;
+    for (let i = 0; i < zoomLevel; i++) {
+      loupeCtx.beginPath();
+      loupeCtx.moveTo(i * gridPixelSize, 0);
+      loupeCtx.lineTo(i * gridPixelSize, loupeSize);
+      loupeCtx.moveTo(0, i * gridPixelSize);
+      loupeCtx.lineTo(loupeSize, i * gridPixelSize);
+      loupeCtx.stroke();
+    }
+    
+    // Draw center pixel marker
+    loupeCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+    loupeCtx.lineWidth = 2;
+    loupeCtx.strokeRect(loupeSizeHalf - gridPixelSize/2, loupeSizeHalf - gridPixelSize/2, gridPixelSize, gridPixelSize);
+
+  }, [imageCanvas, parentRef, loupeSize, zoomLevel]);
+
+  if (!mousePos) return null;
+
+  return (
+    <div
+      className="fixed pointer-events-none z-50 border-4 border-white dark:border-gray-500 rounded-full shadow-2xl overflow-hidden bg-gray-800"
+      style={{
+        left: mousePos.x - loupeSizeHalf,
+        top: mousePos.y - loupeSizeHalf,
+        width: loupeSize,
+        height: loupeSize,
+      }}
+    >
+      <canvas
+        ref={canvasRef}
+        width={loupeSize}
+        height={loupeSize}
+        className="absolute top-0 left-0"
+      />
+      <div className="absolute bottom-0 left-0 w-full bg-black/60 p-1 text-center text-white font-mono text-xs">
+        <div>{pixelData?.rgb}</div>
+        <div>{pixelData?.hex} {pixelData?.pos}</div>
+      </div>
+    </div>
+  );
+};
+
+// --- NEW: Histogram Chart Component ---
+const HistogramChart = ({ histogramData, isDark }) => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!histogramData || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    const { r, g, b, l } = histogramData;
+    
+    // Find max value for scaling
+    let maxVal = 0;
+    for(let i = 0; i < 256; i++) {
+        maxVal = Math.max(maxVal, r[i], g[i], b[i], l[i]);
+    }
+    
+    ctx.clearRect(0, 0, width, height);
+
+    const drawPath = (data, color) => {
+      ctx.beginPath();
+      ctx.moveTo(0, height);
+      for (let i = 0; i < 256; i++) {
+        const x = (i / 255) * width;
+        const y = height - (data[i] / maxVal) * height;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(width, height);
+      ctx.lineTo(0, height);
+      ctx.fillStyle = color;
+      ctx.fill();
+    };
+    
+    // Draw with transparency
+    drawPath(r, 'rgba(255, 0, 0, 0.7)');
+    drawPath(g, 'rgba(0, 255, 0, 0.7)');
+    drawPath(b, 'rgba(0, 0, 255, 0.7)');
+    
+    // Draw luminance as a line
+    ctx.beginPath();
+    ctx.moveTo(0, height - (l[0] / maxVal) * height);
+    for (let i = 1; i < 256; i++) {
+        const x = (i / 255) * width;
+        const y = height - (l[i] / maxVal) * height;
+        ctx.lineTo(x, y);
+    }
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)';
+    ctx.stroke();
+
+  }, [histogramData, isDark]);
+
+  return <canvas ref={canvasRef} width="512" height="200" className="w-full h-auto" />;
+};
+
+
+// --- Main App ---
+const App = () => {
+  // Core states
+  const [imageFile, setImageFile] = useState(null);
+  const [imageSrc, setImageSrc] = useState(null);
+  const [imageInfo, setImageInfo] = useState({ width: 0, height: 0, size: 0, hash: '' });
+
+  // Metadata / analyses
+  const [metadata, setMetadata] = useState(null);
+  const [metadataAnalysis, setMetadataAnalysis] = useState(null);
+  const [embeddedThumbnail, setEmbeddedThumbnail] = useState(null);
+  const [libUsed, setLibUsed] = useState(null);
+  const [threatLevel, setThreatLevel] = useState('safe');
+
+  const [elaDataUrl, setElaDataUrl] = useState(null);
+  const [elaAmplify, setElaAmplify] = useState(15);
+  const [elaHeatmap, setElaHeatmap] = useState(null);
+
+  const [lsbDataUrls, setLsbDataUrls] = useState(null);
+  const [lsbRatio, setLsbRatio] = useState(null);
+
+  const [noiseDataUrl, setNoiseDataUrl] = useState(null);
+  const [cloneDetection, setCloneDetection] = useState(null);
+  const [colorAnalysis, setColorAnalysis] = useState(null);
+  const [stringAnalysis, setStringAnalysis] = useState(null);
+  const [jgAnalysis, setJgAnalysis] = useState(null); // <-- NEW STATE
+
+  const [jpgAnalysis, setJpgAnalysis] = useState(null); // quant tables and estimated quality
+
+  const [activeTab, setActiveTab] = useState('original');
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentAnalysis, setCurrentAnalysis] = useState('');
+  const [error, setError] = useState(null);
+
+  // toggles
+  const [enableMetadata, setEnableMetadata] = useState(true);
+  const [enableJpegAnalysis, setEnableJpegAnalysis] = useState(true);
+  const [fileDataURL, setFileDataURL] = useState(null);
+
+  // refs
+  const originalCanvasRef = useRef(null);
+  const compressedCanvasRef = useRef(null);
+  const elaCanvasRef = useRef(null);
+  const lsbCanvasRef = useRef(null);
+  const noiseCanvasRef = useRef(null);
+  const cloneCanvasRef = useRef(null);
+  const jgChartRef = useRef(null); // <-- NEW REF
+  const originalImageRef = useRef(null); // <-- NEW REF for loupe
+  const chartInstanceRef = useRef(null); // <-- NEW REF for chart.js
+
+  // Theme state
+  const isMobile = useIsMobile();
+  const theme = isMobile ? 'light' : 'dark';
+
+  // Helpers
+  const calculateThreatLevel = useCallback((analysis = {}) => {
+    try {
+      let score = 0;
+      if (analysis.software) score += 2;
+      if (analysis.dateTimeMismatch) score += 2;
+      if (analysis.inconsistencies && analysis.inconsistencies.length > 0) score += analysis.inconsistencies.length;
+      if (analysis.jpegQuality && analysis.jpegQuality < 70) score += 1;
+      if (analysis.jgSuspicious) score += 3; // <-- New threat
+      if (cloneDetection?.count > 10) score += 2; // <-- Existing
+
+      if (score >= 5) return 'critical';
+      if (score >= 3) return 'high';
+      if (score >= 2) return 'medium';
+      if (score >= 1) return 'low';
+      return 'safe';
+    } catch (err) {
+      return 'safe';
+    }
+  }, [cloneDetection]); // <-- Added cloneDetection dependency
+
+  // Metadata extraction - robust with fallback
+  const extractMetadata = useCallback(async () => {
+    if (!imageFile || !fileDataURL) return;
+    setCurrentAnalysis('Extracting metadata...');
+    setProgress(10);
+    setMetadata(null);
+    setMetadataAnalysis(null);
+    setEmbeddedThumbnail(null); // Reset thumbnail
+    setLibUsed(null);
+
+    if (!enableMetadata) {
+      setCurrentAnalysis('Metadata extraction disabled');
+      setProgress(15);
+      return;
+    }
+
+    let data = null;
+    let analysis = { inconsistencies: [] };
+    let libUsed = 'none';
+
+    // --- 1. Try exifr (Modern, Preferred) ---
+    try {
+      let exifrAvailable = false;
+      try {
+        if (!window.exifr) {
+          await loadScript('https://cdnjs.cloudflare.com/ajax/libs/exifr/7.1.3/exifr.iife.min.js', 7000);
+        }
+        if (window.exifr) exifrAvailable = true;
+      } catch (err) {
+        console.warn('exifr load failed, trying exif-js...');
+      }
+
+      if (exifrAvailable) {
+        data = await window.exifr.parse(imageFile, {
+          thumbnail: true, gps: true, ifd0: true, exif: true, interop: true, iptc: true, xmp: true, icc: true, png: true,
+        });
+        libUsed = 'exifr';
+        if (!data || Object.keys(data).length === 0) {
+           throw new Error('exifr found no data, trying exif-js');
+        }
+      } else {
+        throw new Error('exifr load failed');
+      }
+
+    } catch (exifrError) {
+      // --- 2. Try exif-js (Fallback) ---
+      console.warn(`exifr failed (${exifrError.message}), trying exif-js...`);
+      try {
+        let exifJsAvailable = false;
+        if (!window.EXIF) {
+          await loadScript('https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js', 7000);
+        }
+        if (window.EXIF) exifJsAvailable = true;
+        
+        if (exifJsAvailable) {
+          data = await new Promise((resolve, reject) => {
+            // exif-js needs an <img> element, not a file
+            const imgForExif = new Image();
+            imgForExif.onload = function() {
+              window.EXIF.getData(this, function() {
+                const tags = window.EXIF.getAllTags(this);
+                if (!tags || Object.keys(tags).length === 0) {
+                  return reject(new Error('No EXIF data found by exif-js'));
+                }
+                
+                // Normalize exif-js data
+                const normalizedData = {};
+                normalizedData.Make = tags.Make;
+                normalizedData.Model = tags.Model;
+                normalizedData.Software = tags.Software;
+                normalizedData.ImageWidth = tags.ImageWidth || tags.PixelXDimension;
+                normalizedData.ImageHeight = tags.ImageHeight || tags.PixelYDimension;
+                normalizedData.ExposureTime = tags.ExposureTime;
+                normalizedData.FNumber = tags.FNumber;
+
+                if (tags.DateTimeOriginal) {
+                  const parts = tags.DateTimeOriginal.split(' ');
+                  if (parts.length === 2) {
+                    const datePart = parts[0].replace(/:/g, '-');
+                    normalizedData.DateTimeOriginal = new Date(`${datePart}T${parts[1]}`);
+                  }
+                }
+                if (tags.ModifyDate) {
+                  const parts = tags.ModifyDate.split(' ');
+                  if (parts.length === 2) {
+                    const datePart = parts[0].replace(/:/g, '-');
+                    normalizedData.ModifyDate = new Date(`${datePart}T${parts[1]}`);
+                  }
+                }
+                
+                if (tags.GPSLatitude && tags.GPSLongitude && tags.GPSLatitudeRef && tags.GPSLongitudeRef) {
+                  const lat = tags.GPSLatitude;
+                  const lon = tags.GPSLongitude;
+                  let latitude = (lat[0] + (lat[1] / 60) + (lat[2] / 3600)) * (tags.GPSLatitudeRef === 'S' ? -1 : 1);
+                  let longitude = (lon[0] + (lon[1] / 60) + (lon[2] / 3600)) * (tags.GPSLongitudeRef === 'W' ? -1 : 1);
+                  if (!isNaN(latitude) && !isNaN(longitude)) {
+                    normalizedData.latitude = latitude;
+                    normalizedData.longitude = longitude;
+                  }
+                }
+                resolve(normalizedData);
+              });
+            };
+            imgForExif.onerror = () => reject(new Error('Image load failed for exif-js'));
+            imgForExif.src = fileDataURL;
+          });
+          libUsed = 'exif-js';
+        } else {
+          throw new Error('exif-js load failed');
+        }
+      } catch (exifjsError) {
+        console.warn(`exif-js also failed (${exifjsError.message}), trying piexifjs...`);
+        // --- 3. Try piexifjs (Fallback #2) ---
+        try {
+            let piexifAvailable = false;
+            if (!window.piexif) {
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js', 7000);
+            }
+            if (window.piexif) piexifAvailable = true;
+
+            if (piexifAvailable) {
+                const piexifData = window.piexif.load(fileDataURL);
+
+                const parsePiexifDate = (s) => {
+                    if (!s) return null;
+                    try {
+                        const parts = s.split(' ');
+                        if (parts.length === 2) {
+                            const datePart = parts[0].replace(/:/g, '-');
+                            return new Date(`${datePart}T${parts[1]}`);
+                        }
+                        return null;
+                    } catch(e) { return null; }
+                };
+                
+                const normalized = {};
+                const ifd0 = piexifData['0th'] || {};
+                const exif = piexifData['Exif'] || {};
+                
+                if (ifd0[271]) normalized.Make = ifd0[271];
+                if (ifd0[272]) normalized.Model = ifd0[272];
+                if (ifd0[305]) normalized.Software = ifd0[305];
+                if (ifd0[256]) normalized.ImageWidth = ifd0[256];
+                if (ifd0[257]) normalized.ImageHeight = ifd0[257];
+                if (exif[36867]) normalized.DateTimeOriginal = parsePiexifDate(exif[36867]);
+                if (ifd0[306]) normalized.ModifyDate = parsePiexifDate(ifd0[306]);
+                if (exif[33434]) normalized.ExposureTime = exif[33434][0] / exif[33434][1];
+                if (exif[33437]) normalized.FNumber = (exif[33437][0] / exif[33437][1]);
+
+                if (Object.keys(normalized).length === 0) {
+                    throw new Error('piexifjs found no data');
+                }
+                data = normalized;
+                libUsed = 'piexifjs';
+            } else {
+                throw new Error('piexifjs load failed');
+            }
+        } catch (piexifError) {
+            console.warn(`piexifjs also failed (${piexifError.message}), falling back to JPEG parse...`);
+            // --- 4. Final Fallback (JPEG Quant Tables) ---
+            if (imageFile.type === 'image/jpeg') {
+                try {
+                    const buffer = await imageFile.arrayBuffer();
+                    const jpegInfo = parseJpegQuantization(buffer);
+                    data = { _jpeg_fallback: true, _jpeg_parsed: jpegInfo, info: 'All metadata parsers failed, parsed JPEG structure.' };
+                    libUsed = 'jpeg-parser';
+                } catch (err) {
+                    data = { error: 'All metadata parsers failed.' };
+                }
+            } else {
+                data = { error: `All metadata parsers failed: ${piexifError.message}` };
+            }
+        }
+      }
+    }
+
+    // --- 5. Process whatever data we got ---
+    setMetadata(data || {});
+    setLibUsed(libUsed);
+    setProgress(15);
+
+    if (data && !data.error) {
+        try {
+          const suspiciousSoftware = ['photoshop', 'gimp', 'paintshop', 'pixelmator', 'affinity'];
+          if (data.Software && typeof data.Software === 'string' && suspiciousSoftware.some(s => data.Software.toLowerCase().includes(s))) {
+            analysis.software = data.Software;
+          }
+          if (data.DateTimeOriginal && data.ModifyDate && data.DateTimeOriginal instanceof Date && data.ModifyDate instanceof Date) {
+            const timeDiff = Math.abs(data.DateTimeOriginal.getTime() - data.ModifyDate.getTime());
+            if (timeDiff > 60000) analysis.dateTimeMismatch = true;
+          }
+          if (data.latitude && data.longitude) {
+            analysis.gps = { latitude: data.latitude, longitude: data.longitude };
+          }
+          if (data.Make && data.Model && data.LensMake && data.Make !== data.LensMake) {
+            analysis.inconsistencies.push('Camera and lens manufacturers do not match');
+          }
+          if (data.ImageWidth && data.ExifImageWidth && data.ImageWidth !== data.ExifImageWidth) {
+            analysis.inconsistencies.push('Image width metadata mismatch detected');
+          }
+          if (data.ImageHeight && data.ExifImageHeight && data.ImageHeight !== data.ExifImageHeight) {
+            analysis.inconsistencies.push('Image height metadata mismatch detected');
+          }
+          if (data._jpeg_parsed && data._jpeg_parsed.estimatedQuality) {
+            analysis.jpegQuality = data._jpeg_parsed.estimatedQuality;
+          } else if (data.JPEGQuality) {
+            analysis.jpegQuality = data.JPEGQuality;
+          }
+          
+          // --- Thumbnail logic (ONLY if exifr was used) ---
+          if (libUsed === 'exifr' && data.Thumbnail && data.Thumbnail.buffer) {
+            try {
+              const blob = new Blob([data.Thumbnail.buffer], { type: data.Thumbnail.mime || 'image/jpeg' });
+              const url = URL.createObjectURL(blob);
+              setEmbeddedThumbnail(url);
+            } catch (err) { /* ignore */ }
+          }
+        } catch (err) {
+           analysis.inconsistencies.push(`Analysis error: ${err.message}`);
+        }
+    }
+    
+    setMetadataAnalysis(analysis);
+    setThreatLevel(calculateThreatLevel(analysis));
+    setProgress(20);
+
+  }, [imageFile, fileDataURL, enableMetadata, calculateThreatLevel]);
+
+
+  // ELA - Error Level Analysis (completed UI & safe guards)
+  const performELA = useCallback(() => {
+    try {
+      if (!imageSrc) return;
+      setCurrentAnalysis('Performing Error Level Analysis...');
+      setProgress(30);
+
+      const originalCanvas = originalCanvasRef.current;
+      const compressedCanvas = compressedCanvasRef.current;
+      const elaCanvas = elaCanvasRef.current;
+      if (!originalCanvas || !compressedCanvas || !elaCanvas) {
+        setCurrentAnalysis('ELA skipped (canvas not available)');
+        setProgress(35);
+        return;
+      }
+      const ctxOriginal = originalCanvas.getContext('2d');
+      const ctxCompressed = compressedCanvas.getContext('2d');
+      const ctxEla = elaCanvas.getContext('2d');
+      if (!ctxOriginal || !ctxCompressed || !ctxEla) {
+        setCurrentAnalysis('ELA skipped (2D context not available)');
+        setProgress(35);
+        return;
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const width = img.width;
+          const height = img.height;
+          [originalCanvas, compressedCanvas, elaCanvas].forEach(c => { if (c) { c.width = width; c.height = height; } });
+          
+          // --- IMPORTANT: Draw image to originalCanvas for the LOUPE ---
+          ctxOriginal.drawImage(img, 0, 0, width, height);
+          const originalData = ctxOriginal.getImageData(0, 0, width, height);
+          
+          // Now, continue with ELA
+          const compressedDataUrl = originalCanvas.toDataURL('image/jpeg', 0.9);
+          const compressedImg = new Image();
+          compressedImg.crossOrigin = 'anonymous';
+          compressedImg.onload = () => {
+            try {
+              ctxCompressed.drawImage(compressedImg, 0, 0, width, height);
+              const compressedData = ctxCompressed.getImageData(0, 0, width, height);
+              const elaImageData = ctxEla.createImageData(width, height);
+
+              let maxDiff = 0;
+              const differences = new Float32Array(width * height);
+
+              for (let i = 0; i < originalData.data.length; i += 4) {
+                const r1 = originalData.data[i], g1 = originalData.data[i + 1], b1 = originalData.data[i + 2];
+                const r2 = compressedData.data[i], g2 = compressedData.data[i + 1], b2 = compressedData.data[i + 2];
+                const diffR = Math.abs(r1 - r2);
+                const diffG = Math.abs(g1 - g2);
+                const diffB = Math.abs(b1 - b2);
+                const avgDiff = (diffR + diffG + diffB) / 3;
+                differences[i / 4] = avgDiff;
+                maxDiff = Math.max(maxDiff, avgDiff);
+
+                elaImageData.data[i] = Math.min(255, diffR * elaAmplify);
+                elaImageData.data[i + 1] = Math.min(255, diffG * elaAmplify);
+                elaImageData.data[i + 2] = Math.min(255, diffB * elaAmplify);
+                elaImageData.data[i + 3] = 255;
+              }
+
+              ctxEla.putImageData(elaImageData, 0, 0);
+              try { setElaDataUrl(elaCanvas.toDataURL()); } catch (err) { /* ignore */ }
+
+              // Heatmap generation
+              const heatmapData = ctxEla.createImageData(width, height);
+              if (maxDiff <= 0) {
+                for (let i = 0; i < heatmapData.data.length; i += 4) {
+                  heatmapData.data[i] = 0; heatmapData.data[i + 1] = 0; heatmapData.data[i + 2] = 0; heatmapData.data[i + 3] = 255;
+                }
+              } else {
+                for (let i = 0; i < differences.length; i++) {
+                  const normalized = differences[i] / maxDiff;
+                  const idx = i * 4;
+                  if (normalized < 0.5) {
+                    heatmapData.data[idx] = 0;
+                    heatmapData.data[idx + 1] = Math.floor(normalized * 2 * 255);
+                    heatmapData.data[idx + 2] = 255;
+                  } else {
+                    heatmapData.data[idx] = Math.floor((normalized - 0.5) * 2 * 255);
+                    heatmapData.data[idx + 1] = Math.floor((1 - normalized) * 2 * 255);
+                    heatmapData.data[idx + 2] = 0;
+                  }
+                  heatmapData.data[idx + 3] = 255;
+                }
+              }
+              ctxEla.putImageData(heatmapData, 0, 0);
+              try { setElaHeatmap(elaCanvas.toDataURL()); } catch (err) { /* ignore */ }
+              setProgress(40);
+            } catch (err) {
+              // swallow errors gracefully
+              setProgress(40);
+            }
+          };
+          compressedImg.onerror = () => { setProgress(40); };
+          compressedImg.src = compressedDataUrl;
+        } catch (err) {
+          setProgress(40);
+        }
+      };
+      img.onerror = () => { setProgress(40); };
+      img.src = imageSrc;
+    } catch (err) {
+      // safe fallback
+      setProgress(40);
+    }
+  }, [imageSrc, elaAmplify]);
+
+  // LSB steganalysis (safe)
+  const performSteganalysis = useCallback(() => {
+    try {
+      if (!imageSrc) return;
+      setCurrentAnalysis('Analyzing LSB patterns...');
+      setProgress(45);
+
+      const lsbCanvas = lsbCanvasRef.current;
+      if (!lsbCanvas) { setProgress(50); return; }
+      const ctxLsb = lsbCanvas.getContext('2d', { willReadFrequently: true });
+      if (!ctxLsb) { setProgress(50); return; }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const width = img.width;
+          const height = img.height;
+          lsbCanvas.width = width; lsbCanvas.height = height;
+          ctxLsb.drawImage(img, 0, 0, width, height);
+          const imageData = ctxLsb.getImageData(0, 0, width, height);
+          const data = imageData.data;
+
+          const lsbDataR = ctxLsb.createImageData(width, height);
+          const lsbDataG = ctxLsb.createImageData(width, height);
+          const lsbDataB = ctxLsb.createImageData(width, height);
+
+          let onesCount = 0;
+          let totalBits = 0;
+          const channelOnes = { r: 0, g: 0, b: 0 };
+          const channelTotal = { r: 0, g: 0, b: 0 };
+
+          for (let i = 0; i < data.length; i += 4) {
+            const lsbR = (data[i] & 1) * 255;
+            const lsbG = (data[i + 1] & 1) * 255;
+            const lsbB = (data[i + 2] & 1) * 255;
+
+            lsbDataR.data[i] = lsbR; lsbDataR.data[i + 1] = lsbR; lsbDataR.data[i + 2] = lsbR; lsbDataR.data[i + 3] = 255;
+            lsbDataG.data[i] = lsbG; lsbDataG.data[i + 1] = lsbG; lsbDataG.data[i + 2] = lsbG; lsbDataG.data[i + 3] = 255;
+            lsbDataB.data[i] = lsbB; lsbDataB.data[i + 1] = lsbB; lsbDataB.data[i + 2] = lsbB; lsbDataB.data[i + 3] = 255;
+
+            channelOnes.r += (data[i] & 1);
+            channelOnes.g += (data[i + 1] & 1);
+            channelOnes.b += (data[i + 2] & 1);
+            channelTotal.r++; channelTotal.g++; channelTotal.b++;
+
+            onesCount += (data[i] & 1) + (data[i + 1] & 1) + (data[i + 2] & 1);
+            totalBits += 3;
+          }
+
+          const urls = {};
+          ctxLsb.putImageData(lsbDataR, 0, 0);
+          try { urls.r = lsbCanvas.toDataURL(); } catch (err) { urls.r = null; }
+          ctxLsb.putImageData(lsbDataG, 0, 0);
+          try { urls.g = lsbCanvas.toDataURL(); } catch (err) { urls.g = null; }
+          ctxLsb.putImageData(lsbDataB, 0, 0);
+          try { urls.b = lsbCanvas.toDataURL(); } catch (err) { urls.b = null; }
+          setLsbDataUrls(urls);
+
+          const ratio = totalBits > 0 ? onesCount / totalBits : 0.5;
+          const deviation = Math.abs(ratio - 0.5);
+          const rRatio = channelOnes.r / Math.max(1, channelTotal.r);
+          const gRatio = channelOnes.g / Math.max(1, channelTotal.g);
+          const bRatio = channelOnes.b / Math.max(1, channelTotal.b);
+
+          let analysisText = `Overall LSB ratio: ${ratio.toFixed(4)} (deviation: ${deviation.toFixed(4)})\n`;
+          analysisText += `R: ${rRatio.toFixed(4)} | G: ${gRatio.toFixed(4)} | B: ${bRatio.toFixed(4)}\n\n`;
+
+          if (deviation > 0.1) {
+            analysisText += "⚠️ CRITICAL: Extremely high deviation. Strong steganography indicator.";
+          } else if (deviation > 0.05) {
+            analysisText += "⚠️ WARNING: Moderate deviation. Possible steganography detected.";
+          } else if (deviation > 0.01) {
+            analysisText += "ℹ️ NOTICE: Slight deviation. Unlikely but possible.";
+          } else {
+            analysisText += "✓ CLEAN: Ratio near 0.5. No LSB steganography detected.";
+          }
+
+          setLsbRatio(analysisText);
+          setProgress(50);
+        } catch (err) {
+          setLsbRatio('LSB analysis failed');
+          setProgress(50);
+        }
+      };
+      img.onerror = () => { setProgress(50); };
+      img.src = imageSrc;
+    } catch (err) {
+      setLsbRatio('LSB analysis failed');
+      setProgress(50);
+    }
+  }, [imageSrc]);
+
+  // Noise / convolution based PRNU-like visualization
+  const performNoiseAnalysis = useCallback(() => {
+    try {
+      if (!imageSrc) return;
+      setCurrentAnalysis('Analyzing noise patterns...');
+      setProgress(55);
+
+      const noiseCanvas = noiseCanvasRef.current;
+      if (!noiseCanvas) { setProgress(60); return; }
+      const ctxNoise = noiseCanvas.getContext('2d');
+      if (!ctxNoise) { setProgress(60); return; }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const width = img.width; const height = img.height;
+          noiseCanvas.width = width; noiseCanvas.height = height;
+          ctxNoise.drawImage(img, 0, 0, width, height);
+          const imageData = ctxNoise.getImageData(0, 0, width, height);
+          const data = imageData.data;
+
+          for (let i = 0; i < data.length; i += 4) {
+            const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            data[i] = data[i + 1] = data[i + 2] = gray;
+          }
+
+          const kernel = [
+            [-1, -1, -1],
+            [-1,  8, -1],
+            [-1, -1, -1]
+          ];
+          const convolvedData = convolve(imageData, width, height, kernel);
+
+          const noiseImageData = ctxNoise.createImageData(width, height);
+          for (let i = 0; i < convolvedData.length; i++) {
+            const val = Math.abs(convolvedData[i]);
+            const normalizedVal = Math.min(255, val * 2);
+            const j = i * 4;
+            noiseImageData.data[j] = normalizedVal;
+            noiseImageData.data[j + 1] = normalizedVal;
+            noiseImageData.data[j + 2] = normalizedVal;
+            noiseImageData.data[j + 3] = 255;
+          }
+          ctxNoise.putImageData(noiseImageData, 0, 0);
+          try { setNoiseDataUrl(noiseCanvas.toDataURL()); } catch (err) { /* ignore */ }
+          setProgress(60);
+        } catch (err) {
+          setNoiseDataUrl(null);
+          setProgress(60);
+        }
+      };
+      img.onerror = () => { setProgress(60); };
+      img.src = imageSrc;
+    } catch (err) {
+      setNoiseDataUrl(null);
+      setProgress(60);
+    }
+  }, [imageSrc]);
+
+  // --- IMPROVED Clone Detection ---
+  const performCloneDetection = useCallback(() => {
+    try {
+      if (!imageSrc) return;
+      setCurrentAnalysis('Detecting cloned regions (intensive)...');
+      setProgress(65);
+
+      const cloneCanvas = cloneCanvasRef.current;
+      if (!cloneCanvas) { setProgress(75); return; }
+      const ctx = cloneCanvas.getContext('2d');
+      if (!ctx) { setProgress(75); return; }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          // downscale for performance to a working size
+          const maxDim = 300; // Smaller for faster (but less accurate)
+          let width = img.width, height = img.height;
+          if (Math.max(width, height) > maxDim) {
+            const scale = maxDim / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+          cloneCanvas.width = width; cloneCanvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // More sensitive settings
+          const blockSize = 8;
+          const threshold = 10;
+          const step = 4; // Overlapping blocks
+
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const matches = [];
+
+          for (let y1 = 0; y1 < height - blockSize; y1 += step) {
+            for (let x1 = 0; x1 < width - blockSize; x1 += step) {
+              for (let y2 = y1; y2 < height - blockSize; y2 += step) {
+                for (let x2 = (y2 === y1 ? x1 + blockSize : 0); x2 < width - blockSize; x2 += step) {
+                  
+                  let diff = 0;
+                  let skip = false;
+                  for (let by = 0; by < blockSize; by++) {
+                    for (let bx = 0; bx < blockSize; bx++) {
+                      const i1 = ((y1 + by) * width + (x1 + bx)) * 4;
+                      const i2 = ((y2 + by) * width + (x2 + bx)) * 4;
+                      diff += Math.abs(imageData.data[i1] - imageData.data[i2]);
+                      diff += Math.abs(imageData.data[i1 + 1] - imageData.data[i2 + 1]);
+                      diff += Math.abs(imageData.data[i1 + 2] - imageData.data[i2 + 2]);
+                    }
+                    if (diff / ((by + 1) * blockSize * 3) > threshold) {
+                        skip = true;
+                        break;
+                    }
+                  }
+                  
+                  if (!skip) {
+                      const avgDiff = diff / (blockSize * blockSize * 3);
+                      if (avgDiff < threshold) matches.push({ x1, y1, x2, y2 });
+                  }
+                }
+              }
+            }
+          }
+
+          ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+          ctx.lineWidth = 2;
+          matches.slice(0, 50).forEach(m => { // Limit drawing
+            ctx.strokeRect(m.x1, m.y1, blockSize, blockSize);
+            ctx.strokeRect(m.x2, m.y2, blockSize, blockSize);
+            ctx.beginPath();
+            ctx.moveTo(m.x1 + blockSize / 2, m.y1 + blockSize / 2);
+            ctx.lineTo(m.x2 + blockSize / 2, m.y2 + blockSize / 2);
+            ctx.stroke();
+          });
+
+          setCloneDetection({
+            url: cloneCanvas.toDataURL(),
+            count: matches.length,
+            message: matches.length > 50 ?
+              `⚠️ Found ${matches.length} potential cloned regions (High positive)` :
+              matches.length > 5 ?
+                `ℹ️ Found ${matches.length} similar regions (may be natural)` :
+                '✓ No obvious cloning detected'
+          });
+          setProgress(75);
+        } catch (err) {
+          setCloneDetection({ url: null, count: 0, message: 'Clone detection failed' });
+          setProgress(75);
+        }
+      };
+      img.onerror = () => { setProgress(75); };
+      img.src = imageSrc;
+    } catch (err) {
+      setCloneDetection({ url: null, count: 0, message: 'Clone detection failed' });
+      setProgress(75);
+    }
+  }, [imageSrc]);
+  // --- END IMPROVED CLONE ---
+
+  // --- NEW: Color Analysis (Histogram) ---
+  const performColorAnalysis = useCallback(() => {
+    try {
+      if (!imageSrc) return;
+      setCurrentAnalysis('Analyzing color histogram...');
+      setProgress(80);
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { setProgress(85); return; }
+          canvas.width = img.width; canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+
+          const histogram = { 
+            r: new Array(256).fill(0), 
+            g: new Array(256).fill(0), 
+            b: new Array(256).fill(0),
+            l: new Array(256).fill(0), // Luminance
+          };
+          let rSum = 0, gSum = 0, bSum = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+            histogram.r[r]++;
+            histogram.g[g]++;
+            histogram.b[b]++;
+            // Luma (Y') = 0.299*R + 0.587*G + 0.114*B
+            const luma = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+            histogram.l[luma]++;
+            
+            rSum += r; gSum += g; bSum += b;
+          }
+          const pixelCount = data.length / 4;
+          const avgR = Math.round(rSum / pixelCount);
+          const avgG = Math.round(gSum / pixelCount);
+          const avgB = Math.round(bSum / pixelCount);
+
+          setColorAnalysis({
+            avg: { r: avgR, g: avgG, b: avgB },
+            histogram,
+            message: `Average RGB: (${avgR}, ${avgG}, ${avgB})`
+          });
+          setProgress(85);
+        } catch (err) {
+          setColorAnalysis(null);
+          setProgress(85);
+        }
+      };
+      img.onerror = () => { setProgress(85); };
+      img.src = imageSrc;
+    } catch (err) {
+      setColorAnalysis(null);
+      setProgress(85);
+    }
+  }, [imageSrc]);
+  // --- END COLOR ANALYSIS ---
+
+  // --- NEW: String & Hex Analysis ---
+  const performStringAnalysis = useCallback(async () => {
+    if (!imageFile) return;
+    setCurrentAnalysis('Scanning for strings...');
+    setProgress(90);
+
+    try {
+      const buffer = await imageFile.arrayBuffer();
+      
+      // 1. Hex Dump (First 1KB)
+      const view = new Uint8Array(buffer, 0, 1024);
+      let hexDump = '';
+      for (let i = 0; i < view.length; i += 16) {
+        // Offset
+        hexDump += i.toString(16).padStart(8, '0') + '  ';
+        
+        // Hex bytes
+        let hexBytes = '';
+        for (let j = 0; j < 16; j++) {
+          if (i + j < view.length) {
+            hexBytes += view[i + j].toString(16).padStart(2, '0') + ' ';
+          } else {
+            hexBytes += '   '; // padding
+          }
+          if (j === 7) hexBytes += ' '; // middle space
+        }
+        hexDump += hexBytes + ' ';
+
+        // ASCII chars
+        let asciiChars = '';
+        for (let j = 0; j < 16; j++) {
+          if (i + j < view.length) {
+            const charCode = view[i + j];
+            asciiChars += (charCode >= 32 && charCode <= 126) ? String.fromCharCode(charCode) : '.';
+          }
+        }
+        hexDump += asciiChars + '\n';
+      }
+
+      // 2. Extract Strings (10+ chars)
+      const fullView = new Uint8Array(buffer);
+      const strings = [];
+      let currentString = '';
+      for (let i = 0; i < fullView.length; i++) {
+        const charCode = fullView[i];
+        if (charCode >= 32 && charCode <= 126) { // Printable ASCII
+          currentString += String.fromCharCode(charCode);
+        } else {
+          if (currentString.length >= 10) {
+            strings.push(currentString);
+          }
+          currentString = '';
+        }
+      }
+      if (currentString.length >= 10) {
+        strings.push(currentString);
+      }
+
+      setStringAnalysis({ hex: hexDump, strings: strings });
+      setProgress(92);
+    } catch (err) {
+      setStringAnalysis({ error: 'Failed to read file for string analysis.' });
+      setProgress(92);
+    }
+  }, [imageFile]);
+  // --- END NEW FUNCTION ---
+  
+  // JPEG advanced analysis: parse quant tables and estimate quality
+  const performJpegAnalysis = useCallback(async () => {
+    try {
+      setJpgAnalysis(null);
+      if (!imageFile || !enableJpegAnalysis) return;
+      setCurrentAnalysis('Performing JPEG quantization analysis...');
+      setProgress(25); // Run after metadata
+      if (imageFile.type !== 'image/jpeg') {
+        setJpgAnalysis({ info: 'Not a JPEG, analysis skipped.' });
+        setProgress(30);
+        return;
+      }
+      try {
+        const buffer = await imageFile.arrayBuffer();
+        const result = parseJpegQuantization(buffer);
+        const data = {
+          tables: result.tables, // This now includes the full 'values' array
+          estimatedQuality: result.estimatedQuality,
+          note: result.tables.length === 0 ? 'No quantization tables found or not a standard JPEG' : 'Quantization tables parsed'
+        };
+        setJpgAnalysis(data);
+
+        // Also update metadata analysis with this info
+        setMetadataAnalysis(prev => {
+            const newAnalysis = {...(prev || {inconsistencies: []})};
+            if(result.estimatedQuality) {
+                newAnalysis.jpegQuality = result.estimatedQuality;
+            }
+            // Check for suspicious tables (e.g., all 1s, flat)
+            if(result.tables && result.tables.length > 0) {
+                const firstTableAvg = result.tables[0].avg;
+                if(firstTableAvg < 3 || firstTableAvg > 100) {
+                     newAnalysis.inconsistencies.push('Suspicious JPEG quantization (non-standard).');
+                     newAnalysis.jgSuspicious = true;
+                }
+            }
+            return newAnalysis;
+        });
+        
+        setProgress(30);
+      } catch (err) {
+        setJpgAnalysis({ error: 'Failed to parse JPEG stream' });
+        setProgress(30);
+      }
+    } catch (err) {
+      setJpgAnalysis({ error: 'JPEG analysis failed' });
+      setProgress(30);
+    }
+  }, [imageFile, enableJpegAnalysis]);
+  
+  // --- NEW: JPEG GHOST PLOT ---
+  const performJgAnalysis = useCallback(async () => {
+    if (!jpgAnalysis || !jpgAnalysis.tables || jpgAnalysis.tables.length === 0) {
+        setJgAnalysis({ info: 'No JPEG quantization tables found to plot.' });
+        setProgress(95);
+        return;
+    }
+    setCurrentAnalysis('Plotting JPEG Ghost...');
+    
+    try {
+        // Load Chart.js
+        if (!window.Chart) {
+            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js', 7000);
+        }
+        if (!window.Chart) {
+            throw new Error('Chart.js library failed to load.');
+        }
+
+        const table = jpgAnalysis.tables[0]; // Use the first table (usually Luma)
+        const canvas = jgChartRef.current;
+        if (!canvas) return;
+        
+        // Destroy previous chart instance if it exists
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        const isDark = theme === 'dark';
+        
+        // This is the standard "zigzag" order for reading DCT coefficients
+        const zigzag = [
+             0,  1,  5,  6, 14, 15, 27, 28,
+             2,  4,  7, 13, 16, 26, 29, 42,
+             3,  8, 12, 17, 25, 30, 41, 43,
+             9, 11, 18, 24, 31, 40, 44, 53,
+            10, 19, 23, 32, 39, 45, 52, 54,
+            20, 22, 33, 38, 46, 51, 55, 60,
+            21, 34, 37, 47, 50, 56, 59, 61,
+            35, 36, 48, 49, 57, 58, 62, 63
+        ];
+        
+        const sortedValues = zigzag.map(i => table.values[i]);
+
+        chartInstanceRef.current = new window.Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 64}, (_, i) => i),
+                datasets: [{
+                    label: 'Luminance Table (Zigzag Order)',
+                    data: sortedValues,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                    tension: 0.1,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: isDark ? '#ddd' : '#333' } },
+                    title: { display: true, text: 'DCT Quantization Coefficients', color: isDark ? '#eee' : '#333', font: { size: 16 } }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Coefficient Index (0-63)', color: isDark ? '#bbb' : '#555' },
+                        ticks: { color: isDark ? '#aaa' : '#555' },
+                        grid: { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Quantization Value', color: isDark ? '#bbb' : '#555' },
+                        ticks: { color: isDark ? '#aaa' : '#555' },
+                        grid: { color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
+                    }
+                }
+            }
+        });
+        
+        setJgAnalysis({ info: 'Plot generated.' });
+        setProgress(95);
+
+    } catch (err) {
+        setJgAnalysis({ error: `Failed to plot JPEG Ghost: ${err.message}` });
+        setProgress(95);
+    }
+  }, [jpgAnalysis, theme]);
+  // --- END JPEG GHOST ---
+
+  // Report download (safe)
+  const downloadReport = () => {
+    try {
+      const report = {
+        filename: imageFile?.name,
+        timestamp: new Date().toISOString(),
+        imageInfo,
+        metadata,
+        libUsed,
+        metadataAnalysis,
+        threatLevel,
+        lsbRatio,
+        cloneDetection: cloneDetection?.message,
+        stringAnalysis: stringAnalysis?.strings,
+        jpgAnalysis
+      };
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `forensic-report-${Date.now()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err) {
+      // silent
+    }
+  };
+
+  // File selection handler - safe and robust
+  const handleFileChange = async (files) => {
+    try {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload a valid image file');
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      setActiveTab('original');
+      setProgress(0);
+
+      setImageFile(file);
+      setMetadata(null);
+      setMetadataAnalysis(null);
+      setEmbeddedThumbnail(null);
+      setElaDataUrl(null);
+      setElaHeatmap(null);
+      setLsbDataUrls(null);
+      setLsbRatio(null);
+      setNoiseDataUrl(null);
+      setCloneDetection(null);
+      setColorAnalysis(null);
+      setJpgAnalysis(null);
+      setLibUsed(null);
+      setFileDataURL(null);
+      setStringAnalysis(null);
+      setJgAnalysis(null);
+
+      if (imageSrc) URL.revokeObjectURL(imageSrc);
+      if (embeddedThumbnail) { try { URL.revokeObjectURL(embeddedThumbnail); } catch (err) { } }
+      if (chartInstanceRef.current) {
+          chartInstanceRef.current.destroy();
+          chartInstanceRef.current = null;
+      }
+
+      const url = URL.createObjectURL(file);
+      setImageSrc(url);
+      
+      // Also read file as data URL for piexifjs and exif-js
+      try {
+        const dataUrl = await fileToDataURL(file);
+        setFileDataURL(dataUrl);
+      } catch (err) {
+        setError('Failed to read file for analysis.');
+        setIsLoading(false);
+        return;
+      }
+
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const hash = await calculateHash(file);
+          setImageInfo({
+            width: img.width,
+            height: img.height,
+            size: file.size,
+            hash: (hash && hash.length > 16) ? (hash.substring(0, 16) + '...') : hash
+          });
+          setProgress(5);
+        } catch (err) {
+          setImageInfo({
+            width: img.width,
+            height: img.height,
+            size: file.size,
+            hash: 'unavailable'
+          });
+        } finally {
+          setIsLoading(true);
+        }
+      };
+      img.onerror = () => {
+        setError('Failed to load image preview');
+        setIsLoading(false);
+      };
+      img.src = url;
+    } catch (err) {
+      setError('File processing failed');
+      setIsLoading(false);
+    }
+  };
+
+  // Orchestration: run analyses after imageSrc set
+  useEffect(() => {
+    if (!imageFile || !imageSrc || !fileDataURL) return;
+
+    let cancelled = false;
+    const runAnalyses = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // run in controlled sequence
+        await extractMetadata();     // 10 -> 20
+        await performJpegAnalysis(); // 25 -> 30
+        performELA();                // 30 -> 40
+        performSteganalysis();       // 45 -> 50
+        performNoiseAnalysis();      // 55 -> 60
+        performCloneDetection();     // 65 -> 75
+        performColorAnalysis();      // 80 -> 85
+        await performStringAnalysis(); // 90 -> 92
+        await performJgAnalysis();   // (runs) -> 95
+        
+        // Final threat level update
+        setThreatLevel(lvl => calculateThreatLevel(metadataAnalysis));
+
+      } catch (err) {
+        // swallow and show a friendly message
+        setError('Analysis error occurred (non-fatal).');
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+          setCurrentAnalysis('Analysis complete');
+          setProgress(100);
+        }
+      }
+    };
+    runAnalyses();
+
+    return () => {
+      cancelled = true;
+      if (imageSrc) { try { URL.revokeObjectURL(imageSrc); } catch(e) {} }
+      if (fileDataURL) { /* Data URLs don't need revoking */ }
+      if (embeddedThumbnail) { try { URL.revokeObjectURL(embeddedThumbnail); } catch (err) {} }
+    };
+  }, [imageSrc, fileDataURL]); // Added fileDataURL dependency
+
+  // ELA re-run when amplify changed
+  useEffect(() => {
+    if (imageSrc) performELA();
+  }, [elaAmplify]); // eslint-disable-line
+  
+  // JPEG Ghost re-run when analysis is ready or tab is clicked
+  useEffect(() => {
+    if (activeTab === 'jg' && jpgAnalysis) {
+        performJgAnalysis();
+    }
+  }, [activeTab, jpgAnalysis, performJgAnalysis]);
+
+  // Tabs
+  const tabs = [
+    { id: 'original', label: 'Original', icon: <IconImage />, badge: null },
+    { id: 'metadata', label: 'Metadata', icon: <IconInfo />, badge: metadataAnalysis?.inconsistencies?.length || null },
+    { id: 'ela', label: 'ELA', icon: <IconContrast />, badge: null },
+    { id: 'jg', label: 'JPEG Ghost', icon: <IconGhost />, badge: metadataAnalysis?.jgSuspicious ? '!' : null },
+    { id: 'histogram', label: 'Histogram', icon: <IconHistogram />, badge: null },
+    { id: 'lsb', label: 'LSB', icon: <IconLayers />, badge: null },
+    { id: 'noise', label: 'Noise', icon: <IconActivity />, badge: null },
+    { id: 'clone', label: 'Clone', icon: <IconGrid />, badge: cloneDetection?.count > 50 ? '!' : null },
+    { id: 'strings', label: 'Strings', icon: <IconString />, badge: null },
+    { id: 'report', label: 'Report', icon: <IconShield />, badge: null },
+  ];
+
+  // small utility to download a data URL
+  const downloadDataUrl = (dataUrl, filename) => {
+    try {
+      if (!dataUrl) return;
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      a.click();
+    } catch (err) {
+      // ignore
+    }
+  };
+  
+  // --- LOUPE STATE ---
+  const [showLoupe, setShowLoupe] = useState(false);
+
+  return (
+    <div className={`${theme} font-sans`}>
+      <div className="min-h-screen bg-white dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-black text-gray-800 dark:text-gray-100 p-4 md:p-8">
+        
+        {/* --- LOUPE RENDER --- */}
+        {showLoupe && imageSrc && (
+          <PixelLoupe 
+            imageSrc={imageSrc} 
+            imageCanvas={originalCanvasRef.current} 
+            parentRef={originalImageRef} 
+          />
+        )}
+        
+        <div className="max-w-7xl mx-auto">
+          <header className="mb-8 text-center">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <IconShield className="text-blue-500 dark:text-gray-200" />
+              <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 dark:from-blue-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
+                FORENSICS PRO
+              </h1>
+            </div>
+            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+              Advanced image forensics: metadata, ELA, steganalysis, JPEG diagnostics, noise & clone detection
+            </p>
+          </header>
+
+          {error && (
+            <div className="mb-6 bg-red-100 dark:bg-red-900/50 border-l-4 border-red-500 text-red-700 dark:text-red-100 px-6 py-4 rounded-lg shadow-lg" role="alert">
+              <strong className="font-bold">Notice: </strong>
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="bg-white dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="p-6 md:p-8">
+              <FileDropzone onFileChange={handleFileChange} />
+              <div className="mt-4 flex flex-wrap gap-4 items-center">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <input type="checkbox" className="rounded text-blue-500" checked={enableMetadata} onChange={() => setEnableMetadata(v => !v)} />
+                  Enable Metadata
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <input type="checkbox" className="rounded text-blue-500" checked={enableJpegAnalysis} onChange={() => setEnableJpegAnalysis(v => !v)} />
+                  Enable JPEG Analysis
+                </label>
+                <button
+                  className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded text-sm text-gray-700 dark:text-gray-200"
+                  onClick={downloadReport}
+                  title="Download JSON forensic report"
+                >
+                  <IconDownload />
+                  <span className="hidden sm:inline">Download Report</span>
+                </button>
+              </div>
+            </div>
+
+            {imageSrc && (
+              <div>
+                {isLoading && (
+                  <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
+                    <ProgressBar progress={progress} label={currentAnalysis || 'Running analyses...'} />
+                  </div>
+                )}
+
+                <div className="border-t border-b border-gray-200 dark:border-gray-700 px-2 md:px-6 bg-gray-50 dark:bg-gray-800/30">
+                  <nav className="-mb-px flex flex-wrap" aria-label="Tabs">
+                    {tabs.map(tab => (
+                      <TabButton
+                        key={tab.id}
+                        label={tab.label}
+                        icon={tab.icon}
+                        isActive={activeTab === tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        badge={tab.badge}
+                      />
+                    ))}
+                  </nav>
+                </div>
+
+                <div className="p-4 sm:p-6 md:p-8">
+                  {/* Original */}
+                  <div style={{ display: activeTab === 'original' ? 'block' : 'none' }}>
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-start mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold mb-2">Original Image</h2>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                          <p>📐 Dimensions: {imageInfo.width} × {imageInfo.height}px</p>
+                          <p>📦 Size: {(imageInfo.size / 1024).toFixed(2)} KB</p>
+                          <p>🔐 SHA-256: <span className="font-mono text-xs">{imageInfo.hash}</span></p>
+                          <p className="break-all">📁 File: {imageFile?.name}</p>
+                        </div>
+                      </div>
+                      <div className="text-sm space-x-2 mt-4 sm:mt-0 flex-shrink-0">
+                        <button onClick={() => downloadDataUrl(imageSrc, `original-${imageFile?.name || 'image'}`)} className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded">Download</button>
+                      </div>
+                    </div>
+                    <div 
+                      className="bg-black/5 dark:bg-black/30 p-2 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700"
+                      onMouseEnter={() => setShowLoupe(true)}
+                      onMouseLeave={() => setShowLoupe(false)}
+                    >
+                      <img 
+                        ref={originalImageRef}
+                        src={imageSrc} 
+                        alt="Uploaded" 
+                        className="max-w-full max-h-[70vh] w-auto h-auto mx-auto rounded-lg shadow-2xl cursor-crosshair" 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Metadata */}
+                  <div style={{ display: activeTab === 'metadata' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">EXIF Metadata Analysis</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Comprehensive metadata examination for tampering indicators</p>
+
+                    {enableMetadata ? (
+                      <>
+                        {!metadata && (
+                          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <IconSpinner />
+                            <p>Extracting metadata...</p>
+                          </div>
+                        )}
+                        {metadata && (
+                          <>
+                            <div className="mb-6 bg-gray-50 dark:bg-gradient-to-br dark:from-gray-800 dark:to-gray-900 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+                                <h3 className="font-bold text-xl flex items-center mb-2 sm:mb-0"><IconShield /> Forensic Analysis Summary</h3>
+                                <ThreatBadge level={threatLevel} />
+                              </div>
+                              <div className="space-y-3">
+                                {metadataAnalysis?.software && (
+                                  <div className="flex items-start p-4 bg-yellow-100 dark:bg-yellow-900/50 border-l-4 border-yellow-500 rounded-md">
+                                    <IconActivity className="text-yellow-600 dark:text-yellow-300 flex-shrink-0" />
+                                    <div className="flex-1 ml-3">
+                                      <span className="font-semibold text-yellow-800 dark:text-yellow-300 block mb-1">Editing Software Detected</span>
+                                      <p className="text-sm text-yellow-700 dark:text-yellow-200">Software tag: <strong className="font-mono">{metadataAnalysis.software}</strong></p>
+                                    </div>
+                                  </div>
+                                )}
+                                {metadataAnalysis?.dateTimeMismatch && (
+                                  <div className="flex items-start p-4 bg-orange-100 dark:bg-orange-900/50 border-l-4 border-orange-500 rounded-md">
+                                    <IconActivity className="text-orange-600 dark:text-orange-300 flex-shrink-0" />
+                                    <div className="flex-1 ml-3">
+                                      <span className="font-semibold text-orange-800 dark:text-orange-300 block mb-1">Temporal Inconsistency</span>
+                                      <p className="text-sm text-orange-700 dark:text-orange-200">Creation and modification timestamps don't match.</p>
+                                    </div>
+                                  </div>
+                                )}
+                                {metadataAnalysis?.inconsistencies?.length > 0 && (
+                                  <div className="flex items-start p-4 bg-red-100 dark:bg-red-900/50 border-l-4 border-red-500 rounded-md">
+                                    <IconAlert className="text-red-600 dark:text-red-300 flex-shrink-0" />
+                                    <div className="flex-1 ml-3">
+                                      <span className="font-semibold text-red-800 dark:text-red-300 block mb-1">Metadata Inconsistencies</span>
+                                      <ul className="text-sm text-red-700 dark:text-red-200 list-disc list-inside space-y-1 mt-2">
+                                        {metadataAnalysis.inconsistencies.map((issue, i) => (<li key={i}>{issue}</li>))}
+                                      </ul>
+                                    </div>
+                                  </div>
+                                )}
+                                {!metadataAnalysis?.software && !metadataAnalysis?.dateTimeMismatch && (metadataAnalysis?.inconsistencies?.length || 0) === 0 && (
+                                  <div className="flex items-start p-4 bg-green-100 dark:bg-green-900/50 border-l-4 border-green-500 rounded-md">
+                                    <IconCheck className="text-green-600 dark:text-green-300 flex-shrink-0" />
+                                    <div className="flex-1 ml-3">
+                                      <span className="font-semibold text-green-800 dark:text-green-300 block mb-1">No Obvious Tampering Detected</span>
+                                      <p className="text-sm text-green-700 dark:text-green-200">Metadata appears consistent with an unmodified image.</p>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Embedded Thumbnail section - now conditional! */}
+                            {embeddedThumbnail && (
+                              <div className="mb-6 bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                                <h3 className="font-bold text-lg mb-3 flex items-center"><IconImage /> Embedded Thumbnail Comparison</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">Embedded Thumbnail</p>
+                                    <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700"><img src={embeddedThumbnail} alt="Thumbnail" className="w-full rounded" /></div>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">Scaled Main Image</p>
+                                    <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700"><img src={imageSrc} alt="Main" className="w-full rounded" /></div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                              <h3 className="font-bold text-lg mb-4">Complete Metadata</h3>
+                              <div className="max-h-[60vh] overflow-y-auto">
+                                <MetadataTable data={metadata} libUsed={libUsed} />
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Metadata extraction is disabled via the toggle.</div>
+                    )}
+                  </div>
+
+                  {/* ELA Tab */}
+                  <div style={{ display: activeTab === 'ela' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">Error Level Analysis (ELA)</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Detects regions with different compression levels, indicating potential manipulation.</p>
+
+                    <div className="mb-6 bg-blue-50 dark:bg-gradient-to-br dark:from-blue-900/20 dark:to-purple-900/20 p-4 sm:p-6 rounded-xl border border-blue-200 dark:border-blue-700/30">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+                        <label htmlFor="elaAmplify" className="font-semibold text-lg mb-3 sm:mb-0">
+                          Amplify: <span className="text-sm text-gray-600 dark:text-gray-300 ml-2">{elaAmplify}x</span>
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded" onClick={() => { setElaAmplify(a => Math.max(1, a - 1)); }}>-</button>
+                          <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded" onClick={() => { setElaAmplify(a => Math.min(50, a + 1)); }}>+</button>
+                          <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm" onClick={() => { downloadDataUrl(elaDataUrl, `ela-${imageFile?.name || 'image'}.png`); }}>Download ELA</button>
+                          <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm" onClick={() => { downloadDataUrl(elaHeatmap, `ela-heatmap-${imageFile?.name || 'image'}.png`); }}>Download Heatmap</button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">ELA Visualization</p>
+                          <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <canvas ref={elaCanvasRef} className="w-full" style={{ maxHeight: 480 }} />
+                            {!elaDataUrl && <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 p-4">ELA not ready yet</div>}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">Heatmap</p>
+                          <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            {elaHeatmap ? <img src={elaHeatmap} alt="ELA Heatmap" className="w-full rounded" /> : <div className="text-xs text-gray-500 dark:text-gray-400 p-4">Heatmap not ready</div>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* --- NEW: JPEG GHOST TAB --- */}
+                  <div style={{ display: activeTab === 'jg' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">JPEG Ghost Analysis</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                      Plots the Luminance Quantization Table. A smooth, descending curve is normal.
+                      Flat, zeroed, or spiky curves indicate non-standard saving or double compression.
+                    </p>
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                      {jgAnalysis?.error && <p className="text-red-500 dark:text-red-400">{jgAnalysis.error}</p>}
+                      {jgAnalysis?.info && <p className="text-gray-500 dark:text-gray-400">{jgAnalysis.info}</p>}
+                      {!jgAnalysis && <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <IconSpinner />
+                            <p>Loading JPEG Ghost analysis...</p>
+                      </div>}
+                      <div className="relative h-64 md:h-96">
+                        <canvas ref={jgChartRef}></canvas>
+                      </div>
+                    </div>
+                  </div>
+                  {/* --- END JPEG GHOST --- */}
+                  
+                  {/* --- NEW: HISTOGRAM TAB --- */}
+                  <div style={{ display: activeTab === 'histogram' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">Color Histogram</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                      Visualizes the distribution of R, G, B, and Luminance values.
+                      Spikes or gaps can indicate post-processing or manipulation.
+                    </p>
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                      {colorAnalysis?.histogram ? (
+                        <>
+                          <div className="mb-2 flex justify-center gap-4 text-xs font-mono">
+                              <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[rgba(255,0,0,0.7)] mr-1"></span>Red</span>
+                              <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[rgba(0,255,0,0.7)] mr-1"></span>Green</span>
+                              <span className="flex items-center"><span className="w-3 h-3 rounded-full bg-[rgba(0,0,255,0.7)] mr-1"></span>Blue</span>
+                              <span className="flex items-center"><span className="w-3 h-0.5 bg-black dark:bg-white mr-1"></span>Luma</span>
+                          </div>
+                          <HistogramChart histogramData={colorAnalysis.histogram} isDark={theme === 'dark'} />
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <IconSpinner />
+                            <p>Analyzing histogram...</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* --- END HISTOGRAM --- */}
+
+
+                  {/* LSB */}
+                  <div style={{ display: activeTab === 'lsb' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">LSB (Least Significant Bit) Analysis</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Visualize LSBs for each color plane and evaluate bit distribution.</p>
+
+                    <div className="mb-6 bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2">Red Channel LSB</p>
+                          <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            {/* The LSB canvas is drawn to once, then the images are copied from it */}
+                            <canvas ref={lsbCanvasRef} className="w-full" style={{display: lsbDataUrls?.r ? 'none' : 'block'}} />
+                            {lsbDataUrls?.r ? <img src={lsbDataUrls.r} alt="LSB R" className="w-full rounded" /> : <div className="text-xs text-gray-400 p-4">Not ready</div>}
+                          </div>
+                          <div className="mt-2 flex gap-2">
+                            <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm" onClick={() => downloadDataUrl(lsbDataUrls?.r, `lsb-r-${imageFile?.name}`)}>Download R</button>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2">Green Channel LSB</p>
+                          <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            {lsbDataUrls?.g ? <img src={lsbDataUrls.g} alt="LSB G" className="w-full rounded" /> : <div className="text-xs text-gray-400 p-4">Not ready</div>}
+                          </div>
+                          <div className="mt-2 flex gap-2">
+                            <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm" onClick={() => downloadDataUrl(lsbDataUrls?.g, `lsb-g-${imageFile?.name}`)}>Download G</button>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2">Blue Channel LSB</p>
+                          <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            {lsbDataUrls?.b ? <img src={lsbDataUrls.b} alt="LSB B" className="w-full rounded" /> : <div className="text-xs text-gray-400 p-4">Not ready</div>}
+                          </div>
+                          <div className="mt-2 flex gap-2">
+                            <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm" onClick={() => downloadDataUrl(lsbDataUrls?.b, `lsb-b-${imageFile?.name}`)}>Download B</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 bg-gray-100 dark:bg-gray-900/30 p-3 rounded">
+                        <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{lsbRatio || 'LSB analysis not completed yet.'}</pre>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Noise */}
+                  <div style={{ display: activeTab === 'noise' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">Noise / PRNU-like Analysis</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Noise residual highlights sensor pattern / tampering.</p>
+
+                    <div className="mb-6 bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2">Noise Visualization</p>
+                          <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            {/* Noise canvas is also hidden after render */}
+                            <canvas ref={noiseCanvasRef} className="w-full" style={{display: noiseDataUrl ? 'none' : 'block'}} />
+                            {noiseDataUrl ? <img src={noiseDataUrl} alt="Noise" className="w-full rounded" /> : <div className="text-xs text-gray-400 p-4">Not ready</div>}
+                          </div>
+                          <div className="mt-2">
+                            <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm" onClick={() => downloadDataUrl(noiseDataUrl, `noise-${imageFile?.name}`)}>Download Noise</button>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2">Clone Detection</p>
+                          <div className="bg-black/5 dark:bg-black/30 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            {cloneDetection?.url ? <img src={cloneDetection.url} alt="Clone" className="w-full rounded" /> : <div className="text-xs text-gray-500 dark:text-gray-400 p-4">{cloneDetection?.message || 'Clone detection not ready'}</div>}
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-600 dark:text-gray-300">{cloneDetection?.message}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clone */}
+                  <div style={{ display: activeTab === 'clone' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">Clone Detection</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                      Potential copy-move forgeries are highlighted. This analysis is slow but sensitive.
+                    </p>
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                      {cloneDetection ? (
+                        <>
+                          <div className="mb-4">
+                            <p className="text-sm text-gray-600 dark:text-gray-300">{cloneDetection.message}</p>
+                          </div>
+                          {cloneDetection.url && <img src={cloneDetection.url} alt="Clone overlay" className="w-full rounded" />}
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <IconSpinner />
+                            <p>Running sensitive clone detection...</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* --- STRING/HEX TAB --- */}
+                  <div style={{ display: activeTab === 'strings' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">String & Hex Analysis</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                      Scans the file for printable strings and provides a hex dump. This can reveal hidden text, scripts, or appended data.
+                    </p>
+                    {stringAnalysis ? (
+                      <div className="space-y-6">
+                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                          <h3 className="font-bold text-lg mb-3">Hex Dump (First 1KB)</h3>
+                          <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-auto font-mono bg-gray-100 dark:bg-gray-900 p-4 rounded-lg">
+                            {stringAnalysis.hex || 'No hex data generated.'}
+                          </pre>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                          <h3 className="font-bold text-lg mb-3">Extracted Strings (10+ Characters)</h3>
+                          <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-auto font-mono bg-gray-100 dark:bg-gray-900 p-4 rounded-lg max-h-[60vh]">
+                            {stringAnalysis.strings && stringAnalysis.strings.length > 0 
+                              ? stringAnalysis.strings.join('\n') 
+                              : 'No printable strings found.'}
+                          </pre>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+                        <IconSpinner />
+                        <p>Scanning file...</p>
+                      </div>
+                    )}
+                  </div>
+                  {/* --- END NEW TAB --- */}
+
+
+                  {/* Report / JPG course */}
+                  <div style={{ display: activeTab === 'report' ? 'block' : 'none' }}>
+                    <h2 className="text-2xl font-bold mb-4">Report & JPG Analysis</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Detailed findings, JPEG quantization, and recommended next steps.</p>
+
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700 mb-6">
+                      <h3 className="font-bold text-lg mb-3">JPEG Analysis</h3>
+                      {enableJpegAnalysis ? (
+                        <>
+                          {jpgAnalysis ? (
+                            <>
+                              <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                <p>{jpgAnalysis.note || jpgAnalysis.info || 'JPEG analysis returned'}</p>
+                                {jpgAnalysis.estimatedQuality && <p>Estimated JPEG Quality: <strong>{jpgAnalysis.estimatedQuality}%</strong></p>}
+                              </div>
+                              {jpgAnalysis.tables && jpgAnalysis.tables.length > 0 && (
+                                <div className="text-xs text-gray-600 dark:text-gray-300">
+                                  <p className="font-semibold">Quantization tables summary:</p>
+                                  <ul className="list-disc list-inside">
+                                    {jpgAnalysis.tables.map((t, i) => (<li key={i}>Table {t.id} (precision {t.precision}-bit) — avg: {Math.round(t.avg)}</li>))}
+                                  </ul>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">JPEG analysis running...</div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-sm text-gray-500 dark:text-gray-400">JPEG analysis disabled</div>
+                      )}
+                    </div>
+
+                    <div className="bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700">
+                      <h3 className="font-bold text-lg mb-3">Summary</h3>
+                      <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-auto">{JSON.stringify({
+                        filename: imageFile?.name,
+                        threat: threatLevel,
+                        metadataSummary: metadataAnalysis,
+                        jpeg: jpgAnalysis?.estimatedQuality ? {quality: jpgAnalysis.estimatedQuality} : jpgAnalysis,
+                        stringsFound: stringAnalysis?.strings?.length || 0,
+                        cloneFound: cloneDetection?.count || 0,
+                      }, null, 2)}</pre>
+                      <div className="mt-4 flex gap-2">
+                        <button className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded text-sm" onClick={downloadReport}>Download JSON Report</button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* offscreen canvases used for processing */}
+        <div style={{ display: 'none' }}>
+          <canvas ref={originalCanvasRef} />
+          <canvas ref={compressedCanvasRef} />
+          <canvas ref={elaCanvasRef} />
+          <canvas ref={lsbCanvasRef} />
+          <canvas ref={noiseCanvasRef} />
+          <canvas ref={cloneCanvasRef} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;

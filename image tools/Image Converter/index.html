@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Convrt.io Pro - Animated</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    screens: {
+                        'xs': '360px',
+                    },
+                    colors: {
+                        slate: { 850: '#151f32', 900: '#0f172a', 950: '#020617' },
+                        indigo: { 450: '#6366f1', 550: '#4f46e5' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'slide-up': 'slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
+                        'slide-down': 'slideDown 0.3s ease-out forwards',
+                        'scale-in': 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+                        'scale-out': 'scaleOut 0.2s ease-in forwards',
+                        'bounce-slight': 'bounceSlight 3s infinite ease-in-out',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'wiggle': 'wiggle 1s ease-in-out infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'spin-slow': 'spin 3s linear infinite',
+                        'bg-pan': 'bgPan 15s linear infinite',
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px) scale(0.98)' },
+                            '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+                        },
+                        slideDown: {
+                            '0%': { opacity: '0', transform: 'translateY(-20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.9) translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+                        },
+                        scaleOut: {
+                            '0%': { opacity: '1', transform: 'scale(1)' },
+                            '100%': { opacity: '0', transform: 'scale(0.95)' },
+                        },
+                        bounceSlight: {
+                            '0%, 100%': { transform: 'translateY(-5%)' },
+                            '50%': { transform: 'translateY(0)' },
+                        },
+                        wiggle: {
+                            '0%, 100%': { transform: 'rotate(-3deg)' },
+                            '50%': { transform: 'rotate(3deg)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        bgPan: {
+                            '0%': { backgroundPosition: '0% 0%' },
+                            '100%': { backgroundPosition: '100% 100%' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #475569;
+        }
+
+        .hide {
+            display: none !important;
+        }
+
+        /* Smooth Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #6366f1;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: translateY(-7px);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dark input[type=range]::-webkit-slider-thumb {
+            background: #818cf8;
+            box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.1), 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: translateY(-7px) scale(1.2);
+            box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.2);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            transition: background 0.3s;
+        }
+
+        .dark input[type=range]::-webkit-slider-runnable-track {
+            background: #334155;
+        }
+
+        /* Animated Background Pattern */
+        .bg-pattern {
+            background-image: radial-gradient(circle, #6366f1 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.05;
+        }
+
+        .dark .bg-pattern {
+            opacity: 0.1;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-500 selection:bg-indigo-500 selection:text-white overflow-x-hidden min-w-[280px]">
+
+    <!-- Background Pattern -->
+    <div class="fixed inset-0 pointer-events-none bg-pattern z-0"></div>
+
+    <!-- Header -->
+    <header
+        class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 sticky top-0 z-40 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-3 xs:px-4 md:px-6 h-12 xs:h-14 md:h-16 flex items-center justify-between">
+            <div id="logo-btn" class="flex items-center gap-2 md:gap-3 cursor-pointer group shrink-0 select-none">
+                <div
+                    class="relative w-7 h-7 xs:w-8 xs:h-8 md:w-10 md:h-10 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+                    <div
+                        class="absolute inset-0 bg-indigo-500/20 dark:bg-indigo-400/20 rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-500">
+                    </div>
+                    <div
+                        class="absolute inset-0 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                        <i data-lucide="zap"
+                            class="w-4 h-4 xs:w-5 xs:h-5 md:w-6 md:h-6 transition-transform group-hover:scale-110"></i>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <span
+                        class="font-bold text-sm xs:text-base md:text-xl tracking-tight leading-none group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">Convrt<span
+                            class="text-indigo-600 dark:text-indigo-400">.io</span></span>
+                    <span
+                        class="hidden md:block text-[9px] font-bold text-indigo-500/80 uppercase tracking-[0.2em] translate-x-0.5">Studio</span>
+                </div>
+            </div>
+            <button id="theme-toggle"
+                class="relative p-1.5 xs:p-2 md:p-2.5 rounded-full bg-slate-100/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-indigo-500 dark:hover:text-indigo-400 hover:shadow-md transition-all duration-300 hover:rotate-[360deg] active:scale-90">
+                <i data-lucide="moon" class="w-4 h-4 xs:w-5 xs:h-5 dark:hidden"></i>
+                <i data-lucide="sun" class="w-4 h-4 xs:w-5 xs:h-5 hidden dark:block"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN VIEW -->
+    <div id="main-view"
+        class="relative z-10 min-h-[calc(100vh-48px)] md:min-h-[calc(100vh-64px)] pb-32 md:pb-12 px-2 xs:px-4 md:px-6 pt-3 xs:pt-4 md:pt-8">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-3 xs:gap-4 md:gap-6 lg:gap-8">
+
+            <!-- LEFT COLUMN -->
+            <div class="md:col-span-7 lg:col-span-8 space-y-3 xs:space-y-4 md:space-y-6">
+
+                <!-- Toolbar -->
+                <div
+                    class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-2.5 xs:p-3 md:p-4 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-800/60 flex flex-col xs:flex-row items-center justify-between gap-3 animate-slide-up hover:shadow-md transition-shadow duration-300">
+                    <div
+                        class="flex items-center gap-2 md:gap-3 w-full sm:w-auto overflow-x-auto no-scrollbar mask-gradient">
+                        <span
+                            class="text-[10px] xs:text-xs md:text-sm font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap uppercase md:normal-case flex items-center gap-1.5">
+                            <i data-lucide="layers" class="w-3.5 h-3.5 md:w-4 md:h-4 text-indigo-500"></i>
+                            <span class="hidden md:inline">Batch Output:</span>
+                            <span class="md:hidden">FMT:</span>
+                        </span>
+                        <div id="format-options-container"
+                            class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl transition-all"></div>
+                    </div>
+
+                    <div class="flex items-center gap-2 self-end xs:self-auto w-full xs:w-auto justify-end">
+                        <button id="btn-toggle-animation"
+                            class="hide group flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[10px] xs:text-xs md:text-sm font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 transition-all hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:scale-105 active:scale-95">
+                            <i data-lucide="play-circle"
+                                class="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:fill-current transition-colors"></i>
+                            <span class="hidden xs:inline">Preview</span> GIF
+                        </button>
+                        <button id="btn-clear-all"
+                            class="hide flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 text-slate-500 hover:text-red-500 bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl text-[10px] xs:text-xs md:text-sm font-bold transition-all hover:scale-105 active:scale-95 group"
+                            title="Clear All">
+                            <i data-lucide="trash-2"
+                                class="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:rotate-12 transition-transform"></i> <span
+                                class="hidden md:inline">Clear</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dropzone -->
+                <div id="dropzone"
+                    class="relative border-3 border-dashed border-slate-300 dark:border-slate-700 rounded-3xl p-4 xs:p-6 md:p-12 text-center cursor-pointer transition-all duration-500 flex flex-col items-center justify-center min-h-[180px] xs:min-h-[220px] md:min-h-[380px] hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/10 group animate-slide-up overflow-hidden"
+                    style="animation-delay: 0.1s;">
+                    <input type="file" id="file-input" class="hidden" multiple accept="image/*">
+
+                    <!-- Background pulses -->
+                    <div
+                        class="absolute inset-0 bg-indigo-500/5 dark:bg-indigo-400/5 rounded-3xl scale-0 group-hover:scale-100 transition-transform duration-500 rounded-full blur-3xl">
+                    </div>
+
+                    <div class="relative z-10 animate-float">
+                        <div
+                            class="w-14 h-14 xs:w-16 xs:h-16 md:w-24 md:h-24 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 rounded-2xl md:rounded-[2rem] flex items-center justify-center shadow-lg shadow-indigo-500/10 mb-3 md:mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                            <i data-lucide="cloud-upload"
+                                class="w-7 h-7 xs:w-8 xs:h-8 md:w-12 md:h-12 group-hover:-translate-y-1 transition-transform duration-300"></i>
+                        </div>
+                    </div>
+                    <h3
+                        class="relative z-10 text-sm xs:text-lg md:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
+                        Drag & Drop Images</h3>
+                    <p
+                        class="relative z-10 text-[10px] xs:text-xs md:text-base text-slate-500 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+                        or click to browse high-res files</p>
+
+                    <div class="mt-4 flex gap-2 opacity-50 group-hover:opacity-80 transition-opacity delay-100">
+                        <span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-mono">JPG</span>
+                        <span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-mono">PNG</span>
+                        <span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-mono">WEBP</span>
+                    </div>
+                </div>
+
+                <!-- File List -->
+                <div id="file-list-container" class="hide space-y-2 xs:space-y-3 md:space-y-4">
+                    <div class="flex items-center justify-between px-2 animate-slide-up">
+                        <h3 id="files-count-label"
+                            class="font-bold text-slate-700 dark:text-slate-300 text-xs xs:text-sm md:text-base flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                            <span id="count-text">0 Files</span>
+                        </h3>
+                        <button id="btn-add-more"
+                            class="group text-[10px] xs:text-xs md:text-sm px-3 py-1.5 md:px-4 md:py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1.5 hover:border-indigo-500 hover:shadow-md transition-all active:scale-95">
+                            <i data-lucide="plus"
+                                class="w-3 h-3 md:w-4 md:h-4 group-hover:rotate-90 transition-transform"></i> Add More
+                        </button>
+                    </div>
+                    <div id="file-list-items" class="space-y-2 xs:space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="lg:col-span-4 md:col-span-5 space-y-3 xs:space-y-4 md:space-y-6">
+                <!-- Settings Card -->
+                <div class="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-4 xs:p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-800/60 sticky top-16 md:top-24 animate-slide-up hover:shadow-lg transition-all duration-300"
+                    style="animation-delay: 0.2s;">
+                    <h3
+                        class="font-bold text-xs xs:text-sm md:text-lg text-slate-900 dark:text-white mb-4 md:mb-6 flex items-center gap-2">
+                        <div class="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-500">
+                            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 md:w-5 md:h-5"></i>
+                        </div>
+                        Global Settings
+                    </h3>
+
+                    <div class="space-y-4 xs:space-y-5 md:space-y-6">
+                        <!-- Quality -->
+                        <div class="group">
+                            <div class="flex justify-between text-[10px] xs:text-xs md:text-sm mb-2">
+                                <span
+                                    class="text-slate-500 dark:text-slate-400 font-medium group-hover:text-indigo-500 transition-colors">Compression
+                                    Quality</span>
+                                <span id="quality-val"
+                                    class="font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded transition-all group-hover:scale-110">90%</span>
+                            </div>
+                            <input type="range" id="quality-slider" min="10" max="100" value="90" class="w-full">
+                        </div>
+
+                        <!-- Resize -->
+                        <div class="relative group">
+                            <i data-lucide="scaling"
+                                class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400 group-hover:text-indigo-500 transition-colors z-10 hidden xs:block"></i>
+                            <select id="resize-select"
+                                class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 xs:pl-9 py-2.5 md:py-3 text-[10px] xs:text-xs md:text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none appearance-none cursor-pointer transition-all hover:border-indigo-300 dark:hover:border-indigo-700">
+                                <option value="1">Original Size (1x)</option>
+                                <option value="0.75">Resize to 75%</option>
+                                <option value="0.5">Resize to 50%</option>
+                                <option value="0.25">Resize to 25%</option>
+                            </select>
+                            <i data-lucide="chevron-down"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors"></i>
+                        </div>
+                    </div>
+
+                    <div
+                        class="h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent my-5 md:my-7">
+                    </div>
+
+                    <div class="space-y-2 md:space-y-3">
+                        <button id="btn-convert" disabled
+                            class="relative w-full py-3 md:py-4 rounded-xl font-bold text-sm xs:text-base md:text-lg flex items-center justify-center gap-2 transition-all bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed overflow-hidden group">
+                            <span class="relative z-10 flex items-center gap-2">Convert Images</span>
+                            <div class="absolute inset-0 bg-indigo-600 opacity-0 transition-opacity" id="btn-bg"></div>
+                        </button>
+
+                        <button id="btn-download-all"
+                            class="hide w-full py-3 md:py-4 rounded-xl font-bold text-sm xs:text-base md:text-lg flex items-center justify-center gap-2 transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:-translate-y-1 active:translate-y-0 active:scale-95">
+                            <i data-lucide="archive" class="w-4 h-4 md:w-5 md:h-5 animate-bounce"></i> Download All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Animation Card -->
+                <div id="animation-card"
+                    class="hide bg-slate-900 rounded-2xl overflow-hidden shadow-xl border border-slate-800 animate-scale-in hover:shadow-2xl transition-shadow duration-300">
+                    <div
+                        class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 backdrop-blur-md">
+                        <span
+                            class="text-[10px] md:text-xs font-bold text-white uppercase ml-1 flex items-center gap-2">
+                            <span class="relative flex h-2 w-2">
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                            </span>
+                            GIF Preview
+                        </span>
+                        <button id="close-anim"
+                            class="text-slate-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"><i
+                                data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                    <div
+                        class="aspect-video bg-black/50 flex items-center justify-center relative backdrop-blur-sm bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiMyNjI2MjYiLz48cGF0aCBkPSJNMCAwSDRWMHoiIGZpbGw9IiMzMzMiLz48cGF0aCBkPSJNMCA0SDRWNHoiIGZpbGw9IiMzMzMiLz48L3N2Zz4=')]">
+                        <img id="anim-image" class="max-h-full max-w-full object-contain shadow-2xl" />
+                        <div
+                            class="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white text-[9px] md:text-[10px] font-mono px-2 py-1 rounded-lg border border-white/10">
+                            <span id="anim-frame-indicator">1/1</span>
+                        </div>
+                    </div>
+                    <div class="p-3 md:p-4 flex items-center gap-3">
+                        <button id="btn-anim-play"
+                            class="p-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white shadow-lg shadow-indigo-500/20 transition-transform active:scale-90"><i
+                                data-lucide="pause" class="w-4 h-4"></i></button>
+                        <div
+                            class="flex-1 flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700/50">
+                            <i data-lucide="gauge" class="w-3.5 h-3.5 text-slate-500 ml-1"></i>
+                            <input id="anim-speed" type="range" min="50" max="1000" step="50" value="200"
+                                class="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDITOR MODAL -->
+    <div id="editor-modal" class="fixed inset-0 z-50 hide flex items-center justify-center">
+        <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity duration-300"
+            id="editor-backdrop"></div>
+
+        <div
+            class="relative w-full h-[100dvh] md:h-[85vh] md:w-[95vw] lg:w-[90vw] lg:max-w-6xl bg-white dark:bg-slate-900 md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-scale-in border border-white/10">
+
+            <!-- Mobile Header -->
+            <div
+                class="md:hidden h-14 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-3 shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md z-20">
+                <div class="flex items-center gap-2">
+                    <button id="btn-cancel-edit-mob" onclick="closeEditor()"
+                        class="p-2 -ml-2 text-slate-500 hover:text-slate-800 dark:hover:text-white active:scale-90 transition-transform">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                    <h3 class="font-bold text-sm dark:text-white">Edit Image</h3>
+                </div>
+                <button id="btn-save-edit-mob" onclick="saveEditorChanges()"
+                    class="px-4 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-lg shadow-lg shadow-indigo-500/20 active:scale-95 transition-transform">
+                    Apply
+                </button>
+            </div>
+
+            <!-- Canvas Area -->
+            <div
+                class="flex-1 relative bg-slate-100 dark:bg-[#050505] overflow-hidden flex items-center justify-center p-4 md:p-8 animate-bg-pan bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PGcmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMzMzMzMzMiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTAgMGgyMHYyMEgwVjB6bTIwIDIwaDIwdjIwSDIwVjIweiIvPjwvZz48L2c+PC9zdmc+')]">
+                <canvas id="editor-canvas"
+                    class="max-w-[95%] max-h-[95%] shadow-2xl border border-slate-200 dark:border-slate-800 rounded-lg transition-all duration-300"></canvas>
+            </div>
+
+            <!-- Tools Panel -->
+            <div
+                class="w-full md:w-80 h-auto md:h-full bg-white dark:bg-slate-900 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 shrink-0 z-20 pb-6 md:pb-0 flex flex-col shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+
+                <!-- Desktop Header -->
+                <div
+                    class="hidden md:flex h-20 border-b border-slate-200 dark:border-slate-800 items-center justify-between px-6 shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+                    <h3 class="font-bold text-lg dark:text-white flex items-center gap-2.5">
+                        <div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl text-indigo-500">
+                            <i data-lucide="sliders" class="w-5 h-5"></i>
+                        </div>
+                        Editor
+                    </h3>
+                    <button onclick="closeEditor()"
+                        class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-all hover:rotate-90">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Tools Scroll -->
+                <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 md:space-y-8">
+
+                    <!-- Transform -->
+                    <div>
+                        <label
+                            class="text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-3 block tracking-widest">Transform</label>
+                        <div
+                            class="flex md:grid md:grid-cols-2 gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0 no-scrollbar">
+                            <button onclick="editorRotate(-90)"
+                                class="flex-shrink-0 w-12 h-12 md:w-auto md:h-auto md:py-4 md:px-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex md:flex-col items-center justify-center md:gap-2 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:border-indigo-200 dark:hover:border-indigo-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95 group">
+                                <i data-lucide="rotate-ccw"
+                                    class="w-5 h-5 md:group-hover:-rotate-90 transition-transform duration-300"></i>
+                                <span class="hidden md:inline text-xs font-medium">Left</span>
+                            </button>
+                            <button onclick="editorRotate(90)"
+                                class="flex-shrink-0 w-12 h-12 md:w-auto md:h-auto md:py-4 md:px-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex md:flex-col items-center justify-center md:gap-2 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:border-indigo-200 dark:hover:border-indigo-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95 group">
+                                <i data-lucide="rotate-cw"
+                                    class="w-5 h-5 md:group-hover:rotate-90 transition-transform duration-300"></i>
+                                <span class="hidden md:inline text-xs font-medium">Right</span>
+                            </button>
+                            <button onclick="editorFlip('h')"
+                                class="flex-shrink-0 w-12 h-12 md:w-auto md:h-auto md:py-4 md:px-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex md:flex-col items-center justify-center md:gap-2 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:border-indigo-200 dark:hover:border-indigo-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95 group">
+                                <i data-lucide="flip-horizontal"
+                                    class="w-5 h-5 group-hover:scale-x-[-1] transition-transform"></i>
+                                <span class="hidden md:inline text-xs font-medium">Flip H</span>
+                            </button>
+                            <button onclick="editorFlip('v')"
+                                class="flex-shrink-0 w-12 h-12 md:w-auto md:h-auto md:py-4 md:px-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex md:flex-col items-center justify-center md:gap-2 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:border-indigo-200 dark:hover:border-indigo-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95 group">
+                                <i data-lucide="flip-vertical"
+                                    class="w-5 h-5 group-hover:scale-y-[-1] transition-transform"></i>
+                                <span class="hidden md:inline text-xs font-medium">Flip V</span>
+                            </button>
+                            <button onclick="resetEditor()"
+                                class="md:col-span-2 flex-shrink-0 px-4 h-12 md:h-auto md:py-3 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-500 text-xs font-bold border border-red-100 dark:border-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all flex items-center justify-center gap-2 group active:scale-95">
+                                <i data-lucide="refresh-ccw"
+                                    class="w-4 h-4 group-hover:-rotate-180 transition-transform duration-500"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sliders -->
+                    <div class="space-y-6">
+                        <label
+                            class="text-[10px] md:text-xs font-bold text-slate-400 uppercase block tracking-widest">Adjustments</label>
+
+                        <div class="space-y-6">
+                            <!-- Brightness -->
+                            <div class="group">
+                                <div
+                                    class="flex justify-between text-xs md:text-sm mb-2 dark:text-slate-300 font-medium group-hover:text-indigo-500 transition-colors">
+                                    <span class="flex items-center gap-2"><i data-lucide="sun"
+                                            class="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
+                                        Brightness</span>
+                                </div>
+                                <input type="range" id="edit-brightness" min="0" max="200" value="100"
+                                    class="w-full h-8">
+                            </div>
+                            <!-- Contrast -->
+                            <div class="group">
+                                <div
+                                    class="flex justify-between text-xs md:text-sm mb-2 dark:text-slate-300 font-medium group-hover:text-indigo-500 transition-colors">
+                                    <span class="flex items-center gap-2"><i data-lucide="contrast"
+                                            class="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
+                                        Contrast</span>
+                                </div>
+                                <input type="range" id="edit-contrast" min="0" max="200" value="100" class="w-full h-8">
+                            </div>
+                            <!-- Blur -->
+                            <div class="group">
+                                <div
+                                    class="flex justify-between text-xs md:text-sm mb-2 dark:text-slate-300 font-medium group-hover:text-indigo-500 transition-colors">
+                                    <span class="flex items-center gap-2"><i data-lucide="droplet"
+                                            class="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
+                                        Blur</span>
+                                </div>
+                                <input type="range" id="edit-blur" min="0" max="10" value="0" step="0.5"
+                                    class="w-full h-8">
+                            </div>
+                            <!-- Grayscale -->
+                            <div class="group">
+                                <div
+                                    class="flex justify-between text-xs md:text-sm mb-2 dark:text-slate-300 font-medium group-hover:text-indigo-500 transition-colors">
+                                    <span class="flex items-center gap-2"><i data-lucide="palette"
+                                            class="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors"></i>
+                                        Grayscale</span>
+                                </div>
+                                <input type="range" id="edit-grayscale" min="0" max="100" value="0" class="w-full h-8">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Desktop Footer -->
+                <div
+                    class="hidden md:block p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
+                    <button onclick="saveEditorChanges()"
+                        class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 group">
+                        <i data-lucide="check" class="w-5 h-5 group-hover:scale-125 transition-transform"></i> Apply
+                        Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast"
+        class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 dark:bg-white/90 backdrop-blur-md text-white dark:text-slate-900 px-6 py-3 rounded-full shadow-2xl -translate-y-32 opacity-0 transition-all duration-500 z-[100] flex items-center gap-3 w-max max-w-[90%] border border-white/10 dark:border-slate-200/20">
+        <div class="bg-green-500 rounded-full p-1"><i id="toast-icon" data-lucide="check"
+                class="w-3.5 h-3.5 text-white"></i></div>
+        <span id="toast-msg" class="font-bold text-sm">Action Complete</span>
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        // --- CONSTANTS & STATE ---
+        const AVAILABLE_FORMATS = [
+            { value: 'image/jpeg', label: 'JPG' },
+            { value: 'image/png', label: 'PNG' },
+            { value: 'image/webp', label: 'WEBP' },
+            { value: 'image/gif', label: 'GIF' }
+        ];
+
+        const state = {
+            files: [],
+            globalFormat: 'image/jpeg',
+            quality: 0.9,
+            resizeScale: 1,
+            isProcessing: false,
+            anim: { visible: false, interval: null, index: 0, speed: 200, playing: true },
+            editor: { activeId: null, rotation: 0, flipH: 1, flipV: 1, brightness: 100, contrast: 100, grayscale: 0, sepia: 0, blur: 0, originalImg: null }
+        };
+
+        // --- DOM ELEMENTS ---
+        const $ = (id) => document.getElementById(id);
+        const dom = {
+            dropzone: $('dropzone'),
+            fileInput: $('file-input'),
+            fileList: $('file-list-items'),
+            container: $('file-list-container'),
+            convertBtn: $('btn-convert'),
+            downloadBtn: $('btn-download-all'),
+            formatOpts: $('format-options-container'),
+            countLabel: $('files-count-label'),
+            qualitySlider: $('quality-slider'),
+            qualityVal: $('quality-val'),
+            resizeSelect: $('resize-select'),
+            modal: $('editor-modal'),
+            canvas: $('editor-canvas'),
+            animCard: $('animation-card'),
+            animImg: $('anim-image'),
+            animPlay: $('btn-anim-play'),
+            animSpeed: $('anim-speed'),
+            themeToggle: $('theme-toggle')
+        };
+
+        // --- INITIALIZATION ---
+        function init() {
+            renderFormatButtons();
+            setupEventListeners();
+            lucide.createIcons();
+
+            if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        function setupEventListeners() {
+            dom.themeToggle.onclick = () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+            };
+
+            dom.dropzone.onclick = () => dom.fileInput.click();
+            $('btn-add-more').onclick = () => dom.fileInput.click();
+            dom.fileInput.onchange = (e) => addFiles(e.target.files);
+
+            dom.dropzone.ondragover = (e) => { e.preventDefault(); dom.dropzone.classList.add('border-indigo-500', 'bg-indigo-50', 'dark:bg-indigo-900/20', 'scale-[1.02]'); };
+            dom.dropzone.ondragleave = (e) => { e.preventDefault(); dom.dropzone.classList.remove('border-indigo-500', 'bg-indigo-50', 'dark:bg-indigo-900/20', 'scale-[1.02]'); };
+            dom.dropzone.ondrop = (e) => {
+                e.preventDefault();
+                dom.dropzone.classList.remove('border-indigo-500', 'bg-indigo-50', 'dark:bg-indigo-900/20', 'scale-[1.02]');
+                addFiles(e.dataTransfer.files);
+            };
+
+            dom.qualitySlider.oninput = (e) => {
+                state.quality = e.target.value / 100;
+                dom.qualityVal.innerText = e.target.value + '%';
+            };
+            dom.resizeSelect.onchange = (e) => state.resizeScale = parseFloat(e.target.value);
+
+            $('btn-clear-all').onclick = clearAll;
+            dom.convertBtn.onclick = processQueue;
+            dom.downloadBtn.onclick = downloadZip;
+
+            $('btn-toggle-animation').onclick = () => {
+                state.anim.visible = !state.anim.visible;
+                if (state.anim.visible) {
+                    dom.animCard.classList.remove('hide');
+                    startAnim();
+                } else {
+                    dom.animCard.classList.add('hide');
+                    stopAnim();
+                }
+            };
+            $('close-anim').onclick = () => {
+                state.anim.visible = false;
+                dom.animCard.classList.add('hide');
+                stopAnim();
+            };
+            dom.animPlay.onclick = toggleAnim;
+            dom.animSpeed.oninput = (e) => {
+                state.anim.speed = parseInt(e.target.value);
+                if (state.anim.playing) startAnim();
+            };
+
+            ['brightness', 'contrast', 'blur', 'grayscale'].forEach(filter => {
+                const el = $(`edit-${filter}`);
+                if (el) {
+                    el.oninput = (e) => {
+                        state.editor[filter] = parseFloat(e.target.value);
+                        drawEditor();
+                    };
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                if (state.editor.activeId) drawEditor();
+            });
+        }
+
+        function addFiles(files) {
+            const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (validFiles.length === 0) return;
+
+            validFiles.forEach((f, index) => {
+                let target = state.globalFormat;
+                if (f.type === target) {
+                    const alt = AVAILABLE_FORMATS.find(fmt => fmt.value !== f.type);
+                    target = alt ? alt.value : 'image/jpeg';
+                }
+
+                state.files.push({
+                    id: crypto.randomUUID(),
+                    file: f,
+                    preview: URL.createObjectURL(f),
+                    name: f.name,
+                    size: f.size,
+                    targetFormat: target,
+                    status: 'pending',
+                    edits: { rotation: 0, flipH: 1, flipV: 1, brightness: 100, contrast: 100, grayscale: 0, sepia: 0, blur: 0 },
+                    animDelay: (index * 0.1)
+                });
+            });
+
+            renderList();
+            showToast('Files added');
+            if (state.anim.visible) startAnim();
+        }
+
+        function clearAll() {
+            state.files = [];
+            state.anim.visible = false;
+            dom.animCard.classList.add('hide');
+            renderList();
+        }
+
+        function renderFormatButtons() {
+            dom.formatOpts.innerHTML = '';
+            AVAILABLE_FORMATS.forEach(opt => {
+                const btn = document.createElement('button');
+                const active = state.globalFormat === opt.value;
+                btn.className = `flex-shrink-0 px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-lg text-[10px] xs:text-[10px] md:text-xs font-bold transition-all duration-300 border ${active ? 'bg-white dark:bg-slate-700 border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 shadow-sm scale-105' : 'border-transparent text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-200'}`;
+                btn.innerText = opt.label;
+                btn.onclick = () => {
+                    state.globalFormat = opt.value;
+                    state.files.forEach(f => {
+                        if (f.file.type !== opt.value) {
+                            f.targetFormat = opt.value;
+                            if (f.status === 'done') f.status = 'pending';
+                        }
+                    });
+                    renderFormatButtons();
+                    renderList();
+                };
+                dom.formatOpts.appendChild(btn);
+            });
+        }
+
+        function renderList() {
+            const list = dom.fileList;
+            list.innerHTML = '';
+
+            if (state.files.length === 0) {
+                dom.dropzone.classList.remove('hide');
+                dom.container.classList.add('hide');
+                $('btn-clear-all').classList.add('hide');
+                $('btn-toggle-animation').classList.add('hide');
+                dom.downloadBtn.classList.add('hide');
+                dom.convertBtn.disabled = true;
+                dom.convertBtn.className = "w-full py-3 md:py-4 rounded-xl font-bold text-sm md:text-lg flex items-center justify-center gap-2 transition-all bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed";
+                dom.convertBtn.innerHTML = `<span class="relative z-10">Convert</span>`;
+                $('count-text').innerText = `0 Files`;
+                return;
+            }
+
+            dom.dropzone.classList.add('hide');
+            dom.container.classList.remove('hide');
+            $('btn-clear-all').classList.remove('hide');
+            if (state.files.length > 1) $('btn-toggle-animation').classList.remove('hide');
+            $('count-text').innerText = `${state.files.length} Files`;
+
+            const hasPending = state.files.some(f => f.status === 'pending');
+            const hasDone = state.files.some(f => f.status === 'done');
+
+            if (state.isProcessing) {
+                dom.convertBtn.disabled = true;
+                dom.convertBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 md:w-5 md:h-5 animate-spin"></i> <span class="relative z-10">Processing...</span>`;
+                dom.convertBtn.className = "w-full py-3 md:py-4 rounded-xl font-bold text-sm md:text-lg flex items-center justify-center gap-2 transition-all bg-indigo-600 text-white cursor-wait opacity-90";
+            } else {
+                dom.convertBtn.disabled = !hasPending && !hasDone;
+                dom.convertBtn.innerHTML = hasPending ? `<span class="relative z-10">Convert Files</span>` : '<span class="relative z-10">Convert Again</span>';
+                dom.convertBtn.className = "group relative w-full py-3 md:py-4 rounded-xl font-bold text-sm md:text-lg flex items-center justify-center gap-2 transition-all bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 cursor-pointer overflow-hidden active:scale-95";
+            }
+
+            if (hasDone && !state.isProcessing) dom.downloadBtn.classList.remove('hide');
+            else dom.downloadBtn.classList.add('hide');
+
+            state.files.forEach(file => {
+                const el = document.createElement('div');
+                el.className = `group bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-2.5 md:p-3 rounded-xl border ${file.status === 'done' ? 'border-green-200 dark:border-green-900/50' : 'border-slate-200 dark:border-slate-800'} flex flex-col xs:flex-row gap-2.5 md:gap-4 items-start xs:items-center shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.01] animate-slide-up`;
+                el.style.animationDelay = `${file.animDelay || 0}s`;
+
+                const allowedFormats = AVAILABLE_FORMATS.filter(fmt => fmt.value !== file.file.type);
+                const opts = allowedFormats.map(fmt => `<option value="${fmt.value}" ${file.targetFormat === fmt.value ? 'selected' : ''}>${fmt.label}</option>`).join('');
+
+                el.innerHTML = `
+                    <div class="flex items-center gap-2.5 md:gap-4 w-full xs:w-auto">
+                        <div class="relative w-10 h-10 md:w-14 md:h-14 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 dark:border-slate-700 group-hover:shadow-md transition-shadow">
+                            <img src="${file.preview}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                            ${file.status === 'done' ? '<div class="absolute inset-0 bg-green-500/20 flex items-center justify-center animate-scale-in"><div class="bg-green-500 rounded-full p-0.5"><i data-lucide="check" class="w-3 h-3 md:w-4 md:h-4 text-white"></i></div></div>' : ''}
+                        </div>
+                        <div class="flex-1 min-w-0 xs:hidden">
+                             <h4 class="font-bold text-[10px] text-slate-800 dark:text-slate-100 truncate">${file.name}</h4>
+                             <span class="text-[9px] text-slate-400 font-mono">${(file.size / 1024).toFixed(0)}KB</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 w-full xs:w-auto min-w-0 hidden xs:block">
+                        <h4 class="font-bold text-[10px] xs:text-xs md:text-sm text-slate-800 dark:text-slate-100 truncate max-w-[120px] xs:max-w-[150px] md:max-w-[200px]">${file.name}</h4>
+                        <div class="flex items-center gap-2 mt-0.5 md:mt-1">
+                             <span class="text-[9px] md:text-xs font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 rounded">${(file.size / 1024).toFixed(0)}KB</span>
+                             <i data-lucide="arrow-right" class="w-3 h-3 text-slate-300"></i>
+                             <div class="relative group/select">
+                                 <select onchange="changeFormat('${file.id}', this.value)" class="text-[9px] md:text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded py-0.5 md:py-1 pl-1.5 md:pl-2 pr-4 md:pr-6 font-bold text-indigo-600 dark:text-indigo-400 focus:ring-0 cursor-pointer appearance-none transition-colors hover:border-indigo-300 dark:hover:border-indigo-700">
+                                    ${opts}
+                                 </select>
+                                 <i data-lucide="chevron-down" class="absolute right-1 md:right-1.5 top-1/2 -translate-y-1/2 w-2 h-2 md:w-3 md:h-3 text-indigo-400 pointer-events-none group-hover/select:translate-y-0.5 transition-transform"></i>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center justify-between w-full xs:w-auto border-t xs:border-0 border-slate-100 dark:border-slate-800 pt-2 xs:pt-0 gap-2">
+                        <div class="xs:hidden relative flex-1">
+                             <select onchange="changeFormat('${file.id}', this.value)" class="w-full text-[10px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded py-1 pl-2 font-bold text-indigo-600 dark:text-indigo-400">
+                                ${opts}
+                             </select>
+                        </div>
+
+                        <div class="flex gap-1 md:gap-2 ml-auto">
+                            <button onclick="openEditor('${file.id}')" class="p-1.5 md:p-2 rounded-lg text-slate-400 hover:text-indigo-600 bg-slate-50 dark:bg-slate-800 border border-transparent hover:border-indigo-100 transition-all hover:scale-110 active:scale-95" title="Edit">
+                                <i data-lucide="wand-2" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                            </button>
+                            ${file.status === 'done' ? `
+                            <button onclick="downloadOne('${file.id}')" class="p-1.5 md:p-2 rounded-lg text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 transition-all hover:scale-110 active:scale-95" title="Download">
+                                <i data-lucide="download" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                            </button>` : ''}
+                            <button onclick="removeFile('${file.id}')" class="p-1.5 md:p-2 rounded-lg text-slate-400 hover:text-red-500 transition-all hover:scale-110 active:scale-95" title="Remove">
+                                <i data-lucide="x" class="w-3.5 h-3.5 md:w-4 md:h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+            lucide.createIcons();
+        }
+
+        // Logic Functions (Unchanged core logic, just styles updated)
+        function hasEdits(file) {
+            const e = file.edits;
+            return e.rotation !== 0 || e.flipH !== 1 || e.flipV !== 1 || e.brightness !== 100 || e.contrast !== 100 || e.blur !== 0 || e.grayscale !== 0;
+        }
+
+        window.changeFormat = (id, val) => {
+            const f = state.files.find(x => x.id === id);
+            if (f) {
+                f.targetFormat = val;
+                if (f.status === 'done') f.status = 'pending';
+                renderList();
+            }
+        };
+
+        window.removeFile = (id) => {
+            const el = document.querySelector(`button[onclick="removeFile('${id}')"]`).closest('.animate-slide-up');
+            if (el) {
+                el.style.transform = 'scale(0.9) translateX(10px)';
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    state.files = state.files.filter(x => x.id !== id);
+                    renderList();
+                }, 200);
+            } else {
+                state.files = state.files.filter(x => x.id !== id);
+                renderList();
+            }
+        };
+
+        async function processQueue() {
+            if (state.files.every(f => f.status === 'done')) {
+                state.files.forEach(f => f.status = 'pending');
+            }
+            state.isProcessing = true;
+            renderList();
+            for (let file of state.files) {
+                if (file.status === 'pending') {
+                    try {
+                        const res = await convertFile(file);
+                        Object.assign(file, res);
+                    } catch (e) { console.error(e); file.status = 'error'; }
+                }
+            }
+            state.isProcessing = false;
+            renderList();
+            showToast('Batch conversion complete!');
+        }
+
+        function convertFile(fileData) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const scale = state.resizeScale;
+                    let w = img.width * scale;
+                    let h = img.height * scale;
+                    const rot = fileData.edits.rotation % 360;
+                    if (Math.abs(rot) === 90 || Math.abs(rot) === 270) { canvas.width = h; canvas.height = w; }
+                    else { canvas.width = w; canvas.height = h; }
+
+                    if (fileData.targetFormat === 'image/jpeg') {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                    ctx.save();
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(rot * Math.PI / 180);
+                    ctx.scale(fileData.edits.flipH, fileData.edits.flipV);
+                    const e = fileData.edits;
+                    ctx.filter = `brightness(${e.brightness}%) contrast(${e.contrast}%) grayscale(${e.grayscale}%) sepia(${e.sepia}%) blur(${e.blur}px)`;
+                    if (Math.abs(rot) === 90 || Math.abs(rot) === 270) ctx.drawImage(img, -h / 2, -w / 2, h, w);
+                    else ctx.drawImage(img, -w / 2, -h / 2, w, h);
+                    ctx.restore();
+
+                    try {
+                        const dataUrl = canvas.toDataURL(fileData.targetFormat, state.quality);
+                        const ext = fileData.targetFormat.split('/')[1].replace('jpeg', 'jpg');
+                        const finalName = fileData.name.substring(0, fileData.name.lastIndexOf('.')) + '.' + ext;
+                        resolve({ dataUrl: dataUrl, status: 'done', finalName: finalName });
+                    } catch (err) { reject(err); }
+                };
+                img.src = fileData.preview;
+            });
+        }
+
+        window.openEditor = (id) => {
+            const file = state.files.find(x => x.id === id);
+            if (!file) return;
+            state.editor.activeId = id;
+            state.editor = { ...state.editor, ...file.edits, originalImg: new Image() };
+            // Set slider values
+            ['brightness', 'contrast', 'blur', 'grayscale'].forEach(k => {
+                const el = $(`edit-${k}`);
+                if (el) el.value = state.editor[k];
+            });
+            state.editor.originalImg.onload = () => {
+                dom.modal.classList.remove('hide');
+                drawEditor();
+            };
+            state.editor.originalImg.src = file.preview;
+        };
+
+        window.editorRotate = (deg) => { state.editor.rotation += deg; drawEditor(); };
+        window.editorFlip = (dir) => { if (dir === 'h') state.editor.flipH *= -1; else state.editor.flipV *= -1; drawEditor(); };
+        window.resetEditor = () => {
+            state.editor.rotation = 0; state.editor.flipH = 1; state.editor.flipV = 1;
+            state.editor.brightness = 100; state.editor.contrast = 100; state.editor.blur = 0; state.editor.grayscale = 0;
+            $('edit-brightness').value = 100; $('edit-contrast').value = 100; $('edit-blur').value = 0; $('edit-grayscale').value = 0;
+            drawEditor();
+        };
+
+        function drawEditor() {
+            const canvas = dom.canvas;
+            const ctx = canvas.getContext('2d');
+            const img = state.editor.originalImg;
+            const e = state.editor;
+            const parent = canvas.parentElement;
+
+            const maxW = parent.clientWidth;
+            const maxH = parent.clientHeight;
+
+            const rot = Math.abs(e.rotation % 180);
+            const isVertical = rot === 90;
+            const boxW = isVertical ? img.height : img.width;
+            const boxH = isVertical ? img.width : img.height;
+
+            let scale = Math.min(maxW / boxW, maxH / boxH) * 0.9;
+
+            canvas.width = boxW * scale;
+            canvas.height = boxH * scale;
+
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(e.rotation * Math.PI / 180);
+            ctx.scale(e.flipH * scale, e.flipV * scale);
+            ctx.filter = `brightness(${e.brightness}%) contrast(${e.contrast}%) grayscale(${e.grayscale}%) sepia(${e.sepia}%) blur(${e.blur}px)`;
+            ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            ctx.restore();
+        }
+
+        function closeEditor() { dom.modal.classList.add('hide'); state.editor.activeId = null; }
+
+        function saveEditorChanges() {
+            const file = state.files.find(x => x.id === state.editor.activeId);
+            if (file) {
+                file.edits = {
+                    rotation: state.editor.rotation, flipH: state.editor.flipH, flipV: state.editor.flipV,
+                    brightness: state.editor.brightness, contrast: state.editor.contrast,
+                    grayscale: state.editor.grayscale, sepia: state.editor.sepia, blur: state.editor.blur
+                };
+                if (file.status === 'done') file.status = 'pending';
+                renderList();
+                showToast('Applied Changes');
+            }
+            closeEditor();
+        }
+
+        window.downloadOne = (id) => {
+            const f = state.files.find(x => x.id === id);
+            if (f && f.dataUrl) saveAs(f.dataUrl, f.finalName);
+        };
+
+        async function downloadZip() {
+            const zip = new JSZip();
+            let count = 0;
+            state.files.forEach(f => {
+                if (f.status === 'done' && f.dataUrl) {
+                    zip.file(f.finalName, f.dataUrl.split(',')[1], { base64: true });
+                    count++;
+                }
+            });
+            if (count > 0) {
+                const content = await zip.generateAsync({ type: "blob" });
+                saveAs(content, "converted_images.zip");
+            }
+        }
+
+        function startAnim() {
+            clearInterval(state.anim.interval);
+            if (state.files.length === 0) return;
+            state.anim.playing = true;
+            dom.animPlay.innerHTML = `<i data-lucide="pause" class="w-3 h-3 md:w-4 md:h-4"></i>`;
+            state.anim.interval = setInterval(() => {
+                state.anim.index = (state.anim.index + 1) % state.files.length;
+                dom.animImg.src = state.files[state.anim.index].preview;
+                $('anim-frame-indicator').innerText = `${state.anim.index + 1}/${state.files.length}`;
+            }, state.anim.speed);
+        }
+
+        function stopAnim() { clearInterval(state.anim.interval); }
+
+        function toggleAnim() {
+            if (state.anim.playing) {
+                stopAnim(); state.anim.playing = false; dom.animPlay.innerHTML = `<i data-lucide="play" class="w-3 h-3 md:w-4 md:h-4"></i>`;
+            } else { startAnim(); }
+            lucide.createIcons();
+        }
+
+        function showToast(msg) {
+            const t = $('toast'); $('toast-msg').innerText = msg;
+            t.classList.remove('-translate-y-32', 'opacity-0');
+            setTimeout(() => t.classList.add('-translate-y-32', 'opacity-0'), 2500);
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

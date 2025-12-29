@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steganography Studio Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        input[type="file"]::file-selector-button {
+            @apply bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-2 px-4 rounded-lg cursor-pointer transition-all duration-200 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg;
+        }
+        input[type="file"] {
+            @apply text-sm text-gray-400;
+        }
+        button[data-tab-target][aria-selected="true"] {
+            @apply bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg;
+        }
+        button[data-tab-target] {
+            @apply bg-gray-700 text-gray-300;
+        }
+        .glow {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.8); }
+        }
+        .animate-pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        .glass-effect {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        .tooltip {
+            position: relative;
+        }
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-gray-200 min-h-screen flex items-center justify-center p-4 sm:p-6">
+
+    <div class="w-full max-w-4xl glass-effect rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 mx-auto">
+        <!-- Header with Stats -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 mb-3">
+                🔐 Steganography Studio Pro
+            </h1>
+            <p class="text-gray-400 mb-4">Advanced LSB steganography with encryption and compression</p>
+            
+            <!-- Stats Bar -->
+            <div class="grid grid-cols-3 gap-2 sm:gap-4 mt-6">
+                <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                    <div class="text-xl sm:text-2xl font-bold text-blue-400" id="encodedCount">0</div>
+                    <div class="text-xs text-gray-400">Encoded</div>
+                </div>
+                <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                    <div class="text-xl sm:text-2xl font-bold text-green-400" id="decodedCount">0</div>
+                    <div class="text-xs text-gray-400">Decoded</div>
+                </div>
+                <div class="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                    <div class="text-xl sm:text-2xl font-bold text-purple-400" id="capacityDisplay">-</div>
+                    <div class="text-xs text-gray-400">Capacity</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Controls -->
+        <div class="flex rounded-lg bg-gray-800 p-1 mb-6 shadow-lg">
+            <button data-tab-target="#encode-panel" class="tab-btn w-1/2 py-3 rounded-md font-semibold text-sm transition-all duration-200" aria-selected="true">
+                🔒 Encode
+            </button>
+            <button data-tab-target="#decode-panel" class="tab-btn w-1/2 py-3 rounded-md font-semibold text-sm transition-all duration-200" aria-selected="false">
+                🔓 Decode
+            </button>
+        </div>
+
+        <!-- Encode Panel -->
+        <div id="encode-panel" class="space-y-6 slide-in">
+            <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                <span class="text-2xl">📤</span> Encode Your Secret
+            </h2>
+            
+            <!-- Advanced Settings Toggle -->
+            <div class="flex justify-end">
+                <button id="toggleAdvanced" class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                    <span>⚙️</span> Advanced Options
+                </button>
+            </div>
+
+            <!-- Advanced Options (Hidden by default) -->
+            <div id="advancedOptions" class="hidden space-y-4 bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Encryption -->
+                    <div>
+                        <label class="flex items-center gap-2 mb-2">
+                            <input type="checkbox" id="useEncryption" class="w-4 h-4 text-blue-600 rounded">
+                            <span class="text-sm font-medium text-gray-300">🔐 Encrypt Message</span>
+                        </label>
+                        <input type="password" id="encryptionPassword" placeholder="Enter password" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm disabled:opacity-50" disabled>
+                    </div>
+                    <!-- Compression -->
+                    <div>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="useCompression" class="w-4 h-4 text-blue-600 rounded" checked>
+                            <span class="text-sm font-medium text-gray-300">📦 "Compress" Message</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">Uses Base64 to ensure text is safe to encrypt.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cover Image Upload -->
+            <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 transition-all duration-200 hover:border-blue-500">
+                <label for="coverImageInput" class="block text-sm font-semibold text-gray-300 mb-3">
+                    1️⃣ Upload Cover Image
+                </label>
+                <input type="file" id="coverImageInput" accept="image/png, image/jpeg" class="w-full text-gray-300 bg-gray-700 rounded-lg p-2 file:mr-3">
+                <div id="imageInfo" class="text-xs text-gray-500 mt-2 hidden"></div>
+                <div class="mt-4 relative">
+                    <img id="coverPreview" class="rounded-lg hidden max-h-80 mx-auto shadow-xl border border-gray-700" alt="Cover Image Preview" />
+                    <div id="capacityInfo" class="hidden mt-2 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+                        <p class="text-sm text-blue-300">
+                            <span class="font-semibold">Image Capacity:</span> <span id="maxCapacity">-</span>
+                        </p>
+                        <div class="mt-2 bg-gray-800 rounded-full h-2 overflow-hidden">
+                            <div id="capacityBar" class="progress-bar h-full bg-gradient-to-r from-blue-500 to-purple-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secret Message Input -->
+            <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <label for="secretMessageInput" class="block text-sm font-semibold text-gray-300 mb-3">
+                    2️⃣ Your Secret Message
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                    <div class="md:col-span-2">
+                        <textarea id="secretMessageInput" rows="5" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" placeholder="Type your secret message here..."></textarea>
+                        <div class="flex justify-between items-center mt-2 text-xs text-gray-500">
+                            <span>Characters: <span id="charCount" class="text-blue-400">0</span></span>
+                            <span>Bytes: <span id="byteCount" class="text-purple-400">0</span></span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="secretFileInput" class="block text-xs font-medium text-gray-400 mb-2">Or Upload File</label>
+                        <input type="file" id="secretFileInput" accept=".txt" class="w-full text-gray-300 bg-gray-700 rounded-lg p-2 file:mr-2 text-xs">
+                        <button id="clearMessage" class="mt-2 w-full text-xs bg-red-600/20 text-red-400 py-2 rounded-lg hover:bg-red-600/30 transition-colors">
+                            Clear Message
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Encode Button -->
+            <div>
+                <button id="encodeButton" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]">
+                    🚀 Encode and Download
+                </button>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div id="encodeProgress" class="hidden">
+                <div class="bg-gray-800 rounded-full h-3 overflow-hidden">
+                    <div id="encodeProgressBar" class="progress-bar h-full bg-gradient-to-r from-green-500 to-blue-500 animate-pulse-glow" style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-center text-gray-400 mt-2" id="encodeProgressText">Processing...</p>
+            </div>
+            
+            <div id="encodeStatus" class="text-center text-sm min-h-[1.25rem]"></div>
+        </div>
+
+        <!-- Decode Panel -->
+        <div id="decode-panel" class="space-y-6 hidden">
+            <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                <span class="text-2xl">📥</span> Decode Hidden Message
+            </h2>
+
+            <!-- Stego Image Upload -->
+            <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 transition-all duration-200 hover:border-green-500">
+                <label for="stegoImageInput" class="block text-sm font-semibold text-gray-300 mb-3">
+                    1️⃣ Upload Encoded Image
+                </label>
+                <input type="file" id="stegoImageInput" accept="image/png" class="w-full text-gray-300 bg-gray-700 rounded-lg p-2 file:mr-3">
+                <p class="text-xs text-gray-500 mt-2">⚠️ Must be a PNG file created by this tool</p>
+                <img id="stegoPreview" class="mt-4 rounded-lg hidden max-h-80 mx-auto shadow-xl border border-gray-700" alt="Stego Image Preview" />
+            </div>
+
+            <!-- Decryption Password (if needed) -->
+            <div id="decryptionSection" class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <label for="decryptionPassword" class="block text-sm font-semibold text-gray-300 mb-3">
+                    🔑 Decryption Password
+                </label>
+                <input type="password" id="decryptionPassword" placeholder="Enter password if message was encrypted" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:outline-none">
+            </div>
+
+            <!-- Decode Button -->
+            <div>
+                <button id="decodeButton" class="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 hover:from-green-700 hover:to-teal-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]">
+                    🔍 Decode Message
+                </button>
+            </div>
+            
+            <!-- Decoded Message Output -->
+            <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <label for="decodedMessageOutput" class="block text-sm font-semibold text-gray-300">
+                        2️⃣ Decoded Message
+                    </label>
+                    <button id="copyDecoded" class="text-xs bg-blue-600/20 text-blue-400 px-3 py-1 rounded hover:bg-blue-600/30 transition-colors hidden">
+                        📋 Copy
+                    </button>
+                </div>
+                <textarea id="decodedMessageOutput" rows="6" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-green-500 focus:outline-none" readonly placeholder="Your decoded message will appear here..."></textarea>
+                <div id="decodedInfo" class="mt-2 text-xs text-gray-500 hidden"></div>
+            </div>
+
+            <div id="decodeStatus" class="text-center text-sm min-h-[1.25rem]"></div>
+        </div>
+    </div>
+
+    <canvas id="processingCanvas" class="hidden"></canvas>
+    
+    <script>
+        // DOM Elements
+        const tabButtons = document.querySelectorAll('button[data-tab-target]');
+        const tabPanels = [document.getElementById('encode-panel'), document.getElementById('decode-panel')];
+        
+        // Stats
+        let encodedCount = parseInt(localStorage.getItem('encodedCount') || '0');
+        let decodedCount = parseInt(localStorage.getItem('decodedCount') || '0');
+        const encodedCountEl = document.getElementById('encodedCount');
+        const decodedCountEl = document.getElementById('decodedCount');
+        encodedCountEl.textContent = encodedCount;
+        decodedCountEl.textContent = decodedCount;
+        const capacityDisplayEl = document.getElementById('capacityDisplay');
+        
+        // Encode elements
+        const coverImageInput = document.getElementById('coverImageInput');
+        const coverPreview = document.getElementById('coverPreview');
+        const secretMessageInput = document.getElementById('secretMessageInput');
+        const secretFileInput = document.getElementById('secretFileInput');
+        const encodeButton = document.getElementById('encodeButton');
+        const encodeStatus = document.getElementById('encodeStatus');
+        const charCount = document.getElementById('charCount');
+        const byteCount = document.getElementById('byteCount');
+        const clearMessage = document.getElementById('clearMessage');
+        const useEncryption = document.getElementById('useEncryption');
+        const encryptionPassword = document.getElementById('encryptionPassword');
+        const useCompression = document.getElementById('useCompression');
+        const toggleAdvanced = document.getElementById('toggleAdvanced');
+        const advancedOptions = document.getElementById('advancedOptions');
+        const capacityInfo = document.getElementById('capacityInfo');
+        const maxCapacity = document.getElementById('maxCapacity');
+        const capacityBar = document.getElementById('capacityBar');
+        const imageInfo = document.getElementById('imageInfo');
+        const encodeProgress = document.getElementById('encodeProgress');
+        const encodeProgressBar = document.getElementById('encodeProgressBar');
+        const encodeProgressText = document.getElementById('encodeProgressText');
+        
+        // Decode elements
+        const stegoImageInput = document.getElementById('stegoImageInput');
+        const stegoPreview = document.getElementById('stegoPreview');
+        const decodeButton = document.getElementById('decodeButton');
+        const decodedMessageOutput = document.getElementById('decodedMessageOutput');
+        const decodeStatus = document.getElementById('decodeStatus');
+        const copyDecoded = document.getElementById('copyDecoded');
+        const decryptionPassword = document.getElementById('decryptionPassword');
+        const decryptionSection = document.getElementById('decryptionSection');
+        const decodedInfo = document.getElementById('decodedInfo');
+        
+        // Canvas
+        const canvas = document.getElementById('processingCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let currentImageCapacity = 0;
+        const HEADER_BITS = 8 + 32; // 8 for flags, 32 for length
+
+        // --- Utility Functions ---
+        function showStatus(element, message, isError = false) {
+            element.textContent = message;
+            element.className = isError 
+                ? 'text-center text-sm text-red-400 min-h-[1.25rem] slide-in' 
+                : 'text-center text-sm text-green-400 min-h-[1.25rem] slide-in';
+        }
+        
+        function updateProgress(percent, text) {
+            encodeProgressBar.style.width = percent + '%';
+            encodeProgressText.textContent = text;
+        }
+
+        // Simple XOR encryption
+        function encryptDecrypt(text, password) {
+            let result = '';
+            for (let i = 0; i < text.length; i++) {
+                result += String.fromCharCode(text.charCodeAt(i) ^ password.charCodeAt(i % password.length));
+            }
+            return result;
+        }
+
+        // "Compression" (Base64 encoding as in user's code)
+        function compress(str) {
+            return btoa(str); // Base64 encoding
+        }
+        
+        function decompress(str) {
+            return atob(str); // Base64 decoding
+        }
+
+        function loadImageToCanvas(file, previewElement) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    reject(new Error('No file selected.'));
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const imageUrl = e.target.result;
+                    previewElement.src = imageUrl;
+                    previewElement.classList.remove('hidden');
+                    const img = new Image();
+                    img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        resolve(ctx.getImageData(0, 0, canvas.width, canvas.height));
+                    };
+                    img.onerror = () => reject(new Error('Failed to load image.'));
+                    img.src = imageUrl;
+                };
+                reader.onerror = () => reject(new Error('Failed to read file.'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function setLSB(originalValue, bitToEmbed) {
+            if (bitToEmbed === 0) {
+                return originalValue & 0xFE; // ...11111110
+            } else {
+                return originalValue | 0x01; // ...00000001
+            }
+        }
+
+        function getLSB(value) {
+            return value & 1;
+        }
+
+        function updateCapacity() {
+            if (!currentImageCapacity) return;
+            
+            const messageLength = new TextEncoder().encode(secretMessageInput.value).length;
+            const percentage = Math.min((messageLength / currentImageCapacity) * 100, 100);
+            
+            capacityBar.style.width = percentage + '%';
+            
+            if (percentage > 90) {
+                capacityBar.className = 'progress-bar h-full bg-gradient-to-r from-red-500 to-orange-500';
+            } else if (percentage > 70) {
+                capacityBar.className = 'progress-bar h-full bg-gradient-to-r from-yellow-500 to-orange-500';
+            } else {
+                capacityBar.className = 'progress-bar h-full bg-gradient-to-r from-blue-500 to-purple-500';
+            }
+        }
+
+        // --- Event Listeners ---
+        
+        // Tab switching
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetPanelId = button.getAttribute('data-tab-target');
+                
+                tabPanels.forEach(panel => {
+                    if (`#${panel.id}` === targetPanelId) {
+                        panel.classList.remove('hidden');
+                        panel.classList.add('slide-in');
+                    } else {
+                        panel.classList.add('hidden');
+                    }
+                });
+                tabButtons.forEach(btn => {
+                    btn.setAttribute('aria-selected', btn === button);
+                });
+            });
+        });
+
+        // Advanced options toggle
+        toggleAdvanced.addEventListener('click', () => {
+            advancedOptions.classList.toggle('hidden');
+            advancedOptions.classList.add('slide-in');
+        });
+
+        // Encryption toggle
+        useEncryption.addEventListener('change', (e) => {
+            encryptionPassword.disabled = !e.target.checked;
+            if (e.target.checked) {
+                encryptionPassword.focus();
+            }
+        });
+
+        // Character counter
+        secretMessageInput.addEventListener('input', (e) => {
+            const text = e.target.value;
+            charCount.textContent = text.length;
+            byteCount.textContent = new TextEncoder().encode(text).length;
+            updateCapacity();
+        });
+
+        // Clear message
+        clearMessage.addEventListener('click', () => {
+            secretMessageInput.value = '';
+            charCount.textContent = '0';
+            byteCount.textContent = '0';
+            updateCapacity();
+        });
+
+        // Secret file upload
+        secretFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    secretMessageInput.value = event.target.result;
+                    secretMessageInput.dispatchEvent(new Event('input'));
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Cover image upload
+        coverImageInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    const imageData = await loadImageToCanvas(file, coverPreview);
+                    const pixelCount = imageData.width * imageData.height;
+                    // Capacity = (Total Pixels * 3 channels) - Header bits, all divided by 8 bits per byte
+                    const capacityBytes = Math.floor((pixelCount * 3 - HEADER_BITS) / 8);
+                    currentImageCapacity = capacityBytes;
+                    
+                    imageInfo.classList.remove('hidden');
+                    imageInfo.textContent = `📊 ${imageData.width}x${imageData.height} pixels`;
+                    
+                    capacityInfo.classList.remove('hidden');
+                    maxCapacity.textContent = `${capacityBytes.toLocaleString()} bytes (~${(capacityBytes/1024).toFixed(1)} KB)`;
+                    capacityDisplayEl.textContent = `${(capacityBytes/1024).toFixed(1)}KB`;
+                    
+                    updateCapacity();
+                } catch (error) {
+                    console.error('Error loading image:', error);
+                    showStatus(encodeStatus, `Error loading image: ${error.message}`, true);
+                }
+            }
+        });
+
+        // Encode Button
+        encodeButton.addEventListener('click', async () => {
+            showStatus(encodeStatus, '');
+            const coverFile = coverImageInput.files[0];
+            let message = secretMessageInput.value;
+
+            if (!coverFile) {
+                showStatus(encodeStatus, '❌ Please upload a cover image first.', true);
+                return;
+            }
+            if (!message) {
+                showStatus(encodeStatus, '❌ Please enter a secret message.', true);
+                return;
+            }
+            if (useEncryption.checked && !encryptionPassword.value) {
+                showStatus(encodeStatus, '❌ Please enter an encryption password.', true);
+                return;
+            }
+
+            encodeButton.disabled = true;
+            encodeButton.textContent = '⏳ Encoding...';
+            encodeProgress.classList.remove('hidden');
+            updateProgress(10, 'Loading image...');
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Prepare message
+                let processedMessage = message;
+                let flags = 0; // Bit flags: 0001=encrypted, 0010=compressed
+                
+                updateProgress(30, 'Processing message...');
+                
+                if (useCompression.checked) {
+                    processedMessage = compress(processedMessage);
+                    flags |= 2; // Set compressed flag
+                }
+
+                if (useEncryption.checked) {
+                    processedMessage = encryptDecrypt(processedMessage, encryptionPassword.value);
+                    flags |= 1; // Set encrypted flag
+                }
+                
+                updateProgress(50, 'Embedding data...');
+                
+                const imageData = await loadImageToCanvas(coverFile, coverPreview);
+                const pixelData = imageData.data;
+                const messageBytes = new TextEncoder().encode(processedMessage);
+                const totalBitsToEmbed = messageBytes.length * 8;
+                
+                const capacityInBits = (pixelData.length / 4) * 3;
+                const requiredBits = HEADER_BITS + totalBitsToEmbed; // flags + length + message
+                
+                if (requiredBits > capacityInBits) {
+                    throw new Error(`Message too large! Max: ${Math.floor((capacityInBits - HEADER_BITS) / 8)} bytes. Yours: ${messageBytes.length} bytes.`);
+                }
+
+                let dataIndex = 0;
+                
+                // Embed flags (8 bits)
+                for (let i = 0; i < 8; i++) {
+                    const bit = (flags >> (7 - i)) & 1;
+                    while (dataIndex % 4 === 3) dataIndex++; // Skip alpha
+                    pixelData[dataIndex] = setLSB(pixelData[dataIndex], bit);
+                    dataIndex++;
+                }
+                
+                // Embed length (32 bits) - length is of the *processed* message
+                for (let i = 0; i < 32; i++) {
+                    const bit = (totalBitsToEmbed >> (31 - i)) & 1;
+                    while (dataIndex % 4 === 3) dataIndex++; // Skip alpha
+                    pixelData[dataIndex] = setLSB(pixelData[dataIndex], bit);
+                    dataIndex++;
+                }
+
+                updateProgress(70, 'Writing pixels...');
+                
+                // Embed message bytes
+                for (let byte of messageBytes) {
+                    for (let i = 0; i < 8; i++) {
+                        const bit = (byte >> (7 - i)) & 1;
+                        while (dataIndex % 4 === 3) dataIndex++; // Skip alpha
+                        pixelData[dataIndex] = setLSB(pixelData[dataIndex], bit);
+                        dataIndex++;
+                    }
+                }
+                
+                updateProgress(90, 'Generating image...');
+                
+                ctx.putImageData(imageData, 0, 0);
+                const dataUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `stealth-${Date.now()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                updateProgress(100, 'Complete!');
+                
+                encodedCount++;
+                localStorage.setItem('encodedCount', encodedCount.toString());
+                encodedCountEl.textContent = encodedCount;
+                
+                showStatus(encodeStatus, '✅ Encoding successful! Download started.');
+
+            } catch (error) {
+                console.error('Encoding failed:', error);
+                showStatus(encodeStatus, `Error: ${error.message}`, true);
+            } finally {
+                encodeButton.disabled = false;
+                encodeButton.textContent = '🚀 Encode and Download';
+                setTimeout(() => {
+                    encodeProgress.classList.add('hidden');
+                    updateProgress(0, 'Processing...');
+                }, 2000);
+            }
+        });
+
+        // Decode Button
+        decodeButton.addEventListener('click', async () => {
+            showStatus(decodeStatus, '');
+            decodedMessageOutput.value = '';
+            decodedInfo.classList.add('hidden');
+            copyDecoded.classList.add('hidden');
+            const stegoFile = stegoImageInput.files[0];
+            const password = decryptionPassword.value;
+
+            if (!stegoFile) {
+                showStatus(decodeStatus, '❌ Please upload an encoded image.', true);
+                return;
+            }
+            if (stegoFile.type !== 'image/png') {
+                showStatus(decodeStatus, '❌ Invalid file. Only .png files can be decoded.', true);
+                return;
+            }
+
+            decodeButton.disabled = true;
+            decodeButton.textContent = '⏳ Decoding...';
+
+            try {
+                const imageData = await loadImageToCanvas(stegoFile, stegoPreview);
+                const pixelData = imageData.data;
+                const maxBits = (pixelData.length / 4) * 3;
+
+                let dataIndex = 0;
+                let info = [];
+
+                // 1. Extract flags (8 bits)
+                let flags = 0;
+                for (let i = 0; i < 8; i++) {
+                    while (dataIndex % 4 === 3) dataIndex++;
+                    const lsb = getLSB(pixelData[dataIndex]);
+                    flags = (flags << 1) | lsb;
+                    dataIndex++;
+                }
+                
+                const isEncrypted = (flags & 1) === 1;
+                const isCompressed = (flags & 2) === 2;
+                
+                if (isEncrypted) info.push('🔐 Encrypted');
+                if (isCompressed) info.push('📦 Compressed (Base64)');
+
+                if (isEncrypted && !password) {
+                    throw new Error('Message is encrypted, but no password was provided.');
+                }
+                
+                // 2. Extract length (32 bits)
+                let lengthInBits = 0;
+                for (let i = 0; i < 32; i++) {
+                    while (dataIndex % 4 === 3) dataIndex++;
+                    const lsb = getLSB(pixelData[dataIndex]);
+                    lengthInBits = (lengthInBits << 1) | lsb;
+                    dataIndex++;
+                }
+                
+                const totalBitsToExtract = lengthInBits;
+
+                if (totalBitsToExtract <= 0 || totalBitsToExtract > (maxBits - HEADER_BITS)) {
+                    throw new Error('Invalid message length. Is this a valid encoded image?');
+                }
+                if (totalBitsToExtract % 8 !== 0) {
+                    throw new Error('Corrupted data: message length is not a multiple of 8.');
+                }
+                
+                info.push(`📝 Length: ${totalBitsToExtract / 8} bytes`);
+
+                // 3. Extract message bytes
+                const messageBytes = [];
+                let currentByte = 0;
+                for (let i = 0; i < totalBitsToExtract; i++) {
+                    while (dataIndex % 4 === 3) dataIndex++;
+                    const lsb = getLSB(pixelData[dataIndex]);
+                    currentByte = (currentByte << 1) | lsb;
+                    dataIndex++;
+
+                    if ((i + 1) % 8 === 0) {
+                        messageBytes.push(currentByte);
+                        currentByte = 0;
+                    }
+                }
+                
+                // 4. Convert bytes to string
+                let processedMessage = new TextDecoder().decode(new Uint8Array(messageBytes));
+                
+                // 5. De-process message
+                if (isEncrypted) {
+                    processedMessage = encryptDecrypt(processedMessage, password);
+                }
+                
+                if (isCompressed) {
+                    processedMessage = decompress(processedMessage);
+                }
+                
+                // Final check for garbage data (often from wrong password)
+                if (isEncrypted && !isCompressed) {
+                    // Check for non-printable characters if it wasn't compressed
+                    // (b64 would be printable)
+                    if (/[\x00-\x08\x0E-\x1F]/.test(processedMessage)) {
+                         throw new Error('Decryption failed: likely incorrect password.');
+                    }
+                }
+
+                decodedMessageOutput.value = processedMessage;
+                showStatus(decodeStatus, '✅ Decoding successful!');
+                copyDecoded.classList.remove('hidden');
+                decodedInfo.textContent = info.join(' | ');
+                decodedInfo.classList.remove('hidden');
+                
+                decodedCount++;
+                localStorage.setItem('decodedCount', decodedCount.toString());
+                decodedCountEl.textContent = decodedCount;
+
+            } catch (error) {
+                console.error('Decoding failed:', error);
+                // Handle atob fail (wrong password on compressed data)
+                if (error.name === 'InvalidCharacterError') {
+                    showStatus(decodeStatus, '❌ Decryption failed: Incorrect password or corrupted data.', true);
+                } else {
+                    showStatus(decodeStatus, `Error: ${error.message}`, true);
+                }
+            } finally {
+                decodeButton.disabled = false;
+                decodeButton.textContent = '🔍 Decode Message';
+            }
+        });
+
+        // Handle stego image upload preview
+        stegoImageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    stegoPreview.src = event.target.result;
+                    stegoPreview.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Copy decoded message
+        copyDecoded.addEventListener('click', () => {
+            // Use fallback for clipboard API inside sandboxed environments
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = decodedMessageOutput.value;
+                textArea.style.position = 'fixed'; // Avoid scrolling to bottom
+                textArea.style.top = '0';
+                textArea.style.left = '0';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    copyDecoded.textContent = 'Copied!';
+                    setTimeout(() => { copyDecoded.textContent = '📋 Copy'; }, 2000);
+                } else {
+                    throw new Error('Copy command failed');
+                }
+                document.body.removeChild(textArea);
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                showStatus(decodeStatus, 'Could not copy text.', true);
+            }
+        });
+    </script>
+</body>
+</html>
+
+

@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Image Upscaler Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* CRITICAL: Ensure hiding works */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 0 2px #1e293b;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Comparison Slider */
+        .comparison-container {
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .comparison-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            overflow: hidden;
+            border-right: 2px solid white;
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+            transition: width 0.1s ease-out;
+        }
+
+        .slider-handle {
+            position: absolute;
+            top: 50%;
+            right: -18px;
+            width: 36px;
+            height: 36px;
+            background: white;
+            border-radius: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            cursor: col-resize;
+            z-index: 20;
+        }
+
+        .checkerboard {
+            background-color: #1e293b;
+            background-image:
+                linear-gradient(45deg, #334155 25%, transparent 25%),
+                linear-gradient(-45deg, #334155 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #334155 75%),
+                linear-gradient(-45deg, transparent 75%, #334155 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col overflow-hidden selection:bg-indigo-500/30">
+
+    <!-- Top Navigation -->
+    <nav
+        class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md z-30 h-16 flex items-center justify-between px-6 shrink-0 absolute w-full top-0 left-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-2 rounded-lg">
+                <i data-lucide="scan-line" class="w-5 h-5 text-white"></i>
+            </div>
+            <h1 class="font-bold text-xl tracking-tight cursor-pointer">Upscale<span class="text-indigo-500">Pro</span>
+            </h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-xs font-mono text-slate-500 hidden sm:block">v2.3.2</span>
+            <a href="#" class="text-slate-400 hover:text-white transition-colors"><i data-lucide="github"
+                    class="w-5 h-5"></i></a>
+        </div>
+    </nav>
+
+    <!-- LANDING PAGE (Visible Initially) -->
+    <div id="landing-page"
+        class="absolute inset-0 z-20 bg-slate-950 flex flex-col items-center justify-center p-6 pt-20">
+        <div class="max-w-xl w-full text-center space-y-8 animate-in fade-in zoom-in duration-500">
+
+            <div class="relative inline-block">
+                <div class="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full"></div>
+                <div
+                    class="w-24 h-24 bg-slate-900 border border-slate-700 rounded-2xl flex items-center justify-center relative shadow-2xl animate-float mx-auto">
+                    <i data-lucide="image-plus" class="w-10 h-10 text-indigo-500"></i>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-white">
+                    Enhance your images <br />
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">in
+                        seconds.</span>
+                </h1>
+                <p class="text-slate-400 text-lg max-w-md mx-auto">
+                    Upscale, sharpen, and restore details with our advanced client-side AI processing. No uploads to
+                    external servers.
+                </p>
+            </div>
+
+            <!-- Main Upload Trigger -->
+            <div class="pt-8">
+                <label
+                    class="group relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-slate-700 rounded-3xl cursor-pointer hover:border-indigo-500 hover:bg-slate-900/50 transition-all duration-300 bg-slate-900/20"
+                    id="landing-drop-zone">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <i data-lucide="upload-cloud"
+                            class="w-10 h-10 text-slate-500 group-hover:text-indigo-400 mb-3 transition-colors"></i>
+                        <p class="mb-2 text-sm text-slate-300"><span class="font-semibold text-indigo-400">Click to
+                                upload</span> or drag and drop</p>
+                        <p class="text-xs text-slate-500">SVG, PNG, JPG or WEBP (MAX. 8000x8000px)</p>
+                    </div>
+                    <input type="file" id="landing-file-input"
+                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        accept="image/png, image/jpeg, image/webp" />
+                </label>
+            </div>
+
+            <div
+                class="flex items-center justify-center gap-6 pt-4 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                <div class="text-xs text-slate-500 font-mono">100% Privacy</div>
+                <div class="w-1 h-1 bg-slate-700 rounded-full"></div>
+                <div class="text-xs text-slate-500 font-mono">Browser Processing</div>
+                <div class="w-1 h-1 bg-slate-700 rounded-full"></div>
+                <div class="text-xs text-slate-500 font-mono">No Limits</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKSPACE (Hidden Initially) -->
+    <!-- Responsive Layout: Flex Column on Mobile, Row on Desktop -->
+    <div id="workspace" class="hidden flex-1 flex flex-col md:flex-row overflow-hidden relative pt-16 h-screen">
+
+        <!-- Left Sidebar: Controls -->
+        <!-- Mobile: Order 2 (Bottom), Fixed Height/Scrollable -->
+        <!-- Desktop: Order 1 (Left), Fixed Width, Full Height -->
+        <aside
+            class="w-full h-[40vh] md:h-full md:w-80 lg:w-96 bg-slate-900 border-t md:border-t-0 md:border-r border-slate-800 flex flex-col z-20 shrink-0 overflow-y-auto custom-scrollbar order-2 md:order-1 shadow-2xl md:shadow-none">
+
+            <!-- File Info -->
+            <div id="file-info-panel"
+                class="p-4 md:p-6 border-b border-slate-800 sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+                <div class="flex items-start gap-4 mb-4">
+                    <div
+                        class="w-12 h-12 md:w-16 md:h-16 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 shrink-0">
+                        <img id="thumbnail-img" class="w-full h-full object-cover opacity-75">
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h3 id="file-name" class="font-medium text-sm text-slate-200 truncate">filename.jpg</h3>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span id="file-dims"
+                                class="text-xs text-slate-500 font-mono bg-slate-800 px-1.5 py-0.5 rounded">0x0</span>
+                            <span id="file-size" class="text-xs text-slate-500 font-mono">0 MB</span>
+                        </div>
+                    </div>
+                    <button id="remove-file-btn"
+                        class="p-2 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                        title="Close File">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div id="settings-panel" class="p-4 md:p-6 space-y-6 md:space-y-8">
+
+                <!-- Upscale Factor -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Scale
+                        Factor</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button
+                            class="scale-btn py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold transition-all text-sm"
+                            data-scale="2">2x</button>
+                        <button
+                            class="scale-btn py-2 rounded-lg bg-indigo-600 border border-indigo-500 text-white font-bold shadow-lg shadow-indigo-900/40 text-sm"
+                            data-scale="4">4x</button>
+                        <button
+                            class="scale-btn py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold transition-all text-sm"
+                            data-scale="8">8x</button>
+                        <button
+                            class="scale-btn py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold transition-all text-sm"
+                            data-scale="16">16x</button>
+                    </div>
+                    <div
+                        class="mt-2 flex justify-between text-xs items-center bg-slate-800/50 p-2 rounded border border-slate-800">
+                        <span class="text-slate-500">Output:</span>
+                        <span id="target-res" class="text-indigo-400 font-mono font-bold">0 x 0</span>
+                    </div>
+                </div>
+
+                <!-- Enhancements -->
+                <div class="space-y-4">
+                    <!-- Sharpening Slider -->
+                    <div>
+                        <div
+                            class="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                            <span>Sharpen</span>
+                            <span id="sharpen-val" class="text-indigo-400 font-mono">40%</span>
+                        </div>
+                        <input type="range" id="sharpen-slider" min="0" max="100" value="40"
+                            class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Quality -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Quality
+                            Mode</label>
+                        <select id="quality-select"
+                            class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                            <option value="high">High (Bicubic - Best)</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low (Fastest)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Action Area -->
+                <div class="pt-2 space-y-3 pb-8 md:pb-0">
+                    <!-- Format Selection -->
+                    <div class="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+                        <button
+                            class="format-btn flex-1 py-1.5 text-xs font-bold rounded text-white bg-indigo-600 shadow-sm"
+                            data-fmt="png">PNG</button>
+                        <button
+                            class="format-btn flex-1 py-1.5 text-xs font-bold rounded text-slate-400 hover:text-white"
+                            data-fmt="jpeg">JPG</button>
+                        <button
+                            class="format-btn flex-1 py-1.5 text-xs font-bold rounded text-slate-400 hover:text-white"
+                            data-fmt="webp">WEBP</button>
+                    </div>
+
+                    <button id="process-btn"
+                        class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-indigo-900/30 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2">
+                        <i data-lucide="zap" class="w-5 h-5 fill-current"></i>
+                        <span>Upscale Image</span>
+                    </button>
+
+                    <div id="progress-container" class="hidden">
+                        <div class="flex justify-between text-xs text-slate-400 mb-1">
+                            <span id="progress-status">Processing...</span>
+                            <span id="progress-pct">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                            <div id="progress-bar"
+                                class="bg-indigo-500 h-1.5 rounded-full w-0 transition-all duration-100"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Viewport -->
+        <!-- Mobile: Order 1 (Top), Takes remaining height -->
+        <!-- Desktop: Order 2 (Right), Full Height -->
+        <main
+            class="flex-1 h-[60vh] md:h-full relative bg-slate-950 flex flex-col min-w-0 order-1 md:order-2 border-b md:border-b-0 border-slate-800">
+
+            <!-- Toolbar -->
+            <div
+                class="h-12 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-4 z-10 shrink-0">
+                <div class="flex items-center gap-1 md:gap-2">
+                    <button id="view-mode-single" class="p-1.5 rounded bg-slate-700 text-white" title="Single View">
+                        <i data-lucide="image" class="w-4 h-4"></i>
+                    </button>
+                    <button id="view-mode-compare"
+                        class="p-1.5 rounded text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                        title="Compare Slider">
+                        <i data-lucide="columns" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="zoom-out" class="text-slate-400 hover:text-white p-1"><i data-lucide="minus"
+                            class="w-4 h-4"></i></button>
+                    <span id="zoom-level" class="text-xs font-mono text-slate-400 w-10 text-center">100%</span>
+                    <button id="zoom-in" class="text-slate-400 hover:text-white p-1"><i data-lucide="plus"
+                            class="w-4 h-4"></i></button>
+                    <button id="fit-screen"
+                        class="ml-1 text-[10px] uppercase font-bold tracking-wider bg-slate-800 text-slate-300 px-2 py-1 rounded hover:bg-slate-700">Fit</button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="download-btn" disabled
+                        class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg shadow-emerald-900/20 transition-all">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Save</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas Viewport -->
+            <div id="viewport"
+                class="flex-1 overflow-hidden relative checkerboard cursor-grab active:cursor-grabbing flex items-center justify-center">
+
+                <!-- Loading Overlay (For Workspace) -->
+                <div id="loading-overlay"
+                    class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+                    <div
+                        class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4">
+                    </div>
+                    <p class="text-indigo-400 font-bold animate-pulse text-sm">Processing...</p>
+                </div>
+
+                <!-- Image Container (Transform Target) -->
+                <div id="image-transformer" class="origin-center transition-transform duration-75"
+                    style="transform: scale(1) translate(0px, 0px);">
+
+                    <!-- Single View (Processed or Original) -->
+                    <img id="main-image" src="" class="block shadow-2xl pointer-events-none select-none max-w-none">
+
+                    <!-- Comparison View (Overlay) -->
+                    <div id="comparison-view" class="absolute inset-0 hidden shadow-2xl max-w-none">
+                        <!-- Bottom Layer: Processed Image -->
+                        <img id="compare-after" src=""
+                            class="absolute inset-0 w-full h-full object-contain select-none pointer-events-none max-w-none">
+
+                        <!-- Top Layer: Original (Resized to match) -->
+                        <div id="compare-overlay" class="comparison-overlay bg-slate-900 w-1/2">
+                            <img id="compare-before" src=""
+                                class="absolute top-0 left-0 max-w-none select-none pointer-events-none"
+                                style="height: 100%; width: auto;">
+                        </div>
+
+                        <!-- Handle -->
+                        <div id="compare-handle"
+                            class="absolute top-0 bottom-0 left-1/2 w-0.5 bg-transparent cursor-col-resize z-30"
+                            style="touch-action: none;">
+                            <div class="slider-handle">
+                                <i data-lucide="chevrons-left-right" class="w-4 h-4 text-slate-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Hidden Worker Script Store -->
+    <script id="worker-script" type="javascript/worker">
+        self.onmessage = function(e) {
+            try {
+                const { imageData, width, height, mix, type } = e.data;
+
+                if (type === 'sharpen') {
+                    const data = imageData.data;
+                    const kernel = [
+                        0, -1, 0,
+                        -1, 5, -1,
+                        0, -1, 0
+                    ];
+
+                    const inputData = new Uint8ClampedArray(data);
+
+                    // Iterate over pixels (excluding borders for simplicity)
+                    for (let y = 1; y < height - 1; y++) {
+                        for (let x = 1; x < width - 1; x++) {
+                            // RGB channels
+                            for (let c = 0; c < 3; c++) {
+                                const i = (y * width + x) * 4 + c;
+                                
+                                const sum = 
+                                    kernel[0] * inputData[((y - 1) * width + (x - 1)) * 4 + c] +
+                                    kernel[1] * inputData[((y - 1) * width + x) * 4 + c] +
+                                    kernel[2] * inputData[((y - 1) * width + (x + 1)) * 4 + c] +
+                                    kernel[3] * inputData[(y * width + (x - 1)) * 4 + c] +
+                                    kernel[4] * inputData[(y * width + x) * 4 + c] +
+                                    kernel[5] * inputData[(y * width + (x + 1)) * 4 + c] +
+                                    kernel[6] * inputData[((y + 1) * width + (x - 1)) * 4 + c] +
+                                    kernel[7] * inputData[((y + 1) * width + x) * 4 + c] +
+                                    kernel[8] * inputData[((y + 1) * width + (x + 1)) * 4 + c];
+
+                                const original = inputData[i];
+                                // Mix logic
+                                data[i] = original * (1 - mix) + sum * mix;
+                            }
+                        }
+                        
+                        // Simple progress report every 50 rows
+                        if (y % 50 === 0) {
+                            self.postMessage({ type: 'progress', value: (y / height) * 100 });
+                        }
+                    }
+                    
+                    self.postMessage({ type: 'complete', imageData: imageData });
+                }
+            } catch (err) {
+                self.postMessage({ type: 'error', message: err.message });
+            }
+        };
+    </script>
+
+    <script>
+        // --- App State ---
+        const state = {
+            file: null,
+            originalUrl: null,
+            processedUrl: null,
+            scale: 4,
+            sharpen: 0.4,
+            quality: 'high',
+            format: 'png',
+            zoom: 1,
+            pan: { x: 0, y: 0 },
+            isDragging: false,
+            lastMouse: { x: 0, y: 0 },
+            isProcessing: false,
+            viewMode: 'single', // 'single' or 'compare'
+            originalDims: { w: 0, h: 0 }
+        };
+
+        // --- DOM Elements ---
+        const els = {
+            // Landing
+            landingPage: document.getElementById('landing-page'),
+            landingInput: document.getElementById('landing-file-input'),
+            landingDropZone: document.getElementById('landing-drop-zone'),
+
+            // Workspace
+            workspace: document.getElementById('workspace'),
+            settingsPanel: document.getElementById('settings-panel'),
+            fileInfoPanel: document.getElementById('file-info-panel'),
+            thumbnail: document.getElementById('thumbnail-img'),
+            fileName: document.getElementById('file-name'),
+            fileDims: document.getElementById('file-dims'),
+            fileSize: document.getElementById('file-size'),
+            removeBtn: document.getElementById('remove-file-btn'),
+
+            processBtn: document.getElementById('process-btn'),
+            downloadBtn: document.getElementById('download-btn'),
+            progressContainer: document.getElementById('progress-container'),
+            progressBar: document.getElementById('progress-bar'),
+            progressPct: document.getElementById('progress-pct'),
+
+            scaleBtns: document.querySelectorAll('.scale-btn'),
+            formatBtns: document.querySelectorAll('.format-btn'),
+            sharpenSlider: document.getElementById('sharpen-slider'),
+            sharpenVal: document.getElementById('sharpen-val'),
+            qualitySelect: document.getElementById('quality-select'),
+            targetRes: document.getElementById('target-res'),
+
+            viewport: document.getElementById('viewport'),
+            transformer: document.getElementById('image-transformer'),
+            mainImage: document.getElementById('main-image'),
+            loadingOverlay: document.getElementById('loading-overlay'),
+
+            viewSingleBtn: document.getElementById('view-mode-single'),
+            viewCompareBtn: document.getElementById('view-mode-compare'),
+            compareView: document.getElementById('comparison-view'),
+            compareOverlay: document.getElementById('compare-overlay'),
+            compareBefore: document.getElementById('compare-before'),
+            compareAfter: document.getElementById('compare-after'),
+            compareHandle: document.getElementById('compare-handle'),
+
+            zoomIn: document.getElementById('zoom-in'),
+            zoomOut: document.getElementById('zoom-out'),
+            zoomLevel: document.getElementById('zoom-level'),
+            fitScreen: document.getElementById('fit-screen'),
+        };
+
+        // --- Worker Setup ---
+        let worker;
+        try {
+            const workerBlob = new Blob([document.getElementById('worker-script').textContent], { type: 'text/javascript' });
+            const workerUrl = URL.createObjectURL(workerBlob);
+            worker = new Worker(workerUrl);
+
+            worker.onmessage = (e) => {
+                const { type, value, imageData, message } = e.data;
+                if (type === 'progress') {
+                    updateProgress(value);
+                } else if (type === 'complete') {
+                    finalizeImage(imageData);
+                } else if (type === 'error') {
+                    console.error("Worker Calculation Error:", message);
+                    handleError("An error occurred while processing the image.");
+                }
+            };
+
+            worker.onerror = (e) => {
+                console.error("Worker Error:", e);
+            };
+        } catch (e) {
+            console.error("Worker Initialization Failed", e);
+        }
+
+        // --- Event Listeners ---
+
+        window.addEventListener('load', () => {
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+
+        // Landing Page Upload
+        els.landingInput.addEventListener('change', e => {
+            if (e.target.files && e.target.files[0]) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Landing Drag & Drop
+        els.landingDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            els.landingDropZone.classList.add('border-indigo-500', 'bg-slate-900/80');
+        });
+        els.landingDropZone.addEventListener('dragleave', (e) => {
+            els.landingDropZone.classList.remove('border-indigo-500', 'bg-slate-900/80');
+        });
+        els.landingDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            els.landingDropZone.classList.remove('border-indigo-500', 'bg-slate-900/80');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Navbar branding click to reset
+        document.querySelector('nav h1').addEventListener('click', () => resetApp(true));
+
+        // Workspace Controls
+        els.removeBtn.addEventListener('click', () => resetApp(true));
+
+        els.scaleBtns.forEach(btn => btn.addEventListener('click', (e) => {
+            els.scaleBtns.forEach(b => {
+                b.classList.remove('bg-indigo-600', 'border-indigo-500', 'text-white', 'shadow-lg');
+                b.classList.add('bg-slate-800', 'border-slate-700', 'text-slate-300');
+            });
+            e.target.classList.remove('bg-slate-800', 'border-slate-700', 'text-slate-300');
+            e.target.classList.add('bg-indigo-600', 'border-indigo-500', 'text-white', 'shadow-lg');
+            state.scale = parseInt(e.target.dataset.scale);
+            updateTargetResolution();
+        }));
+
+        els.formatBtns.forEach(btn => btn.addEventListener('click', (e) => {
+            els.formatBtns.forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white', 'shadow-sm');
+                b.classList.add('text-slate-400');
+            });
+            e.target.classList.remove('text-slate-400');
+            e.target.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+            state.format = e.target.dataset.fmt;
+        }));
+
+        els.sharpenSlider.addEventListener('input', (e) => {
+            state.sharpen = e.target.value / 100;
+            els.sharpenVal.innerText = `${e.target.value}%`;
+        });
+
+        els.qualitySelect.addEventListener('change', (e) => state.quality = e.target.value);
+
+        els.processBtn.addEventListener('click', startProcessing);
+        els.downloadBtn.addEventListener('click', downloadImage);
+
+        els.viewSingleBtn.addEventListener('click', () => setViewMode('single'));
+        els.viewCompareBtn.addEventListener('click', () => setViewMode('compare'));
+
+        // Pan & Zoom
+        els.viewport.addEventListener('wheel', handleWheel, { passive: false });
+        els.viewport.addEventListener('mousedown', startPan);
+        els.viewport.addEventListener('touchstart', startPan, { passive: false }); // Mobile touch
+
+        window.addEventListener('mousemove', pan);
+        window.addEventListener('touchmove', pan, { passive: false }); // Mobile touch
+
+        window.addEventListener('mouseup', endPan);
+        window.addEventListener('touchend', endPan);
+
+        els.zoomIn.addEventListener('click', () => updateZoom(state.zoom * 1.2));
+        els.zoomOut.addEventListener('click', () => updateZoom(state.zoom / 1.2));
+        els.fitScreen.addEventListener('click', fitToScreen);
+
+        // Comparison Slider Logic
+        let isSliding = false;
+        const startSlide = (e) => { isSliding = true; e.stopPropagation(); };
+        const moveSlide = (e) => {
+            if (!isSliding) return;
+            const rect = els.compareView.getBoundingClientRect();
+            // Handle both touch and mouse
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
+            let x = clientX - rect.left;
+            x = Math.max(0, Math.min(x, rect.width));
+            const pct = (x / rect.width) * 100;
+            els.compareOverlay.style.width = `${pct}%`;
+            els.compareHandle.style.left = `${pct}%`;
+        };
+        const stopSlide = () => isSliding = false;
+
+        els.compareHandle.addEventListener('mousedown', startSlide);
+        els.compareHandle.addEventListener('touchstart', startSlide, { passive: false });
+
+        window.addEventListener('mouseup', stopSlide);
+        window.addEventListener('touchend', stopSlide);
+
+        window.addEventListener('mousemove', moveSlide);
+        window.addEventListener('touchmove', moveSlide, { passive: false });
+
+        // --- Logic Functions ---
+
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                alert('Please upload a valid image file (JPG, PNG, WebP).');
+                return;
+            }
+
+            // Show Loading Overlay
+            els.loadingOverlay.classList.remove('hidden');
+
+            // Cleanup previous URLs
+            if (state.originalUrl && state.originalUrl.startsWith('blob:')) URL.revokeObjectURL(state.originalUrl);
+            if (state.processedUrl && state.processedUrl.startsWith('blob:')) URL.revokeObjectURL(state.processedUrl);
+
+            // Reset state
+            state.zoom = 1;
+            state.pan = { x: 0, y: 0 };
+            state.isProcessing = false;
+            state.processedUrl = null;
+            state.file = file;
+
+            try {
+                state.originalUrl = URL.createObjectURL(file);
+            } catch (err) {
+                console.error("Failed to create object URL", err);
+                alert("Failed to load image.");
+                els.loadingOverlay.classList.add('hidden');
+                return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                state.originalDims = { w: img.width, h: img.height };
+
+                // UI Updates
+                els.thumbnail.src = state.originalUrl;
+                els.fileName.innerText = file.name;
+                els.fileDims.innerText = `${img.width}x${img.height}`;
+                els.fileSize.innerText = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+
+                els.mainImage.src = state.originalUrl;
+                els.compareBefore.src = state.originalUrl;
+
+                // HIDE Landing, SHOW Workspace
+                els.landingPage.classList.add('hidden');
+                els.workspace.classList.remove('hidden');
+
+                // HIDE Loading State
+                els.loadingOverlay.classList.add('hidden');
+
+                // Reset Process Button & Progress
+                els.processBtn.disabled = false;
+                els.processBtn.innerHTML = '<i data-lucide="zap" class="w-5 h-5 fill-current"></i><span>Upscale Image</span>';
+                els.progressContainer.classList.add('hidden');
+                els.downloadBtn.disabled = true;
+
+                // Set default Single View
+                setViewMode('single');
+
+                updateTargetResolution();
+
+                // CRITICAL FIX: Delay fitting to screen so DOM can calculate sizes of newly visible workspace
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        fitToScreen();
+                    });
+                });
+
+                // Re-init icons
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            };
+
+            img.onerror = () => {
+                alert("Failed to decode image.");
+                els.loadingOverlay.classList.add('hidden');
+            };
+
+            img.src = state.originalUrl;
+        }
+
+        function updateTargetResolution() {
+            if (state.originalDims.w === 0) return;
+            els.targetRes.innerText = `${state.originalDims.w * state.scale} x ${state.originalDims.h * state.scale}`;
+        }
+
+        async function startProcessing() {
+            if (state.isProcessing) return;
+
+            try {
+                state.isProcessing = true;
+                els.processBtn.disabled = true;
+                els.processBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div><span>Processing...</span>';
+                els.progressContainer.classList.remove('hidden');
+                updateProgress(0);
+
+                await new Promise(r => setTimeout(r, 50));
+
+                const canvas = document.createElement('canvas');
+                const targetW = state.originalDims.w * state.scale;
+                const targetH = state.originalDims.h * state.scale;
+
+                if (targetW * targetH > 16384 * 16384) {
+                    throw new Error("Target resolution is too large for browser Canvas.");
+                }
+
+                canvas.width = targetW;
+                canvas.height = targetH;
+                const ctx = canvas.getContext('2d');
+
+                if (!ctx) throw new Error("Could not create canvas context");
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = state.quality;
+
+                const img = new Image();
+                img.src = state.originalUrl;
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = () => reject(new Error("Image failed to load"));
+                });
+
+                ctx.drawImage(img, 0, 0, targetW, targetH);
+                updateProgress(30);
+
+                if (state.sharpen > 0 && worker) {
+                    const imageData = ctx.getImageData(0, 0, targetW, targetH);
+                    worker.postMessage({
+                        imageData: imageData,
+                        width: targetW,
+                        height: targetH,
+                        mix: state.sharpen,
+                        type: 'sharpen'
+                    });
+                } else {
+                    updateProgress(100);
+                    const resultUrl = canvas.toDataURL(`image/${state.format}`);
+                    finishProcessing(resultUrl);
+                }
+            } catch (err) {
+                console.error("Processing Error:", err);
+                handleError(err.message || "An error occurred.");
+            }
+        }
+
+        function handleError(msg) {
+            alert(msg);
+            state.isProcessing = false;
+            els.processBtn.disabled = false;
+            els.processBtn.innerHTML = '<i data-lucide="zap" class="w-5 h-5 fill-current"></i><span>Upscale Image</span>';
+            els.progressContainer.classList.add('hidden');
+            try { lucide.createIcons(); } catch (e) { }
+        }
+
+        function updateProgress(pct) {
+            els.progressBar.style.width = `${pct}%`;
+            els.progressPct.innerText = `${Math.round(pct)}%`;
+        }
+
+        function finalizeImage(imageData) {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = imageData.width;
+                canvas.height = imageData.height;
+                const ctx = canvas.getContext('2d');
+                ctx.putImageData(imageData, 0, 0);
+
+                const resultUrl = canvas.toDataURL(`image/${state.format}`);
+                finishProcessing(resultUrl);
+            } catch (e) {
+                handleError("Failed to generate final image.");
+            }
+        }
+
+        function finishProcessing(url) {
+            state.processedUrl = url;
+            state.isProcessing = false;
+
+            els.processBtn.disabled = false;
+            els.processBtn.innerHTML = '<i data-lucide="zap" class="w-5 h-5 fill-current"></i><span>Upscale Image</span>';
+            els.progressContainer.classList.add('hidden');
+            els.downloadBtn.disabled = false;
+            try { lucide.createIcons(); } catch (e) { }
+
+            els.mainImage.src = url;
+            els.compareAfter.src = url;
+            els.compareBefore.src = state.originalUrl;
+            els.compareBefore.style.imageRendering = 'pixelated';
+
+            setViewMode('compare');
+            // Auto fit after processing
+            setTimeout(fitToScreen, 100);
+        }
+
+        function setViewMode(mode) {
+            state.viewMode = mode;
+            if (mode === 'single') {
+                els.viewSingleBtn.classList.replace('text-slate-400', 'bg-slate-700');
+                els.viewSingleBtn.classList.add('text-white');
+                els.viewCompareBtn.classList.remove('bg-slate-700', 'text-white');
+                els.viewCompareBtn.classList.add('text-slate-400');
+
+                els.compareView.classList.add('hidden');
+                // FIX: Use remove('invisible') instead of remove('hidden') to maintain layout
+                els.mainImage.classList.remove('hidden');
+                els.mainImage.classList.remove('invisible');
+            } else {
+                if (!state.processedUrl) return;
+
+                els.viewCompareBtn.classList.replace('text-slate-400', 'bg-slate-700');
+                els.viewCompareBtn.classList.add('text-white');
+                els.viewSingleBtn.classList.remove('bg-slate-700', 'text-white');
+                els.viewSingleBtn.classList.add('text-slate-400');
+
+                // FIX: Use add('invisible') instead of add('hidden') so container doesn't collapse
+                els.mainImage.classList.remove('hidden');
+                els.mainImage.classList.add('invisible');
+                els.compareView.classList.remove('hidden');
+
+                requestAnimationFrame(syncCompareWidth);
+            }
+        }
+
+        function syncCompareWidth() {
+            if (state.viewMode === 'compare') {
+                // Ensure we get dimensions from the transformer or the main image placeholder
+                const width = els.mainImage.offsetWidth || els.compareAfter.offsetWidth;
+                if (width > 0) {
+                    els.compareBefore.style.width = width + 'px';
+                }
+                if (state.viewMode === 'compare') requestAnimationFrame(syncCompareWidth);
+            }
+        }
+
+        function downloadImage() {
+            if (!state.processedUrl) return;
+            const link = document.createElement('a');
+            link.download = `upscaled-${state.scale}x-${state.file.name.split('.')[0]}.${state.format}`;
+            link.href = state.processedUrl;
+            link.click();
+        }
+
+        function resetApp(fullReset = true) {
+            if (fullReset) {
+                // Show Landing, Hide Workspace
+                els.landingPage.classList.remove('hidden');
+                els.workspace.classList.add('hidden');
+
+                state.file = null;
+                state.originalUrl = null;
+                state.processedUrl = null;
+                els.landingInput.value = '';
+            }
+            state.zoom = 1;
+            state.pan = { x: 0, y: 0 };
+            state.isProcessing = false;
+
+            els.downloadBtn.disabled = true;
+            els.processBtn.disabled = false;
+            els.progressContainer.classList.add('hidden');
+
+            setViewMode('single');
+        }
+
+        // --- Pan & Zoom Logic (Mouse + Touch) ---
+
+        // NEW: Get the scale that fits the image exactly to the viewport
+        function getFitScale() {
+            if (!els.mainImage.naturalWidth && !state.originalDims.w) return 1;
+
+            const containerW = els.viewport.clientWidth;
+            const containerH = els.viewport.clientHeight;
+
+            // Get current dimensions (upscaled or original)
+            const imgW = state.processedUrl ? els.compareAfter.naturalWidth : state.originalDims.w;
+            const imgH = state.processedUrl ? els.compareAfter.naturalHeight : state.originalDims.h;
+
+            if (!imgW || !imgH) return 1;
+
+            const scaleW = (containerW - 40) / imgW;
+            const scaleH = (containerH - 40) / imgH;
+            // Never return <= 0
+            return Math.max(0.01, Math.min(scaleW, scaleH));
+        }
+
+        // NEW: Enforce pan boundaries so image can't be dragged into void
+        function clampPan() {
+            // Get current dimensions
+            const imgW = state.processedUrl ? els.compareAfter.naturalWidth : state.originalDims.w;
+            const imgH = state.processedUrl ? els.compareAfter.naturalHeight : state.originalDims.h;
+
+            if (!imgW || !imgH) return;
+
+            const scaledW = imgW * state.zoom;
+            const scaledH = imgH * state.zoom;
+
+            const viewportW = els.viewport.clientWidth;
+            const viewportH = els.viewport.clientHeight;
+
+            // X Axis Constraints
+            if (scaledW <= viewportW) {
+                // Image is smaller than viewport width: Force center
+                state.pan.x = 0;
+            } else {
+                // Image is larger: Allow panning only until edges hit viewport boundaries
+                const maxPanX = (scaledW - viewportW) / 2;
+                state.pan.x = Math.max(-maxPanX, Math.min(maxPanX, state.pan.x));
+            }
+
+            // Y Axis Constraints
+            if (scaledH <= viewportH) {
+                // Image is smaller than viewport height: Force center
+                state.pan.y = 0;
+            } else {
+                // Image is larger: Allow panning only until edges hit viewport boundaries
+                const maxPanY = (scaledH - viewportH) / 2;
+                state.pan.y = Math.max(-maxPanY, Math.min(maxPanY, state.pan.y));
+            }
+        }
+
+        function updateTransform() {
+            els.transformer.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
+            els.zoomLevel.innerText = `${Math.round(state.zoom * 100)}%`;
+        }
+
+        function handleWheel(e) {
+            if (els.viewport.contains(e.target)) {
+                e.preventDefault();
+                const delta = -Math.sign(e.deltaY) * 0.1;
+
+                // NEW: Use getFitScale() as the minimum zoom level
+                const minZoom = getFitScale();
+                const maxZoom = 10; // Max zoom 10x
+
+                const newZoom = Math.max(minZoom, Math.min(maxZoom, state.zoom + delta * state.zoom));
+                updateZoom(newZoom);
+            }
+        }
+
+        function updateZoom(newZoom) {
+            state.zoom = newZoom;
+            clampPan(); // Prevent zooming out into "infinite space"
+            updateTransform();
+        }
+
+        function startPan(e) {
+            // Allow slider interaction
+            if (e.target.closest('.slider-handle') || e.target.closest('#compare-handle')) return;
+
+            // Mouse button check (only left)
+            if (e.type === 'mousedown' && e.button !== 0) return;
+
+            state.isDragging = true;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            state.lastMouse = { x: clientX, y: clientY };
+            els.viewport.classList.replace('cursor-grab', 'cursor-grabbing');
+        }
+
+        function pan(e) {
+            if (!state.isDragging) return;
+            if (e.cancelable) e.preventDefault();
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const dx = clientX - state.lastMouse.x;
+            const dy = clientY - state.lastMouse.y;
+            state.pan.x += dx;
+            state.pan.y += dy;
+
+            clampPan(); // Apply boundary constraints immediately
+
+            state.lastMouse = { x: clientX, y: clientY };
+            updateTransform();
+        }
+
+        function endPan() {
+            state.isDragging = false;
+            els.viewport.classList.replace('cursor-grabbing', 'cursor-grab');
+        }
+
+        function fitToScreen() {
+            // SAFEGUARD: Ensure valid inputs
+            if (!els.mainImage.naturalWidth && !state.originalDims.w) return;
+
+            const containerW = els.viewport.clientWidth;
+            const containerH = els.viewport.clientHeight;
+
+            // SAFEGUARD: If container is invisible/collapsed, retry later or abort
+            if (containerW === 0 || containerH === 0) return;
+
+            // Calculate fit scale and set it
+            let scale = getFitScale();
+            // Cap it at 100% (1.0) so small images don't look blurry by default, unless user zooms
+            // But if user requested "remove infinite space", they probably want it to fit viewport.
+            // Let's stick to fit-to-viewport.
+
+            state.zoom = scale;
+            state.pan = { x: 0, y: 0 };
+            updateTransform();
+        }
+
+        window.addEventListener('resize', () => {
+            fitToScreen();
+        });
+
+    </script>
+</body>
+
+</html>

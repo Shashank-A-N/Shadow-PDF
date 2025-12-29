@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word to PDF Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Mammoth.js for reading .docx files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.7.0/mammoth.browser.min.js"></script>
+    <!-- jsPDF for creating PDF documents -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- html2canvas to take "snapshots" of the rendered content -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* * Styles for the off-screen content renderer.
+         * Giving it a standard A4 width helps the library calculate the layout correctly.
+        */
+        #content-renderer {
+            position: absolute;
+            left: -9999px; /* Position off-screen */
+            top: auto;
+            width: 210mm; /* Standard A4 width, content will be scaled from this */
+            box-sizing: border-box;
+            background: white;
+            /* Padding is removed here as it will be controlled by the user via margins */
+        }
+        #content-renderer img {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto bg-white rounded-2xl shadow-lg p-8 md:p-12">
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Word to PDF Converter</h1>
+            <p class="mt-3 text-gray-600">Creates a high-quality, image-based PDF with a small file size.</p>
+        </div>
+
+        <!-- File Input Area -->
+        <div id="upload-area" class="mt-8 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-all">
+            <input type="file" id="doc-file" class="hidden" accept=".docx,.doc">
+            <div id="upload-prompt">
+                 <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <p class="mt-4 text-lg text-gray-600">
+                    <span class="font-semibold text-blue-600">Click to upload</span> or drag and drop
+                </p>
+                <p id="file-name" class="mt-2 text-sm text-gray-500">DOC or DOCX files only</p>
+            </div>
+        </div>
+
+        <!-- Status & Action Buttons -->
+        <div id="action-section" class="mt-6 text-center">
+            <p id="status" class="text-gray-600 h-6"></p>
+            <button id="convert-btn" class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed">
+                Generate Preview
+            </button>
+        </div>
+
+        <!-- PDF Preview and Controls Section -->
+        <div id="preview-section" class="hidden mt-8">
+            <div class="flex flex-wrap justify-center items-end gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <label for="margin-top" class="block text-sm font-medium text-gray-700">Top (mm)</label>
+                    <input type="number" id="margin-top" value="15" class="w-24 mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="margin-bottom" class="block text-sm font-medium text-gray-700">Bottom (mm)</label>
+                    <input type="number" id="margin-bottom" value="15" class="w-24 mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                 <div>
+                    <label for="margin-left" class="block text-sm font-medium text-gray-700">Left (mm)</label>
+                    <input type="number" id="margin-left" value="15" class="w-24 mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                 <div>
+                    <label for="margin-right" class="block text-sm font-medium text-gray-700">Right (mm)</label>
+                    <input type="number" id="margin-right" value="15" class="w-24 mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <button id="regenerate-btn" class="bg-gray-700 text-white font-bold py-2 px-5 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-300">Apply</button>
+            </div>
+            <div id="pdf-preview-container" class="w-full h-[70vh] border-2 border-gray-200 rounded-lg overflow-y-auto bg-gray-100 p-4 space-y-4">
+                 <!-- Page images will be inserted here by JavaScript -->
+            </div>
+            <button id="download-btn" class="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300">
+                Download Full PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- This is a temporary container for rendering the docx content. -->
+    <div id="content-renderer"></div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        // DOM Elements
+        const uploadArea = document.getElementById('upload-area');
+        const docFileInput = document.getElementById('doc-file');
+        const fileNameDisplay = document.getElementById('file-name');
+        const convertBtn = document.getElementById('convert-btn');
+        const status = document.getElementById('status');
+        const contentRenderer = document.getElementById('content-renderer');
+        const actionSection = document.getElementById('action-section');
+        const previewSection = document.getElementById('preview-section');
+        const pdfPreviewContainer = document.getElementById('pdf-preview-container');
+        const marginTopInput = document.getElementById('margin-top');
+        const marginBottomInput = document.getElementById('margin-bottom');
+        const marginLeftInput = document.getElementById('margin-left');
+        const marginRightInput = document.getElementById('margin-right');
+        const regenerateBtn = document.getElementById('regenerate-btn');
+        const downloadBtn = document.getElementById('download-btn');
+
+        // State variables
+        let selectedFile = null;
+        let mainCanvas = null; // To store the initial snapshot
+        let currentPdfName = '';
+
+        // --- Event Listeners ---
+
+        uploadArea.addEventListener('click', () => docFileInput.click());
+
+        docFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file && (file.name.endsWith('.docx') || file.name.endsWith('.doc'))) {
+                selectedFile = file;
+                fileNameDisplay.textContent = file.name;
+                fileNameDisplay.classList.add('text-blue-700', 'font-semibold');
+                status.textContent = '';
+            } else {
+                selectedFile = null;
+                fileNameDisplay.textContent = 'Invalid file. Please select a .doc or .docx file.';
+                fileNameDisplay.classList.remove('text-blue-700', 'font-semibold');
+            }
+        });
+        
+        uploadArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            uploadArea.classList.add('border-blue-500', 'bg-gray-50');
+        });
+        
+        uploadArea.addEventListener('dragleave', (event) => {
+            event.preventDefault();
+            uploadArea.classList.remove('border-blue-500', 'bg-gray-50');
+        });
+
+        uploadArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            uploadArea.classList.remove('border-blue-500', 'bg-gray-50');
+            const file = event.dataTransfer.files[0];
+             if (file && (file.name.endsWith('.docx') || file.name.endsWith('.doc'))) {
+                docFileInput.files = event.dataTransfer.files;
+                const changeEvent = new Event('change');
+                docFileInput.dispatchEvent(changeEvent);
+            } else {
+                 selectedFile = null;
+                fileNameDisplay.textContent = 'Invalid file. Please select a .doc or .docx file.';
+                fileNameDisplay.classList.remove('text-blue-700', 'font-semibold');
+            }
+        });
+
+        // Main conversion logic
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                status.textContent = 'Please select a file to convert.';
+                status.classList.add('text-red-500');
+                return;
+            }
+
+            convertBtn.disabled = true;
+            status.textContent = 'Reading file...';
+            status.classList.remove('text-red-500');
+
+            try {
+                const arrayBuffer = await readFileAsArrayBuffer(selectedFile);
+                status.textContent = 'Extracting content...';
+
+                const mammothOptions = {
+                    convertImage: mammoth.images.imgElement(function(image) {
+                        return image.read("base64").then(function(imageBuffer) {
+                            return { src: "data:" + image.contentType + ";base64," + imageBuffer };
+                        });
+                    })
+                };
+                const { value: htmlContent } = await mammoth.convertToHtml({ arrayBuffer }, mammothOptions);
+                contentRenderer.innerHTML = htmlContent;
+                
+                status.textContent = 'Taking page snapshots...';
+                mainCanvas = await html2canvas(contentRenderer, {
+                    scale: 1.5,
+                    useCORS: true,
+                    logging: false,
+                    scrollY: -window.scrollY,
+                    windowWidth: contentRenderer.scrollWidth,
+                    windowHeight: contentRenderer.scrollHeight
+                });
+                
+                currentPdfName = selectedFile.name.replace(/\.docx?$/, '.pdf');
+                actionSection.classList.add('hidden');
+                previewSection.classList.remove('hidden');
+
+                await generateAndDisplayPreview();
+
+            } catch (error) {
+                console.error('Conversion Error:', error);
+                status.textContent = 'An error occurred during conversion.';
+                status.classList.add('text-red-500');
+                convertBtn.disabled = false;
+            }
+        });
+
+        // Regenerate PDF with new dimensions
+        regenerateBtn.addEventListener('click', generateAndDisplayPreview);
+
+        // Download the currently previewed PDF
+        downloadBtn.addEventListener('click', async () => {
+            if (!mainCanvas) return;
+            status.textContent = 'Assembling PDF for download...';
+            const pdf = await generatePdfObject();
+            if (pdf) {
+                pdf.save(currentPdfName);
+                status.textContent = 'Download started.';
+            }
+        });
+
+        // --- Helper Functions ---
+        
+        async function generateAndDisplayPreview() {
+            if (!mainCanvas) return;
+            status.textContent = 'Generating preview...';
+            pdfPreviewContainer.innerHTML = ''; // Clear previous preview
+
+            const marginTop = parseFloat(marginTopInput.value) || 0;
+            const marginBottom = parseFloat(marginBottomInput.value) || 0;
+            const marginLeft = parseFloat(marginLeftInput.value) || 0;
+            const marginRight = parseFloat(marginRightInput.value) || 0;
+
+            const pdfPageWidth = 210;
+            const pdfPageHeight = 297;
+            
+            const contentWidth = pdfPageWidth - marginLeft - marginRight;
+            const contentHeight = pdfPageHeight - marginTop - marginBottom;
+
+            if (contentWidth <= 0 || contentHeight <= 0) {
+                status.textContent = "Error: Margins are too large for the page size.";
+                status.classList.add('text-red-500');
+                return;
+            }
+
+            const pageHeightOnCanvas = (mainCanvas.width / contentWidth) * contentHeight;
+            let yPosition = 0;
+            
+            while (yPosition < mainCanvas.height) {
+                const pageCanvas = document.createElement('canvas');
+                pageCanvas.width = mainCanvas.width;
+                pageCanvas.height = pageHeightOnCanvas;
+                const pageCtx = pageCanvas.getContext('2d');
+                
+                pageCtx.fillStyle = 'white';
+                pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+                pageCtx.drawImage(mainCanvas, 0, yPosition, mainCanvas.width, pageHeightOnCanvas, 0, 0, mainCanvas.width, pageHeightOnCanvas);
+                
+                const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
+                
+                const imgElement = document.createElement('img');
+                imgElement.src = pageImgData;
+                imgElement.className = 'w-full h-auto shadow-lg';
+                
+                // Create a container for the image to apply margins visually
+                const pageContainer = document.createElement('div');
+                pageContainer.className = 'bg-white';
+                pageContainer.style.width = `${pdfPageWidth}mm`;
+                pageContainer.style.height = `${pdfPageHeight}mm`;
+                pageContainer.style.padding = `${marginTop}mm ${marginRight}mm ${marginBottom}mm ${marginLeft}mm`;
+                pageContainer.style.boxSizing = 'border-box';
+                pageContainer.appendChild(imgElement);
+
+                pdfPreviewContainer.appendChild(pageContainer);
+                
+                yPosition += pageHeightOnCanvas;
+            }
+            status.textContent = 'Preview updated.';
+        }
+
+        async function generatePdfObject() {
+            if (!mainCanvas) return null;
+
+            const marginTop = parseFloat(marginTopInput.value) || 0;
+            const marginBottom = parseFloat(marginBottomInput.value) || 0;
+            const marginLeft = parseFloat(marginLeftInput.value) || 0;
+            const marginRight = parseFloat(marginRightInput.value) || 0;
+
+            const pdfPageWidth = 210;
+            const pdfPageHeight = 297;
+
+            const pdf = new jsPDF('p', 'mm', [pdfPageWidth, pdfPageHeight]);
+            
+            const contentWidth = pdfPageWidth - marginLeft - marginRight;
+            const contentHeight = pdfPageHeight - marginTop - marginBottom;
+
+            if (contentWidth <= 0 || contentHeight <= 0) {
+                status.textContent = "Error: Margins are too large for the page size.";
+                status.classList.add('text-red-500');
+                return null;
+            }
+            
+            const pageHeightOnCanvas = (mainCanvas.width / contentWidth) * contentHeight;
+            let yPosition = 0;
+            let pages = 0;
+            
+            while (yPosition < mainCanvas.height) {
+                if (pages > 0) pdf.addPage();
+                
+                const pageCanvas = document.createElement('canvas');
+                pageCanvas.width = mainCanvas.width;
+                pageCanvas.height = pageHeightOnCanvas;
+                const pageCtx = pageCanvas.getContext('2d');
+                
+                pageCtx.fillStyle = 'white';
+                pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+                pageCtx.drawImage(mainCanvas, 0, yPosition, mainCanvas.width, pageHeightOnCanvas, 0, 0, mainCanvas.width, pageHeightOnCanvas);
+                
+                const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.92);
+                pdf.addImage(pageImgData, 'JPEG', marginLeft, marginTop, contentWidth, contentHeight);
+                
+                yPosition += pageHeightOnCanvas;
+                pages++;
+            }
+            return pdf;
+        }
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+    </script>
+
+</body>
+</html>

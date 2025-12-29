@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BlurFace Studio - Titan Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-dark: #09090b;
+            --bg-panel: #18181b;
+            --bg-hover: #27272a;
+            --accent: #3b82f6;
+            --text-primary: #f4f4f5;
+            --text-secondary: #a1a1aa;
+            --border: #27272a;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            user-select: none;
+            overscroll-behavior: none;
+            /* Prevent pull-to-refresh */
+        }
+
+        /* Canvas Pattern */
+        .canvas-container {
+            background-image:
+                linear-gradient(45deg, #1f1f22 25%, transparent 25%),
+                linear-gradient(-45deg, #1f1f22 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #1f1f22 75%),
+                linear-gradient(-45deg, transparent 75%, #1f1f22 75%);
+            background-size: 24px 24px;
+            background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+            touch-action: none;
+            /* Critical for touch drawing */
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+
+        /* Range Slider Styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: #3f3f46;
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            margin-top: -6px;
+            background-color: var(--text-primary);
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-panel);
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            background-color: var(--accent);
+        }
+
+        /* Tool Buttons */
+        .tool-btn {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .tool-btn.active {
+            background-color: var(--accent);
+            color: white;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .tool-btn:not(.active):hover {
+            background-color: var(--bg-hover);
+            color: white;
+        }
+
+        /* Layer Items */
+        .layer-item {
+            border-left: 2px solid transparent;
+            transition: all 0.15s;
+        }
+
+        .layer-item.selected {
+            background-color: var(--bg-hover);
+            border-left-color: var(--accent);
+        }
+
+        .layer-item:hover:not(.selected) {
+            background-color: #27272a80;
+        }
+
+        .layer-item .btn-vis {
+            opacity: 0.3;
+        }
+
+        .layer-item:hover .btn-vis,
+        .layer-item.selected .btn-vis {
+            opacity: 1;
+        }
+
+        .layer-item.hidden-layer {
+            opacity: 0.5;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .tool-btn {
+                width: 2.5rem;
+                height: 2.5rem;
+            }
+
+            .tool-btn i {
+                width: 1.25rem;
+                height: 1.25rem;
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header
+        class="h-14 md:h-12 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between px-3 md:px-4 shrink-0 z-30">
+        <div class="flex items-center gap-2 md:gap-3">
+            <div class="flex items-center gap-2 text-blue-500">
+                <i data-lucide="shield-check" class="w-5 h-5 md:w-5 md:h-5"></i>
+                <span class="font-bold tracking-wide text-white hidden md:inline">BlurFace<span
+                        class="text-zinc-500 font-normal ml-1">Titan</span></span>
+            </div>
+
+            <div class="h-4 w-px bg-zinc-700 mx-1 md:mx-2"></div>
+
+            <!-- History Controls -->
+            <div class="flex items-center gap-1">
+                <button id="btn-undo" disabled
+                    class="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Undo (Ctrl+Z)">
+                    <i data-lucide="undo-2" class="w-5 h-5 md:w-4 md:h-4"></i>
+                </button>
+                <button id="btn-redo" disabled
+                    class="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Redo (Ctrl+Y)">
+                    <i data-lucide="redo-2" class="w-5 h-5 md:w-4 md:h-4"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 md:gap-3">
+            <!-- Mobile Inspector Toggle -->
+            <button id="btn-toggle-inspector"
+                class="md:hidden p-2 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg relative">
+                <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+                <span id="inspector-badge"
+                    class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full hidden"></span>
+            </button>
+
+            <button id="btn-help" class="hidden md:flex text-zinc-400 hover:text-white transition-colors"
+                title="Keyboard Shortcuts">
+                <i data-lucide="keyboard" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Zoom Controls (Compact on Mobile) -->
+            <div class="hidden md:flex bg-zinc-800 rounded-md p-0.5 border border-zinc-700/50">
+                <button id="zoom-out" class="p-1.5 hover:text-white text-zinc-400 transition-colors"><i
+                        data-lucide="minus" class="w-3 h-3"></i></button>
+                <span id="zoom-level"
+                    class="text-xs font-mono text-zinc-300 w-12 text-center flex items-center justify-center">100%</span>
+                <button id="zoom-in" class="p-1.5 hover:text-white text-zinc-400 transition-colors"><i
+                        data-lucide="plus" class="w-3 h-3"></i></button>
+            </div>
+
+            <input type="file" id="file-upload" accept="image/*" class="hidden">
+            <button onclick="document.getElementById('file-upload').click()"
+                class="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded transition-colors border border-zinc-700 flex items-center gap-2">
+                <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+                <span class="hidden md:inline">Open</span>
+            </button>
+            <button id="btn-export" disabled
+                class="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span class="hidden md:inline">Export</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <!-- Left Toolbar (Desktop) / Bottom Toolbar (Mobile) -->
+        <aside
+            class="order-3 md:order-1 w-full md:w-16 h-14 md:h-auto bg-zinc-900 border-t md:border-t-0 md:border-r border-zinc-800 flex flex-row md:flex-col items-center justify-center md:justify-start md:py-4 gap-4 md:gap-3 z-20 shrink-0 overflow-x-auto md:overflow-visible no-scrollbar px-4 md:px-0">
+
+            <button class="tool-btn active w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 shrink-0"
+                id="tool-select" title="Select / Move (V)">
+                <i data-lucide="mouse-pointer-2" class="w-5 h-5"></i>
+            </button>
+
+            <div class="w-px h-6 bg-zinc-800 md:w-8 md:h-px md:my-1"></div>
+
+            <button class="tool-btn w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 shrink-0"
+                id="tool-rect" title="Rectangle (M)">
+                <i data-lucide="square" class="w-5 h-5"></i>
+            </button>
+            <button class="tool-btn w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 shrink-0"
+                id="tool-ellipse" title="Ellipse (O)">
+                <i data-lucide="circle" class="w-5 h-5"></i>
+            </button>
+            <button class="tool-btn w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 shrink-0"
+                id="tool-brush" title="Freehand Brush (B)">
+                <i data-lucide="pen-tool" class="w-5 h-5"></i>
+            </button>
+
+            <div class="w-px h-6 bg-zinc-800 md:w-8 md:h-px md:my-1"></div>
+
+            <button class="tool-btn w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 shrink-0"
+                id="tool-text" title="Text Label (T)">
+                <i data-lucide="type" class="w-5 h-5"></i>
+            </button>
+            <button class="tool-btn w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 shrink-0"
+                id="tool-stamp" title="Emoji Stamp (S)">
+                <i data-lucide="smile" class="w-5 h-5"></i>
+            </button>
+
+            <div class="w-px h-6 bg-zinc-800 md:w-8 md:h-px md:my-1"></div>
+
+            <button class="tool-btn w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 shrink-0"
+                id="tool-hand" title="Pan Canvas (Space)">
+                <i data-lucide="hand" class="w-5 h-5"></i>
+            </button>
+        </aside>
+
+        <!-- Center Viewport -->
+        <div id="viewport"
+            class="order-2 flex-1 bg-black relative overflow-hidden canvas-container flex items-center justify-center cursor-default">
+
+            <!-- Welcome Screen -->
+            <div id="welcome-screen"
+                class="absolute inset-0 flex flex-col items-center justify-center z-10 bg-zinc-950/80 backdrop-blur-sm px-4">
+                <div
+                    class="bg-zinc-900 p-6 md:p-8 rounded-2xl border border-zinc-800 shadow-2xl text-center max-w-sm w-full">
+                    <div
+                        class="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-zinc-700/50">
+                        <i data-lucide="image-plus" class="w-8 h-8 text-blue-500"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-white mb-2">BlurFace Titan</h2>
+                    <p class="text-zinc-400 text-sm mb-6 leading-relaxed">
+                        Secure, offline image obfuscation.<br>
+                        Works on Mobile & Desktop.
+                    </p>
+                    <button onclick="document.getElementById('file-upload').click()"
+                        class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 active:scale-95">
+                        Choose Image
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div id="canvas-wrapper" class="absolute top-0 left-0 origin-top-left shadow-2xl shadow-black"
+                style="display: none;">
+                <canvas id="main-canvas" class="block"></canvas>
+                <!-- Interaction Layer -->
+                <svg id="ui-layer" class="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+                    <!-- Dynamic handles and selection boxes go here -->
+                </svg>
+            </div>
+        </div>
+
+        <!-- Right Panel (Inspector) -->
+        <!-- Fixed Overlay on Mobile, Sidebar on Desktop -->
+        <aside id="inspector-panel"
+            class="absolute inset-y-0 right-0 w-80 bg-zinc-900 border-l border-zinc-800 flex flex-col z-40 transform translate-x-full md:translate-x-0 md:relative md:w-72 transition-transform duration-300 shadow-2xl md:shadow-none">
+
+            <!-- Tab Header -->
+            <div class="flex items-center justify-between border-b border-zinc-800 pr-2">
+                <div class="px-4 py-3 text-xs font-bold text-white tracking-widest uppercase">Inspector</div>
+                <button id="btn-close-inspector" class="md:hidden p-2 text-zinc-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+
+                <!-- Global Adjustments -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Global</h3>
+                        <div class="flex gap-2">
+                            <button id="rotate-left" class="text-zinc-400 hover:text-white" title="Rotate Left 90°"><i
+                                    data-lucide="rotate-ccw" class="w-3 h-3"></i></button>
+                            <button id="rotate-right" class="text-zinc-400 hover:text-white" title="Rotate Right 90°"><i
+                                    data-lucide="rotate-cw" class="w-3 h-3"></i></button>
+                            <div class="w-px h-3 bg-zinc-700"></div>
+                            <button id="reset-global"
+                                class="text-[10px] text-blue-400 hover:text-blue-300">Reset</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 bg-zinc-950/30 p-3 rounded-lg border border-zinc-800/50">
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-zinc-400"><span>Brightness</span><span
+                                    id="val-brightness" class="font-mono text-zinc-500">100%</span></div>
+                            <input type="range" id="adj-brightness" min="0" max="200" value="100">
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-zinc-400"><span>Contrast</span><span
+                                    id="val-contrast" class="font-mono text-zinc-500">100%</span></div>
+                            <input type="range" id="adj-contrast" min="0" max="200" value="100">
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-zinc-400"><span>Saturation</span><span
+                                    id="val-saturate" class="font-mono text-zinc-500">100%</span></div>
+                            <input type="range" id="adj-saturate" min="0" max="200" value="100">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-zinc-800"></div>
+
+                <!-- Layer Properties (Conditional) -->
+                <div id="layer-properties" class="space-y-4 opacity-50 pointer-events-none transition-opacity">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Properties</h3>
+                        <button id="btn-delete-layer"
+                            class="p-1.5 bg-red-900/20 text-red-400 hover:bg-red-900/40 rounded transition-colors"
+                            title="Delete Object">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+
+                    <!-- Shape/Brush Controls -->
+                    <div id="controls-shape" class="hidden-control">
+                        <div class="grid grid-cols-2 gap-2 mb-4">
+                            <button
+                                class="effect-btn active flex flex-col items-center justify-center p-2 rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-600 transition-all gap-1"
+                                data-type="blur">
+                                <i data-lucide="droplets" class="w-4 h-4 mb-1"></i>
+                                <span class="text-[10px]">Blur</span>
+                            </button>
+                            <button
+                                class="effect-btn flex flex-col items-center justify-center p-2 rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-600 transition-all gap-1"
+                                data-type="pixelate">
+                                <i data-lucide="grid" class="w-4 h-4 mb-1"></i>
+                                <span class="text-[10px]">Pixelate</span>
+                            </button>
+                            <button
+                                class="effect-btn flex flex-col items-center justify-center p-2 rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-600 transition-all gap-1"
+                                data-type="invert">
+                                <i data-lucide="contrast" class="w-4 h-4 mb-1"></i>
+                                <span class="text-[10px]">Invert</span>
+                            </button>
+                            <button
+                                class="effect-btn flex flex-col items-center justify-center p-2 rounded bg-zinc-800 border border-zinc-700 hover:border-zinc-600 transition-all gap-1"
+                                data-type="solid">
+                                <i data-lucide="square" class="w-4 h-4 mb-1"></i>
+                                <span class="text-[10px]">Solid</span>
+                            </button>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-zinc-400">
+                                <span id="lbl-intensity">Intensity</span>
+                                <span id="layer-strength-val" class="font-mono text-zinc-500">20px</span>
+                            </div>
+                            <input type="range" id="layer-strength" min="1" max="100" value="20">
+                        </div>
+                    </div>
+
+                    <!-- Text Controls -->
+                    <div id="controls-text" class="hidden-control hidden">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-xs text-zinc-400 block mb-1">Content</label>
+                                <textarea id="text-input"
+                                    class="w-full bg-zinc-950 border border-zinc-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none"
+                                    rows="2"></textarea>
+                            </div>
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-xs text-zinc-400">
+                                    <span>Font Size</span>
+                                    <span id="text-size-val" class="font-mono text-zinc-500">20px</span>
+                                </div>
+                                <input type="range" id="text-size" min="10" max="200" value="40">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stamp Controls -->
+                    <div id="controls-stamp" class="hidden-control hidden">
+                        <label class="text-xs text-zinc-400 block mb-2">Select Emoji</label>
+                        <div class="grid grid-cols-4 gap-2 mb-4" id="emoji-grid">
+                            <!-- Generated by JS -->
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-zinc-400">
+                                <span>Size</span>
+                                <span id="stamp-size-val" class="font-mono text-zinc-500">50px</span>
+                            </div>
+                            <input type="range" id="stamp-size" min="10" max="300" value="50">
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="h-px bg-zinc-800"></div>
+
+                <!-- Layers List -->
+                <div class="flex flex-col flex-1 min-h-[150px]">
+                    <h3 class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Layers Stack</h3>
+                    <div id="layers-list"
+                        class="flex-1 bg-zinc-950/50 rounded-lg border border-zinc-800 overflow-y-auto p-1 space-y-0.5 custom-scrollbar">
+                        <!-- Layers injected here -->
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Mobile Overlay Backdrop for Inspector -->
+        <div id="inspector-backdrop" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm"></div>
+
+    </main>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-overlay px-4">
+        <div class="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-6 max-w-sm w-full relative">
+            <button id="close-help" class="absolute top-4 right-4 text-zinc-500 hover:text-white"><i data-lucide="x"
+                    class="w-5 h-5"></i></button>
+            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2"><i data-lucide="keyboard"
+                    class="w-5 h-5 text-blue-500"></i> Keyboard Shortcuts</h3>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Select Tool</span>
+                    <span class="text-white font-mono bg-zinc-800 px-1.5 rounded">V</span></div>
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Rectangle</span>
+                    <span class="text-white font-mono bg-zinc-800 px-1.5 rounded">M</span></div>
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Ellipse</span> <span
+                        class="text-white font-mono bg-zinc-800 px-1.5 rounded">O</span></div>
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Brush</span> <span
+                        class="text-white font-mono bg-zinc-800 px-1.5 rounded">B</span></div>
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Text</span> <span
+                        class="text-white font-mono bg-zinc-800 px-1.5 rounded">T</span></div>
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Stamp</span> <span
+                        class="text-white font-mono bg-zinc-800 px-1.5 rounded">S</span></div>
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Pan Canvas</span>
+                    <span class="text-white font-mono bg-zinc-800 px-1.5 rounded">Space</span></div>
+                <div class="flex justify-between text-zinc-400 border-b border-zinc-800 pb-2"><span>Undo</span> <span
+                        class="text-white font-mono bg-zinc-800 px-1.5 rounded">Ctrl+Z</span></div>
+                <div class="flex justify-between text-zinc-400 pb-2"><span>Redo</span> <span
+                        class="text-white font-mono bg-zinc-800 px-1.5 rounded">Ctrl+Y</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const EMOJIS = ['😎', '⛔', '💩', '🤡', '⚠️', '🙈', '😷', '🤖', '🎃', '👽', '👻', '💀'];
+
+        class Studio {
+            constructor() {
+                // UI Elements
+                this.ui = {
+                    fileInput: document.getElementById('file-upload'),
+                    viewport: document.getElementById('viewport'),
+                    canvasWrapper: document.getElementById('canvas-wrapper'),
+                    canvas: document.getElementById('main-canvas'),
+                    uiLayer: document.getElementById('ui-layer'),
+                    welcome: document.getElementById('welcome-screen'),
+                    exportBtn: document.getElementById('btn-export'),
+                    undoBtn: document.getElementById('btn-undo'),
+                    redoBtn: document.getElementById('btn-redo'),
+
+                    tools: {
+                        select: document.getElementById('tool-select'),
+                        rect: document.getElementById('tool-rect'),
+                        ellipse: document.getElementById('tool-ellipse'),
+                        brush: document.getElementById('tool-brush'),
+                        text: document.getElementById('tool-text'),
+                        stamp: document.getElementById('tool-stamp'),
+                        hand: document.getElementById('tool-hand'),
+                    },
+
+                    propPanel: document.getElementById('layer-properties'),
+                    deleteLayer: document.getElementById('btn-delete-layer'),
+                    layersList: document.getElementById('layers-list'),
+
+                    // Controls
+                    ctrlShape: document.getElementById('controls-shape'),
+                    ctrlText: document.getElementById('controls-text'),
+                    ctrlStamp: document.getElementById('controls-stamp'),
+
+                    // Inputs
+                    layerStrength: document.getElementById('layer-strength'),
+                    strengthVal: document.getElementById('layer-strength-val'),
+                    textInput: document.getElementById('text-input'),
+                    textSize: document.getElementById('text-size'),
+                    textSizeVal: document.getElementById('text-size-val'),
+                    stampSize: document.getElementById('stamp-size'),
+                    stampSizeVal: document.getElementById('stamp-size-val'),
+                    emojiGrid: document.getElementById('emoji-grid'),
+
+                    // Global Controls
+                    rotateLeft: document.getElementById('rotate-left'),
+                    rotateRight: document.getElementById('rotate-right'),
+                    zoomIn: document.getElementById('zoom-in'),
+                    zoomOut: document.getElementById('zoom-out'),
+                    zoomLevel: document.getElementById('zoom-level'),
+                    helpBtn: document.getElementById('btn-help'),
+                    helpModal: document.getElementById('help-modal'),
+                    closeHelp: document.getElementById('close-help'),
+
+                    // Mobile Inspector
+                    inspectorPanel: document.getElementById('inspector-panel'),
+                    btnToggleInspector: document.getElementById('btn-toggle-inspector'),
+                    btnCloseInspector: document.getElementById('btn-close-inspector'),
+                    inspectorBackdrop: document.getElementById('inspector-backdrop'),
+                    inspectorBadge: document.getElementById('inspector-badge'),
+                };
+
+                this.ctx = this.ui.canvas.getContext('2d', { willReadFrequently: true });
+
+                // App State
+                this.state = {
+                    img: null,
+                    rotation: 0,
+                    layers: [],
+                    selectedId: null,
+                    nextId: 1,
+                    tool: 'select',
+
+                    view: { scale: 1, panX: 0, panY: 0 },
+                    global: { brightness: 100, contrast: 100, saturate: 100 },
+
+                    interaction: {
+                        isDragging: false,
+                        dragMode: null,
+                        startPos: { x: 0, y: 0 },
+                        startView: { x: 0, y: 0 },
+                        activeHandle: null,
+                        tempLayer: null,
+                    }
+                };
+
+                this.history = [];
+                this.historyIndex = -1;
+
+                // Init
+                this.initEmojiGrid();
+                lucide.createIcons();
+                this.bindEvents();
+                this.renderLoop = this.renderLoop.bind(this);
+                requestAnimationFrame(this.renderLoop);
+            }
+
+            initEmojiGrid() {
+                this.ui.emojiGrid.innerHTML = EMOJIS.map(e => `
+                    <button class="emoji-btn h-8 w-8 flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 rounded text-xl" 
+                            onclick="app.setStamp('${e}')">${e}</button>
+                `).join('');
+            }
+
+            bindEvents() {
+                // File
+                this.ui.fileInput.addEventListener('change', e => this.loadFile(e.target.files[0]));
+                this.ui.viewport.addEventListener('dragover', e => e.preventDefault());
+                this.ui.viewport.addEventListener('drop', e => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files[0]) this.loadFile(e.dataTransfer.files[0]);
+                });
+                this.ui.exportBtn.addEventListener('click', () => this.exportImage());
+
+                // Tools
+                Object.keys(this.ui.tools).forEach(k => {
+                    this.ui.tools[k].addEventListener('click', () => this.setTool(k));
+                });
+
+                // Canvas Interaction (Pointer Events for better Touch support)
+                this.ui.viewport.addEventListener('pointerdown', this.onPointerDown.bind(this));
+                window.addEventListener('pointermove', this.onPointerMove.bind(this));
+                window.addEventListener('pointerup', this.onPointerUp.bind(this));
+                window.addEventListener('pointercancel', this.onPointerUp.bind(this));
+                this.ui.viewport.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
+
+                // Properties Change Events
+                const bindInput = (el, prop, valFormat) => {
+                    el.addEventListener('change', () => this.recordHistory());
+                    el.addEventListener('input', e => {
+                        let val = e.target.value;
+                        if (el.type === 'range') val = parseInt(val);
+                        this.updateSelectedLayer({ [prop]: val }, false);
+                        if (valFormat) valFormat(val);
+                    });
+                };
+
+                bindInput(this.ui.layerStrength, 'strength', v => this.ui.strengthVal.innerText = v + 'px');
+                bindInput(this.ui.textSize, 'fontSize', v => this.ui.textSizeVal.innerText = v + 'px');
+                bindInput(this.ui.stampSize, 'fontSize', v => this.ui.stampSizeVal.innerText = v + 'px');
+                bindInput(this.ui.textInput, 'text');
+
+                this.ui.deleteLayer.addEventListener('click', () => {
+                    this.recordHistory();
+                    this.deleteSelected();
+                });
+
+                document.querySelectorAll('.effect-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.recordHistory();
+                        this.updateSelectedLayer({ effect: btn.dataset.type });
+                    });
+                });
+
+                // Global Controls
+                this.ui.undoBtn.addEventListener('click', () => this.undo());
+                this.ui.redoBtn.addEventListener('click', () => this.redo());
+
+                ['brightness', 'contrast', 'saturate'].forEach(k => {
+                    const el = document.getElementById(`adj-${k}`);
+                    el.addEventListener('change', () => this.recordHistory());
+                    el.addEventListener('input', e => {
+                        this.state.global[k] = parseInt(e.target.value);
+                        document.getElementById(`val-${k}`).innerText = this.state.global[k] + '%';
+                        this.requestRender = true;
+                    });
+                });
+
+                document.getElementById('reset-global').addEventListener('click', () => {
+                    this.recordHistory();
+                    this.state.global = { brightness: 100, contrast: 100, saturate: 100 };
+                    ['brightness', 'contrast', 'saturate'].forEach(k => {
+                        document.getElementById(`adj-${k}`).value = 100;
+                        document.getElementById(`val-${k}`).innerText = '100%';
+                    });
+                    this.requestRender = true;
+                });
+
+                this.ui.rotateLeft.addEventListener('click', () => this.rotateImage(-90));
+                this.ui.rotateRight.addEventListener('click', () => this.rotateImage(90));
+                this.ui.zoomIn.addEventListener('click', () => this.zoom(0.1));
+                this.ui.zoomOut.addEventListener('click', () => this.zoom(-0.1));
+
+                // Modal
+                this.ui.helpBtn.addEventListener('click', () => this.ui.helpModal.classList.remove('hidden'));
+                this.ui.closeHelp.addEventListener('click', () => this.ui.helpModal.classList.add('hidden'));
+
+                // Mobile Inspector Logic
+                const toggleInspector = (show) => {
+                    if (show) {
+                        this.ui.inspectorPanel.classList.remove('translate-x-full');
+                        this.ui.inspectorBackdrop.classList.remove('hidden');
+                        // Hide badge when opening
+                        this.ui.inspectorBadge.classList.add('hidden');
+                    } else {
+                        this.ui.inspectorPanel.classList.add('translate-x-full');
+                        this.ui.inspectorBackdrop.classList.add('hidden');
+                    }
+                };
+
+                this.ui.btnToggleInspector.addEventListener('click', () => toggleInspector(true));
+                this.ui.btnCloseInspector.addEventListener('click', () => toggleInspector(false));
+                this.ui.inspectorBackdrop.addEventListener('click', () => toggleInspector(false));
+
+                // Keyboard
+                window.addEventListener('keydown', e => {
+                    if (e.key === 'Delete' || e.key === 'Backspace') {
+                        if (document.activeElement !== this.ui.textInput) {
+                            this.recordHistory();
+                            this.deleteSelected();
+                        }
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); this.undo(); }
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); this.redo(); }
+                    if (e.code === 'Space' && this.state.tool !== 'hand') {
+                        this.prevTool = this.state.tool;
+                        this.setTool('hand');
+                    }
+                    if (document.activeElement !== this.ui.textInput) {
+                        if (e.key.toLowerCase() === 'v') this.setTool('select');
+                        if (e.key.toLowerCase() === 'm') this.setTool('rect');
+                        if (e.key.toLowerCase() === 'o') this.setTool('ellipse');
+                        if (e.key.toLowerCase() === 'b') this.setTool('brush');
+                        if (e.key.toLowerCase() === 't') this.setTool('text');
+                        if (e.key.toLowerCase() === 's') this.setTool('stamp');
+                    }
+                });
+                window.addEventListener('keyup', e => {
+                    if (e.code === 'Space' && this.prevTool) {
+                        this.setTool(this.prevTool);
+                        this.prevTool = null;
+                    }
+                });
+            }
+
+            loadFile(file) {
+                if (!file || !file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = new Image();
+                    img.onload = () => this.initEditor(img, file.name);
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            initEditor(img, name) {
+                this.state.img = img;
+                this.state.rotation = 0;
+
+                this.state.layers = [];
+                this.state.selectedId = null;
+                this.state.nextId = 1;
+                this.history = [];
+                this.historyIndex = -1;
+
+                this.setupCanvasDimensions();
+
+                this.ui.welcome.style.display = 'none';
+                this.ui.canvasWrapper.style.display = 'block';
+                this.ui.exportBtn.disabled = false;
+
+                this.recordHistory();
+                this.fitToScreen();
+                this.updateLayersList();
+                this.updateInspector();
+                this.requestRender = true;
+            }
+
+            setupCanvasDimensions() {
+                const rot = Math.abs(this.state.rotation % 180);
+                if (rot === 90) {
+                    this.ui.canvas.width = this.state.img.height;
+                    this.ui.canvas.height = this.state.img.width;
+                } else {
+                    this.ui.canvas.width = this.state.img.width;
+                    this.ui.canvas.height = this.state.img.height;
+                }
+            }
+
+            fitToScreen() {
+                const viewportW = this.ui.viewport.clientWidth;
+                const viewportH = this.ui.viewport.clientHeight;
+                const cw = this.ui.canvas.width;
+                const ch = this.ui.canvas.height;
+                // Add padding
+                const scale = Math.min((viewportW - 40) / cw, (viewportH - 40) / ch, 1);
+                this.state.view.scale = scale;
+                this.state.view.panX = (viewportW - cw * scale) / 2;
+                this.state.view.panY = (viewportH - ch * scale) / 2;
+                this.updateViewTransform();
+            }
+
+            // --- Rotation Logic ---
+            rotateImage(deg) {
+                this.recordHistory();
+                const oldW = this.ui.canvas.width;
+                const oldH = this.ui.canvas.height;
+
+                this.state.rotation = (this.state.rotation + deg) % 360;
+                this.setupCanvasDimensions();
+
+                const rad = deg * Math.PI / 180;
+                const cos = Math.round(Math.cos(rad)); // 0 or 1 or -1
+                const sin = Math.round(Math.sin(rad)); // 0 or 1 or -1
+
+                this.state.layers.forEach(l => {
+                    const cx = oldW / 2;
+                    const cy = oldH / 2;
+                    const ncx = this.ui.canvas.width / 2;
+                    const ncy = this.ui.canvas.height / 2;
+
+                    let lcx = l.x + l.w / 2;
+                    let lcy = l.y + l.h / 2;
+
+                    if (l.type === 'brush') {
+                        l.points.forEach(p => {
+                            const rx = p.x - cx;
+                            const ry = p.y - cy;
+                            p.x = ncx + (rx * cos - ry * sin);
+                            p.y = ncy + (rx * sin + ry * cos);
+                        });
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        l.points.forEach(p => {
+                            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                            if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+                        });
+                        const pad = l.strength + 2;
+                        l.x = minX - pad; l.y = minY - pad;
+                        l.w = maxX - minX + pad * 2; l.h = maxY - minY + pad * 2;
+                    } else {
+                        const rx = lcx - cx;
+                        const ry = lcy - cy;
+                        const newLcx = ncx + (rx * cos - ry * sin);
+                        const newLcy = ncy + (rx * sin + ry * cos);
+
+                        if (Math.abs(sin) === 1) {
+                            const temp = l.w; l.w = l.h; l.h = temp;
+                        }
+                        l.x = newLcx - l.w / 2;
+                        l.y = newLcy - l.h / 2;
+                    }
+                });
+
+                this.fitToScreen();
+                this.requestRender = true;
+            }
+
+            // --- History ---
+            recordHistory() {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.history = this.history.slice(0, this.historyIndex + 1);
+                }
+                const snapshot = JSON.stringify({
+                    layers: this.state.layers,
+                    global: this.state.global,
+                    rotation: this.state.rotation
+                });
+                this.history.push(snapshot);
+                this.historyIndex++;
+                if (this.history.length > 30) {
+                    this.history.shift();
+                    this.historyIndex--;
+                }
+                this.ui.undoBtn.disabled = this.historyIndex <= 0;
+                this.ui.redoBtn.disabled = this.historyIndex >= this.history.length - 1;
+            }
+
+            undo() {
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.restoreState(this.history[this.historyIndex]);
+                }
+            }
+
+            redo() {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    this.restoreState(this.history[this.historyIndex]);
+                }
+            }
+
+            restoreState(json) {
+                const data = JSON.parse(json);
+                if (this.state.rotation !== data.rotation) {
+                    this.state.rotation = data.rotation;
+                    this.setupCanvasDimensions();
+                    this.fitToScreen();
+                }
+                this.state.layers = data.layers;
+                this.state.global = data.global;
+
+                ['brightness', 'contrast', 'saturate'].forEach(k => {
+                    document.getElementById(`adj-${k}`).value = this.state.global[k];
+                    document.getElementById(`val-${k}`).innerText = this.state.global[k] + '%';
+                });
+
+                this.selectLayer(null);
+                this.updateLayersList();
+                this.requestRender = true;
+                this.ui.undoBtn.disabled = this.historyIndex <= 0;
+                this.ui.redoBtn.disabled = this.historyIndex >= this.history.length - 1;
+            }
+
+            // --- Tools ---
+            setTool(tool) {
+                this.state.tool = tool;
+                Object.values(this.ui.tools).forEach(btn => btn.classList.remove('active'));
+                this.ui.tools[tool].classList.add('active');
+
+                let cursor = 'default';
+                if (tool === 'hand') cursor = 'grab';
+                else if (['select', 'text', 'stamp'].includes(tool)) cursor = 'default';
+                else cursor = 'crosshair';
+
+                this.ui.viewport.style.cursor = cursor;
+                if (tool !== 'select') this.selectLayer(null);
+            }
+
+            setStamp(emoji) {
+                if (this.state.selectedId) {
+                    const l = this.state.layers.find(l => l.id === this.state.selectedId);
+                    if (l && l.type === 'stamp') {
+                        this.recordHistory();
+                        l.text = emoji;
+                        this.requestRender = true;
+                        return;
+                    }
+                }
+                this.state.nextStamp = emoji;
+                this.setTool('stamp');
+            }
+
+            getPointerPos(e) {
+                const rect = this.ui.viewport.getBoundingClientRect();
+                return {
+                    screenX: e.clientX - rect.left,
+                    screenY: e.clientY - rect.top,
+                    canvasX: (e.clientX - rect.left - this.state.view.panX) / this.state.view.scale,
+                    canvasY: (e.clientY - rect.top - this.state.view.panY) / this.state.view.scale
+                };
+            }
+
+            onPointerDown(e) {
+                if (!this.state.img) return;
+                // Important for pointer events in some browsers to capture movement outside el
+                this.ui.viewport.setPointerCapture(e.pointerId);
+
+                const pos = this.getPointerPos(e);
+                const inter = this.state.interaction;
+                inter.isDragging = true;
+                inter.startPos = { x: pos.screenX, y: pos.screenY };
+
+                if (this.state.tool === 'hand' || e.code === 'Space' || e.button === 1) {
+                    inter.dragMode = 'pan';
+                    inter.startView = { x: this.state.view.panX, y: this.state.view.panY };
+                    this.ui.viewport.style.cursor = 'grabbing';
+                    return;
+                }
+
+                // Creation Tools
+                if (['rect', 'ellipse', 'brush'].includes(this.state.tool)) {
+                    this.selectLayer(null);
+                    if (this.state.tool === 'brush') {
+                        inter.dragMode = 'brush';
+                        inter.tempLayer = {
+                            id: -1, type: 'brush', visible: true, effect: 'blur', strength: 20,
+                            points: [{ x: pos.canvasX, y: pos.canvasY }], x: 0, y: 0, w: 0, h: 0
+                        };
+                    } else {
+                        inter.dragMode = 'create';
+                        inter.tempLayer = {
+                            id: -1, type: this.state.tool, visible: true, effect: 'blur', strength: 20,
+                            x: pos.canvasX, y: pos.canvasY, w: 0, h: 0
+                        };
+                    }
+                    return;
+                }
+
+                // Instant Placement Tools (Text/Stamp)
+                if (this.state.tool === 'text') {
+                    this.recordHistory();
+                    const id = this.state.nextId++;
+                    const layer = {
+                        id, type: 'text', visible: true,
+                        x: pos.canvasX, y: pos.canvasY - 20, w: 150, h: 40,
+                        text: 'CENSORED', fontSize: 40, color: 'white'
+                    };
+                    this.state.layers.push(layer);
+                    this.selectLayer(id);
+                    this.setTool('select');
+                    this.updateLayersList();
+                    this.requestRender = true;
+                    inter.isDragging = false;
+                    return;
+                }
+
+                if (this.state.tool === 'stamp') {
+                    this.recordHistory();
+                    const id = this.state.nextId++;
+                    const layer = {
+                        id, type: 'stamp', visible: true,
+                        x: pos.canvasX - 25, y: pos.canvasY - 25, w: 50, h: 50,
+                        text: this.state.nextStamp || '😎', fontSize: 50
+                    };
+                    this.state.layers.push(layer);
+                    this.selectLayer(id);
+                    this.setTool('select');
+                    this.updateLayersList();
+                    this.requestRender = true;
+                    inter.isDragging = false;
+                    return;
+                }
+
+                // Selection
+                if (this.state.tool === 'select') {
+                    if (this.state.selectedId) {
+                        const handle = this.checkHandles(pos.canvasX, pos.canvasY);
+                        if (handle) {
+                            inter.dragMode = 'resize';
+                            inter.activeHandle = handle;
+                            const l = this.state.layers.find(l => l.id === this.state.selectedId);
+                            inter.initialLayerState = JSON.parse(JSON.stringify(l));
+                            return;
+                        }
+                    }
+                    const hitId = this.checkHit(pos.canvasX, pos.canvasY);
+                    if (hitId) {
+                        this.selectLayer(hitId);
+                        inter.dragMode = 'move';
+                        const l = this.state.layers.find(l => l.id === hitId);
+                        inter.initialLayerState = { x: l.x, y: l.y };
+                        this.drawUI();
+                    } else {
+                        this.selectLayer(null);
+                    }
+                }
+            }
+
+            onPointerMove(e) {
+                if (!this.state.img) return;
+                const pos = this.getPointerPos(e);
+                const inter = this.state.interaction;
+
+                if (!inter.isDragging && this.state.tool === 'select' && this.state.selectedId) {
+                    const handle = this.checkHandles(pos.canvasX, pos.canvasY);
+                    this.ui.viewport.style.cursor = handle ? (handle + '-resize') : 'default';
+                }
+
+                if (!inter.isDragging) return;
+
+                if (inter.dragMode === 'pan') {
+                    const dx = pos.screenX - inter.startPos.x;
+                    const dy = pos.screenY - inter.startPos.y;
+                    this.state.view.panX = inter.startView.x + dx;
+                    this.state.view.panY = inter.startView.y + dy;
+                    this.updateViewTransform();
+                } else if (inter.dragMode === 'brush') {
+                    inter.tempLayer.points.push({ x: pos.canvasX, y: pos.canvasY });
+                    this.drawUI();
+                } else if (inter.dragMode === 'create') {
+                    inter.tempLayer.w = pos.canvasX - inter.tempLayer.x;
+                    inter.tempLayer.h = pos.canvasY - inter.tempLayer.y;
+                    this.drawUI();
+                } else if (inter.dragMode === 'move' && this.state.selectedId) {
+                    const l = this.state.layers.find(l => l.id === this.state.selectedId);
+                    if (l.type !== 'brush') {
+                        const dx = (pos.screenX - inter.startPos.x) / this.state.view.scale;
+                        const dy = (pos.screenY - inter.startPos.y) / this.state.view.scale;
+                        l.x = inter.initialLayerState.x + dx;
+                        l.y = inter.initialLayerState.y + dy;
+                        this.requestRender = true;
+                    }
+                } else if (inter.dragMode === 'resize' && this.state.selectedId) {
+                    this.handleResize(pos.canvasX, pos.canvasY);
+                }
+            }
+
+            onPointerUp(e) {
+                const inter = this.state.interaction;
+                if (!inter.isDragging) return;
+                this.ui.viewport.releasePointerCapture(e.pointerId);
+
+                if (inter.dragMode === 'create' || inter.dragMode === 'brush') {
+                    this.recordHistory();
+                    const t = inter.tempLayer;
+                    let finalLayer = null;
+
+                    if (t.type === 'brush' && t.points.length > 2) {
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        t.points.forEach(p => {
+                            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                            if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+                        });
+                        const pad = t.strength + 2;
+                        finalLayer = {
+                            id: this.state.nextId++, type: 'brush', visible: true, effect: 'blur', strength: 30,
+                            points: t.points, x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2
+                        };
+                    } else if (Math.abs(t.w) > 5) {
+                        finalLayer = {
+                            id: this.state.nextId++, type: t.type, visible: true, effect: 'blur', strength: 20,
+                            x: t.w < 0 ? t.x + t.w : t.x,
+                            y: t.h < 0 ? t.y + t.h : t.y,
+                            w: Math.abs(t.w), h: Math.abs(t.h)
+                        };
+                    }
+
+                    if (finalLayer) {
+                        this.state.layers.push(finalLayer);
+                        this.selectLayer(finalLayer.id);
+                        this.updateLayersList();
+                        if (finalLayer.type !== 'brush') this.setTool('select');
+                    }
+                    this.requestRender = true;
+                } else if (inter.dragMode === 'move' || inter.dragMode === 'resize') {
+                    this.recordHistory();
+                }
+
+                inter.isDragging = false;
+                inter.dragMode = null;
+                inter.tempLayer = null;
+                this.ui.viewport.style.cursor = this.state.tool === 'hand' ? 'grab' : (this.state.tool === 'select' ? 'default' : 'crosshair');
+                this.drawUI();
+            }
+
+            onWheel(e) {
+                if (!this.state.img) return;
+                e.preventDefault();
+                this.zoom(e.deltaY > 0 ? -0.1 : 0.1, e.clientX, e.clientY);
+            }
+
+            zoom(delta, clientX, clientY) {
+                const oldScale = this.state.view.scale;
+                let newScale = Math.max(0.05, Math.min(10, oldScale + delta));
+                if (!clientX) {
+                    const rect = this.ui.viewport.getBoundingClientRect();
+                    clientX = rect.left + rect.width / 2;
+                    clientY = rect.top + rect.height / 2;
+                }
+                const rect = this.ui.viewport.getBoundingClientRect();
+                const mx = clientX - rect.left;
+                const my = clientY - rect.top;
+                const cx = (mx - this.state.view.panX) / oldScale;
+                const cy = (my - this.state.view.panY) / oldScale;
+                this.state.view.panX = mx - cx * newScale;
+                this.state.view.panY = my - cy * newScale;
+                this.state.view.scale = newScale;
+                this.updateViewTransform();
+            }
+
+            updateViewTransform() {
+                this.ui.canvasWrapper.style.transform = `translate(${this.state.view.panX}px, ${this.state.view.panY}px) scale(${this.state.view.scale})`;
+                this.ui.zoomLevel.innerText = Math.round(this.state.view.scale * 100) + '%';
+                this.drawUI();
+            }
+
+            checkHit(x, y) {
+                for (let i = this.state.layers.length - 1; i >= 0; i--) {
+                    const l = this.state.layers[i];
+                    if (!l.visible) continue;
+                    if (x >= l.x && x <= l.x + l.w && y >= l.y && y <= l.y + l.h) return l.id;
+                }
+                return null;
+            }
+
+            checkHandles(x, y) {
+                const l = this.state.layers.find(l => l.id === this.state.selectedId);
+                if (!l || l.type === 'brush') return null;
+                const dist = 15 / this.state.view.scale; // Larger hit area for mobile
+                if (Math.abs(x - l.x) < dist && Math.abs(y - l.y) < dist) return 'nw';
+                if (Math.abs(x - (l.x + l.w)) < dist && Math.abs(y - l.y) < dist) return 'ne';
+                if (Math.abs(x - l.x) < dist && Math.abs(y - (l.y + l.h)) < dist) return 'sw';
+                if (Math.abs(x - (l.x + l.w)) < dist && Math.abs(y - (l.y + l.h)) < dist) return 'se';
+                return null;
+            }
+
+            handleResize(currX, currY) {
+                const l = this.state.layers.find(l => l.id === this.state.selectedId);
+                const init = this.state.interaction.initialLayerState;
+                const handle = this.state.interaction.activeHandle;
+
+                if (handle === 'se') { l.w = Math.max(10, currX - init.x); l.h = Math.max(10, currY - init.y); }
+                else if (handle === 'sw') { const nw = init.w + (init.x - currX); if (nw > 10) { l.x = currX; l.w = nw; } l.h = Math.max(10, currY - init.y); }
+                else if (handle === 'ne') { l.w = Math.max(10, currX - init.x); const nh = init.h + (init.y - currY); if (nh > 10) { l.y = currY; l.h = nh; } }
+                else if (handle === 'nw') { const nw = init.w + (init.x - currX); const nh = init.h + (init.y - currY); if (nw > 10) { l.x = currX; l.w = nw; } if (nh > 10) { l.y = currY; l.h = nh; } }
+                this.requestRender = true;
+            }
+
+            // --- Render ---
+
+            render() {
+                const ctx = this.ctx;
+                const { width, height } = this.ui.canvas;
+                const g = this.state.global;
+
+                ctx.clearRect(0, 0, width, height);
+                ctx.save();
+                ctx.translate(width / 2, height / 2);
+                ctx.rotate(this.state.rotation * Math.PI / 180);
+
+                // Draw Base Image
+                const imgW = this.state.img.width;
+                const imgH = this.state.img.height;
+                ctx.filter = `brightness(${g.brightness}%) contrast(${g.contrast}%) saturate(${g.saturate}%)`;
+                ctx.drawImage(this.state.img, -imgW / 2, -imgH / 2);
+                ctx.filter = 'none';
+                ctx.restore();
+
+                // Draw Layers (They are now in canvas coordinate space)
+                this.state.layers.forEach(l => {
+                    if (!l.visible) return;
+                    if (l.type === 'brush') this.renderBrushLayer(ctx, l);
+                    else if (l.type === 'text') this.renderTextLayer(ctx, l);
+                    else if (l.type === 'stamp') this.renderStampLayer(ctx, l);
+                    else this.renderShapeLayer(ctx, l);
+                });
+            }
+
+            renderTextLayer(ctx, l) {
+                ctx.save();
+                ctx.font = `bold ${l.fontSize}px sans-serif`;
+                ctx.fillStyle = 'black'; // text shadow/bg
+                ctx.fillText(l.text, l.x + 2, l.y + l.fontSize + 2);
+                ctx.fillStyle = 'white';
+                if (l.text === 'CENSORED') ctx.fillStyle = '#ef4444';
+                ctx.fillText(l.text, l.x, l.y + l.fontSize);
+
+                // Update W/H based on text metrics for hitbox
+                const m = ctx.measureText(l.text);
+                l.w = m.width;
+                l.h = l.fontSize; // Approx
+                ctx.restore();
+            }
+
+            renderStampLayer(ctx, l) {
+                ctx.save();
+                ctx.font = `${l.fontSize}px serif`;
+                ctx.fillText(l.text, l.x, l.y + l.fontSize * 0.9);
+                l.w = l.fontSize;
+                l.h = l.fontSize;
+                ctx.restore();
+            }
+
+            renderShapeLayer(ctx, l) {
+                ctx.save();
+                ctx.beginPath();
+                if (l.type === 'ellipse') ctx.ellipse(l.x + l.w / 2, l.y + l.h / 2, l.w / 2, l.h / 2, 0, 0, 2 * Math.PI);
+                else ctx.rect(l.x, l.y, l.w, l.h);
+                ctx.clip();
+                this.applyEffect(ctx, l);
+                ctx.restore();
+            }
+
+            renderBrushLayer(ctx, l) {
+                if (l.points.length < 2) return;
+                const temp = document.createElement('canvas');
+                temp.width = l.w; temp.height = l.h;
+                const tCtx = temp.getContext('2d');
+                tCtx.lineCap = 'round'; tCtx.lineJoin = 'round'; tCtx.lineWidth = l.strength;
+                tCtx.strokeStyle = 'white';
+                tCtx.beginPath();
+                tCtx.moveTo(l.points[0].x - l.x, l.points[0].y - l.y);
+                for (let i = 1; i < l.points.length; i++) tCtx.lineTo(l.points[i].x - l.x, l.points[i].y - l.y);
+                tCtx.stroke();
+
+                const srcData = document.createElement('canvas');
+                srcData.width = l.w; srcData.height = l.h;
+                const sCtx = srcData.getContext('2d');
+                sCtx.drawImage(this.ui.canvas, l.x, l.y, l.w, l.h, 0, 0, l.w, l.h);
+
+                this.applyCompositeEffect(tCtx, srcData, l);
+                ctx.drawImage(temp, l.x, l.y);
+            }
+
+            applyEffect(ctx, l) {
+                if (l.effect === 'solid') {
+                    ctx.fillStyle = 'black'; ctx.fill();
+                } else if (l.effect === 'blur') {
+                    // Optimization: Only blur relevant area
+                    const temp = document.createElement('canvas');
+                    temp.width = l.w; temp.height = l.h;
+                    const tCtx = temp.getContext('2d');
+                    tCtx.drawImage(this.ui.canvas, l.x, l.y, l.w, l.h, 0, 0, l.w, l.h);
+                    ctx.filter = `blur(${l.strength}px)`;
+                    ctx.drawImage(temp, l.x, l.y, l.w, l.h);
+                } else if (l.effect === 'invert') {
+                    const temp = document.createElement('canvas');
+                    temp.width = l.w; temp.height = l.h;
+                    const tCtx = temp.getContext('2d');
+                    tCtx.drawImage(this.ui.canvas, l.x, l.y, l.w, l.h, 0, 0, l.w, l.h);
+                    ctx.filter = 'invert(100%)';
+                    ctx.drawImage(temp, l.x, l.y, l.w, l.h);
+                } else if (l.effect === 'pixelate') {
+                    const blockSize = Math.max(2, l.strength);
+                    const w = Math.ceil(l.w / blockSize);
+                    const h = Math.ceil(l.h / blockSize);
+                    const temp = document.createElement('canvas');
+                    temp.width = w; temp.height = h;
+                    const tCtx = temp.getContext('2d');
+                    tCtx.imageSmoothingEnabled = false;
+                    tCtx.drawImage(this.ui.canvas, l.x, l.y, l.w, l.h, 0, 0, w, h);
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(temp, 0, 0, w, h, l.x, l.y, l.w, l.h);
+                    ctx.imageSmoothingEnabled = true;
+                }
+            }
+
+            applyCompositeEffect(ctx, src, l) {
+                // For brush
+                if (l.effect === 'blur') {
+                    const blurred = document.createElement('canvas');
+                    blurred.width = l.w; blurred.height = l.h;
+                    const bCtx = blurred.getContext('2d');
+                    bCtx.filter = `blur(${10}px)`;
+                    bCtx.drawImage(src, 0, 0);
+                    ctx.globalCompositeOperation = 'source-in';
+                    ctx.drawImage(blurred, 0, 0);
+                } else if (l.effect === 'solid') {
+                    ctx.globalCompositeOperation = 'source-in';
+                    ctx.fillStyle = 'black'; ctx.fillRect(0, 0, l.w, l.h);
+                } else if (l.effect === 'pixelate') {
+                    const blk = 8;
+                    const w = Math.ceil(l.w / blk); const h = Math.ceil(l.h / blk);
+                    const pCan = document.createElement('canvas'); pCan.width = w; pCan.height = h;
+                    const pCtx = pCan.getContext('2d'); pCtx.drawImage(src, 0, 0, l.w, l.h, 0, 0, w, h);
+                    ctx.globalCompositeOperation = 'source-in';
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(pCan, 0, 0, w, h, 0, 0, l.w, l.h);
+                } else if (l.effect === 'invert') {
+                    const iCan = document.createElement('canvas'); iCan.width = l.w; iCan.height = l.h;
+                    const iCtx = iCan.getContext('2d'); iCtx.filter = 'invert(100%)'; iCtx.drawImage(src, 0, 0);
+                    ctx.globalCompositeOperation = 'source-in'; ctx.drawImage(iCan, 0, 0);
+                }
+            }
+
+            drawUI() {
+                const layer = this.ui.uiLayer;
+                while (layer.firstChild) layer.removeChild(layer.firstChild);
+
+                // Drawing Temp Layer
+                if (this.state.interaction.tempLayer) {
+                    const t = this.state.interaction.tempLayer;
+                    if (t.type === 'brush' && t.points.length > 1) {
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        let d = `M ${t.points[0].x} ${t.points[0].y}`;
+                        for (let i = 1; i < t.points.length; i++) d += ` L ${t.points[i].x} ${t.points[i].y}`;
+                        path.setAttribute('d', d); path.setAttribute('stroke', '#3b82f6');
+                        path.setAttribute('stroke-width', 2 / this.state.view.scale); path.setAttribute('fill', 'none');
+                        layer.appendChild(path);
+                    } else if (t.type !== 'brush') {
+                        this.appendSVG(t.type, t.x, t.y, t.w, t.h, 'stroke-blue-500 stroke-2 fill-blue-500/20 dashed');
+                    }
+                }
+
+                if (this.state.selectedId) {
+                    const l = this.state.layers.find(l => l.id === this.state.selectedId);
+                    if (l && l.visible) {
+                        const rect = this.appendSVG('rect', l.x, l.y, l.w, l.h, 'stroke-blue-500 fill-transparent');
+                        rect.setAttribute('stroke-width', 1.5 / this.state.view.scale);
+
+                        if (l.type !== 'brush') {
+                            const hs = 8 / this.state.view.scale;
+                            this.appendHandle(l.x, l.y, hs); this.appendHandle(l.x + l.w, l.y, hs);
+                            this.appendHandle(l.x, l.y + l.h, hs); this.appendHandle(l.x + l.w, l.y + l.h, hs);
+                        }
+                    }
+                }
+            }
+
+            appendSVG(type, x, y, w, h, classes) {
+                const el = document.createElementNS('http://www.w3.org/2000/svg', type === 'ellipse' ? 'ellipse' : 'rect');
+                if (type === 'ellipse') {
+                    el.setAttribute('cx', x + w / 2); el.setAttribute('cy', y + h / 2);
+                    el.setAttribute('rx', Math.abs(w / 2)); el.setAttribute('ry', Math.abs(h / 2));
+                } else {
+                    el.setAttribute('x', w < 0 ? x + w : x); el.setAttribute('y', h < 0 ? y + h : y);
+                    el.setAttribute('width', Math.abs(w)); el.setAttribute('height', Math.abs(h));
+                }
+                if (classes.includes('stroke-blue-500')) el.setAttribute('stroke', '#3b82f6');
+                if (classes.includes('fill-blue-500/20')) el.setAttribute('fill', 'rgba(59, 130, 246, 0.2)');
+                if (classes.includes('fill-transparent')) el.setAttribute('fill', 'none');
+                if (classes.includes('dashed')) el.setAttribute('stroke-dasharray', '4');
+                this.ui.uiLayer.appendChild(el);
+                return el;
+            }
+
+            appendHandle(x, y, size) {
+                const el = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                el.setAttribute('x', x - size / 2); el.setAttribute('y', y - size / 2);
+                el.setAttribute('width', size); el.setAttribute('height', size);
+                el.setAttribute('fill', 'white'); el.setAttribute('stroke', '#3b82f6');
+                el.setAttribute('stroke-width', size / 4);
+                this.ui.uiLayer.appendChild(el);
+            }
+
+            renderLoop() {
+                if (this.requestRender && this.state.img) {
+                    this.render();
+                    this.requestRender = false;
+                    this.drawUI();
+                }
+                requestAnimationFrame(this.renderLoop);
+            }
+
+            updateLayersList() {
+                const list = this.ui.layersList;
+                list.innerHTML = '';
+                [...this.state.layers].reverse().forEach(l => {
+                    const el = document.createElement('div');
+                    el.className = `layer-item flex items-center justify-between p-2 cursor-pointer bg-zinc-900 mb-1 rounded border border-zinc-800 ${!l.visible ? 'hidden-layer' : ''}`;
+                    el.dataset.id = l.id;
+                    let icon = 'droplets';
+                    if (l.type === 'text') icon = 'type';
+                    else if (l.type === 'stamp') icon = 'smile';
+                    else if (l.type === 'brush') icon = 'pen-tool';
+                    else if (l.effect === 'pixelate') icon = 'grid';
+                    else if (l.effect === 'solid') icon = 'square';
+
+                    el.innerHTML = `
+                        <div class="flex items-center gap-2 overflow-hidden flex-1" onclick="app.selectLayer(${l.id})">
+                            <i data-lucide="${icon}" class="w-3.5 h-3.5 text-zinc-400"></i>
+                            <span class="text-xs text-zinc-300 truncate font-medium">${l.type === 'text' ? l.text : `Layer ${l.id}`}</span>
+                        </div>
+                        <button class="btn-vis p-1 text-zinc-400 hover:text-white" onclick="app.toggleVisibility(${l.id}, event)">
+                            <i data-lucide="${l.visible ? 'eye' : 'eye-off'}" class="w-3 h-3"></i>
+                        </button>
+                    `;
+                    list.appendChild(el);
+                });
+                lucide.createIcons();
+                this.updateListSelection();
+            }
+
+            toggleVisibility(id, e) {
+                e.stopPropagation();
+                this.recordHistory();
+                const l = this.state.layers.find(l => l.id === id);
+                if (l) { l.visible = !l.visible; this.updateLayersList(); this.requestRender = true; }
+            }
+
+            selectLayer(id) {
+                this.state.selectedId = id;
+                this.updateInspector();
+                this.updateListSelection();
+                this.drawUI();
+
+                // Show badge on mobile if layer selected
+                if (id && window.innerWidth < 768) {
+                    this.ui.inspectorBadge.classList.remove('hidden');
+                } else {
+                    this.ui.inspectorBadge.classList.add('hidden');
+                }
+            }
+
+            updateListSelection() {
+                this.ui.layersList.querySelectorAll('.layer-item').forEach(el => {
+                    if (parseInt(el.dataset.id) === this.state.selectedId) {
+                        el.classList.add('selected'); el.classList.replace('border-zinc-800', 'border-zinc-700');
+                    } else {
+                        el.classList.remove('selected'); el.classList.replace('border-zinc-700', 'border-zinc-800');
+                    }
+                });
+            }
+
+            updateInspector() {
+                const { propPanel, ctrlShape, ctrlText, ctrlStamp } = this.ui;
+                if (!this.state.selectedId) {
+                    propPanel.style.opacity = '0.5'; propPanel.style.pointerEvents = 'none'; return;
+                }
+                propPanel.style.opacity = '1'; propPanel.style.pointerEvents = 'auto';
+
+                const l = this.state.layers.find(l => l.id === this.state.selectedId);
+
+                ctrlShape.classList.add('hidden');
+                ctrlText.classList.add('hidden');
+                ctrlStamp.classList.add('hidden');
+
+                if (l.type === 'text') {
+                    ctrlText.classList.remove('hidden');
+                    this.ui.textInput.value = l.text;
+                    this.ui.textSize.value = l.fontSize;
+                    this.ui.textSizeVal.innerText = l.fontSize + 'px';
+                } else if (l.type === 'stamp') {
+                    ctrlStamp.classList.remove('hidden');
+                    this.ui.stampSize.value = l.fontSize;
+                    this.ui.stampSizeVal.innerText = l.fontSize + 'px';
+                } else {
+                    ctrlShape.classList.remove('hidden');
+                    document.getElementById('lbl-intensity').innerText = l.type === 'brush' ? 'Brush Size' : 'Intensity';
+                    this.ui.layerStrength.value = l.strength;
+                    this.ui.strengthVal.innerText = l.strength + 'px';
+                    document.querySelectorAll('.effect-btn').forEach(b => {
+                        if (b.dataset.type === l.effect) b.classList.add('bg-blue-600', 'border-blue-500', 'text-white');
+                        else b.classList.remove('bg-blue-600', 'border-blue-500', 'text-white');
+                    });
+                }
+            }
+
+            updateSelectedLayer(props, record = true) {
+                if (!this.state.selectedId) return;
+                const layer = this.state.layers.find(l => l.id === this.state.selectedId);
+                Object.assign(layer, props);
+                this.updateLayersList();
+                this.requestRender = true;
+            }
+
+            deleteSelected() {
+                if (!this.state.selectedId) return;
+                this.state.layers = this.state.layers.filter(l => l.id !== this.state.selectedId);
+                this.selectLayer(null); this.updateLayersList(); this.requestRender = true;
+            }
+
+            exportImage() {
+                this.selectLayer(null); this.render();
+                const link = document.createElement('a');
+                link.download = `BlurFace-Titan-${Date.now()}.png`;
+                link.href = this.ui.canvas.toDataURL('image/png', 0.9);
+                link.click();
+            }
+        }
+        window.app = new Studio();
+    </script>
+</body>
+
+</html>

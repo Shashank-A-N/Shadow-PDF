@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR PDF - Make Scanned PDFs Searchable</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PDF.js for rendering PDF pages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- Tesseract.js for OCR -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@2.1.5/dist/tesseract.min.js'></script>
+    <!-- pdf-lib.js for creating the new searchable PDF -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        /* Custom scrollbar for file list */
+        #file-list-container::-webkit-scrollbar, #merge-list-container::-webkit-scrollbar, #individual-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #file-list-container::-webkit-scrollbar-track, #merge-list-container::-webkit-scrollbar-track, #individual-list-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        #file-list-container::-webkit-scrollbar-thumb, #merge-list-container::-webkit-scrollbar-thumb, #individual-list-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        #file-list-container::-webkit-scrollbar-thumb:hover, #merge-list-container::-webkit-scrollbar-thumb:hover, #individual-list-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        #progress-bar-inner {
+            transition: width 0.3s ease-in-out;
+        }
+        .draggable-item {
+            cursor: grab;
+        }
+        .dragging {
+            opacity: 0.5;
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Liquid Glass Loader */
+        .liquid-loader {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            overflow: hidden;
+            border: 4px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+        .liquid-loader::before {
+            content: '';
+            position: absolute;
+            top: -150%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-color: #fff;
+            border-radius: 40%;
+            animation: wave 5s linear infinite;
+        }
+        @keyframes wave {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-100">
+
+    <div class="w-full h-screen bg-transparent flex flex-col">
+        <!-- Header -->
+        <div class="text-center p-4 flex-shrink-0">
+            <h1 class="text-3xl font-bold text-white">OCR PDF Converter</h1>
+            <p class="mt-1 text-gray-200">Make your scanned PDFs selectable and searchable.</p>
+        </div>
+
+        <div id="main-content" class="flex-grow flex flex-col gap-6 p-6 min-h-0">
+            <!-- Top Section: Options -->
+            <div class="w-full flex-shrink-0">
+                <div class="glass-panel p-6 rounded-2xl w-full max-w-3xl mx-auto">
+                    <h2 class="text-xl font-bold mb-4 text-white">1. Set OCR Options</h2>
+                    <div class="bg-black bg-opacity-10 border-l-4 border-blue-300 text-blue-100 p-3 rounded-md mb-6 text-sm"><p>The accuracy of detection is increased by correctly selecting the document's languages.</p></div>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="language-select" class="block text-sm font-medium text-gray-200 mb-1">Document Language</label>
+                            <select id="language-select" name="language-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base bg-white bg-opacity-20 border-gray-500 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="eng" class="text-black" selected>English</option><option value="spa" class="text-black">Spanish</option><option value="fra" class="text-black">French</option><option value="deu" class="text-black">German</option><option value="ita" class="text-black">Italian</option><option value="por" class="text-black">Portuguese</option><option value="nld" class="text-black">Dutch</option><option value="chi_sim" class="text-black">Chinese (Simplified)</option><option value="jpn" class="text-black">Japanese</option><option value="kor" class="text-black">Korean</option><option value="rus" class="text-black">Russian</option><option value="ara" class="text-black">Arabic</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Main Area -->
+            <div id="left-column" class="flex-grow flex flex-col min-w-0 items-center justify-start">
+                <!-- Drop Zone -->
+                <div id="drop-zone-area" class="w-full max-w-3xl mx-auto">
+                    <div id="drop-zone" class="glass-panel rounded-2xl text-center cursor-pointer w-full flex flex-col items-center justify-center p-4 min-h-[250px]">
+                        <input type="file" id="pdf-upload" class="hidden" accept="application/pdf" multiple>
+                        <div id="upload-prompt" class="flex flex-col items-center justify-center">
+                             <h2 class="text-xl font-bold mb-4 text-white">2. Upload Files</h2>
+                            <svg class="mx-auto h-12 w-12 text-gray-300" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                            <p class="mt-4 text-lg text-gray-200"><span class="font-semibold text-white">Click to upload</span> or drag and drop</p>
+                            <p class="mt-1 text-sm text-gray-400">PDF files only</p>
+                        </div>
+                        <div id="file-list-wrapper" class="hidden w-full h-full flex flex-col min-h-0">
+                            <div id="file-list-container" class="flex-grow overflow-y-auto pr-2"></div>
+                            <div class="flex-shrink-0 pt-4 flex flex-col sm:flex-row gap-3">
+                                <button id="add-more-btn" class="w-full sm:w-auto flex-grow bg-white bg-opacity-20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-30">Add More Files</button>
+                                <button id="convert-btn" class="w-full sm:w-auto flex-grow bg-red-500 text-white font-semibold py-3 px-4 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center">Apply OCR</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Status Area -->
+                <div id="status-area" class="hidden w-full max-w-3xl mx-auto items-center justify-center text-center p-6 glass-panel rounded-2xl">
+                    <div class="w-full max-w-md">
+                        <div class="flex items-center justify-center space-x-4">
+                            <div class="liquid-loader"></div>
+                            <div>
+                                <p id="status-text" class="text-lg font-semibold text-white">Processing...</p>
+                                <p id="status-progress" class="text-sm text-gray-200">Initializing...</p>
+                            </div>
+                        </div>
+                        <div class="w-full bg-black bg-opacity-20 rounded-full h-2.5 mt-6"><div id="progress-bar-inner" class="bg-white h-2.5 rounded-full" style="width: 0%"></div></div>
+                        <p id="overall-progress-text" class="text-sm text-gray-200 mt-2">Overall Progress: 0%</p>
+                        <button id="cancel-btn" class="mt-6 bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600">Cancel</button>
+                    </div>
+                </div>
+                <!-- Post-Process Area -->
+                <div id="post-process-area" class="hidden w-full max-w-3xl mx-auto flex-col p-4 glass-panel rounded-2xl">
+                     <div class="text-center">
+                        <svg class="mx-auto h-12 w-12 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 class="text-xl font-bold mt-2 text-white">OCR Complete!</h3>
+                        <p class="text-sm text-gray-200 mt-1 mb-4">Choose your download option.</p>
+                    </div>
+                    <!-- Merge View -->
+                    <div id="merge-view" class="hidden w-full flex-col">
+                        <p class="text-sm text-gray-200 text-center mb-4">Drag and drop the files to set the order for the final merged PDF.</p>
+                        <div id="merge-list-container" class="flex-grow overflow-y-auto border border-white border-opacity-20 rounded-md p-2 bg-black bg-opacity-10"></div>
+                        <div class="flex gap-4 mt-4"><button id="back-to-download-options-btn-1" class="w-full bg-white bg-opacity-20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-30">Back</button><button id="download-merged-btn" class="w-full bg-green-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-600">Download Merged PDF</button></div>
+                    </div>
+                    <!-- Individual Download View -->
+                    <div id="individual-download-view" class="hidden w-full flex-col">
+                        <p class="text-sm text-gray-200 text-center mb-4">Check the files you want to download individually.</p>
+                        <div class="flex items-center p-2 border-b border-white border-opacity-20"><input type="checkbox" id="select-all-checkbox" class="h-4 w-4 text-indigo-400 bg-transparent border-gray-400 rounded focus:ring-indigo-500"><label for="select-all-checkbox" class="ml-3 block text-sm font-medium text-white">Select All</label></div>
+                        <div id="individual-list-container" class="flex-grow overflow-y-auto border-b border-white border-opacity-20 rounded-md p-2 bg-black bg-opacity-10"></div>
+                        <div class="flex gap-4 mt-4"><button id="back-to-download-options-btn-2" class="w-full bg-white bg-opacity-20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-30">Back</button><button id="download-selected-btn" class="w-full bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">Download Selected</button></div>
+                    </div>
+                    <!-- Main Download Options -->
+                    <div id="main-download-options" class="flex flex-wrap gap-3 justify-center mt-4">
+                        <button id="download-individual-btn" class="flex-grow bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600">Download Individually</button>
+                        <button id="prepare-merge-btn" class="flex-grow bg-green-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-600">Merge & Reorder</button>
+                        <button id="restart-btn" class="w-full bg-white bg-opacity-20 text-white font-semibold py-2 px-4 rounded-lg hover:bg-opacity-30">Start Over</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        const dropZone = document.getElementById('drop-zone');
+        const pdfUpload = document.getElementById('pdf-upload');
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const fileListWrapper = document.getElementById('file-list-wrapper');
+        const fileListContainer = document.getElementById('file-list-container');
+        const addMoreBtn = document.getElementById('add-more-btn');
+        const dropZoneArea = document.getElementById('drop-zone-area');
+        
+        const languageSelect = document.getElementById('language-select');
+        const convertBtn = document.getElementById('convert-btn');
+        
+        const statusArea = document.getElementById('status-area');
+        const statusText = document.getElementById('status-text');
+        const statusProgress = document.getElementById('status-progress');
+        const progressBarInner = document.getElementById('progress-bar-inner');
+        const overallProgressText = document.getElementById('overall-progress-text');
+        const cancelBtn = document.getElementById('cancel-btn');
+        
+        const postProcessArea = document.getElementById('post-process-area');
+        const mainDownloadOptions = document.getElementById('main-download-options');
+        const downloadIndividualBtn = document.getElementById('download-individual-btn');
+        const prepareMergeBtn = document.getElementById('prepare-merge-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const mergeView = document.getElementById('merge-view');
+        const mergeListContainer = document.getElementById('merge-list-container');
+        const backToDownloadOptionsBtn1 = document.getElementById('back-to-download-options-btn-1');
+        const downloadMergedBtn = document.getElementById('download-merged-btn');
+
+        const individualDownloadView = document.getElementById('individual-download-view');
+        const individualListContainer = document.getElementById('individual-list-container');
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        const backToDownloadOptionsBtn2 = document.getElementById('back-to-download-options-btn-2');
+        const downloadSelectedBtn = document.getElementById('download-selected-btn');
+
+        let pdfFiles = [];
+        let processedPdfData = [];
+        let tesseractWorker = null;
+        let isCancelled = false;
+        let draggedItem = null;
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('click', (e) => { if (fileListWrapper.classList.contains('hidden')) pdfUpload.click(); });
+        addMoreBtn.addEventListener('click', () => pdfUpload.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drop-zone--over'); });
+        ['dragleave', 'dragend'].forEach(type => { dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over')); });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drop-zone--over'); if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files); });
+        pdfUpload.addEventListener('change', (e) => { if (e.target.files.length) handleFileSelect(e.target.files); });
+
+        convertBtn.addEventListener('click', runConversion);
+        cancelBtn.addEventListener('click', cancelConversion);
+        restartBtn.addEventListener('click', resetUI);
+        
+        downloadIndividualBtn.addEventListener('click', showIndividualDownloadArea);
+        prepareMergeBtn.addEventListener('click', showMergeArea);
+        
+        backToDownloadOptionsBtn1.addEventListener('click', hideSubViews);
+        backToDownloadOptionsBtn2.addEventListener('click', hideSubViews);
+        
+        downloadMergedBtn.addEventListener('click', downloadMergedFile);
+        downloadSelectedBtn.addEventListener('click', downloadSelectedFiles);
+        selectAllCheckbox.addEventListener('change', (e) => {
+            document.querySelectorAll('.file-checkbox').forEach(checkbox => checkbox.checked = e.target.checked);
+        });
+
+        function handleFileSelect(files) {
+            const newFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+            pdfFiles.push(...newFiles);
+            updateFileListUI();
+        }
+
+        function updateFileListUI() {
+            if (pdfFiles.length === 0) {
+                uploadPrompt.classList.remove('hidden');
+                fileListWrapper.classList.add('hidden');
+                convertBtn.disabled = true;
+                return;
+            }
+            uploadPrompt.classList.add('hidden');
+            fileListWrapper.classList.remove('hidden');
+            fileListContainer.innerHTML = ''; 
+
+            pdfFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'flex items-center justify-between p-2 mb-2 bg-black bg-opacity-20 rounded-md border border-white border-opacity-20';
+                fileItem.innerHTML = `<div class="flex items-center min-w-0"><svg class="w-6 h-6 text-red-400 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M4 2a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V8.414A2 2 0 0017.414 7L13 2.586A2 2 0 0011.586 2H4zm5 8a1 1 0 11-2 0 1 1 0 012 0zM9 14a1 1 0 100-2 1 1 0 000 2zm3-6a1 1 0 11-2 0 1 1 0 012 0z"></path></svg><span class="text-sm text-gray-200 truncate">${file.name}</span></div><button data-index="${index}" class="remove-btn text-gray-400 hover:text-red-400 p-1 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>`;
+                fileListContainer.appendChild(fileItem);
+            });
+
+            document.querySelectorAll('.remove-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const indexToRemove = parseInt(e.currentTarget.dataset.index, 10);
+                    pdfFiles.splice(indexToRemove, 1);
+                    updateFileListUI();
+                });
+            });
+            convertBtn.disabled = false;
+        }
+
+        async function runConversion() {
+            if (pdfFiles.length === 0) return;
+            isCancelled = false;
+            processedPdfData = [];
+
+            dropZoneArea.classList.add('hidden');
+            statusArea.classList.remove('hidden');
+            statusArea.classList.add('flex');
+            postProcessArea.classList.add('hidden');
+            updateOverallProgress(0);
+
+            try {
+                statusText.textContent = "Analyzing files...";
+                statusProgress.textContent = "Calculating total pages...";
+                let totalPages = 0;
+                for (const file of pdfFiles) {
+                    const typedarray = await file.arrayBuffer().then(buf => new Uint8Array(buf));
+                    const pdfjsDoc = await pdfjsLib.getDocument(typedarray).promise;
+                    totalPages += pdfjsDoc.numPages;
+                }
+
+                await createSearchablePdfs(pdfFiles, totalPages);
+                
+                if (isCancelled) {
+                     statusText.textContent = 'Process Cancelled';
+                     statusProgress.textContent = 'Cleaning up...';
+                     setTimeout(resetUI, 1500);
+                     return;
+                }
+                
+                statusArea.classList.add('hidden');
+                statusArea.classList.remove('flex');
+                postProcessArea.classList.remove('hidden');
+                postProcessArea.classList.add('flex');
+                mainDownloadOptions.classList.remove('hidden');
+
+
+            } catch (error) {
+                if (!isCancelled) {
+                    console.error("An error occurred during conversion:", error);
+                    statusText.textContent = 'An Error Occurred';
+                    statusProgress.textContent = 'Please check the console and try again.';
+                }
+            }
+        }
+        
+        async function cancelConversion() {
+            isCancelled = true;
+            if (tesseractWorker) await tesseractWorker.terminate();
+        }
+        
+        function updateOverallProgress(pagesComplete, totalPages) {
+            if (totalPages === 0 || !totalPages) {
+                progressBarInner.style.width = `0%`;
+                overallProgressText.textContent = `Overall Progress: 0%`;
+                return;
+            };
+            const percentage = Math.round((pagesComplete / totalPages) * 100);
+            progressBarInner.style.width = `${percentage}%`;
+            overallProgressText.textContent = `Overall Progress: ${percentage}%`;
+        }
+
+        async function createSearchablePdfs(files, totalPages) {
+            const { PDFDocument, rgb, StandardFonts } = PDFLib;
+            const selectedLanguage = languageSelect.value;
+            let pagesProcessed = 0;
+            
+            tesseractWorker = Tesseract.createWorker({ logger: m => { if (m.status === 'recognizing text') statusProgress.textContent = `Scanning page... ${(m.progress * 100).toFixed(0)}%`; }});
+            await tesseractWorker.load();
+            await tesseractWorker.loadLanguage(selectedLanguage);
+            await tesseractWorker.initialize(selectedLanguage);
+
+            for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+                if (isCancelled) break;
+                const file = files[fileIndex];
+                const newPdfDoc = await PDFDocument.create();
+                const helveticaFont = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+                const typedarray = await file.arrayBuffer().then(buf => new Uint8Array(buf));
+                const pdfjsDoc = await pdfjsLib.getDocument(typedarray).promise;
+
+                for (let i = 1; i <= pdfjsDoc.numPages; i++) {
+                    if (isCancelled) break;
+                    statusText.textContent = `File ${fileIndex + 1}/${files.length}: ${file.name}`;
+                    statusProgress.textContent = `Processing page ${i} of ${pdfjsDoc.numPages}...`;
+
+                    const page = await pdfjsDoc.getPage(i);
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    const canvas = document.createElement('canvas');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+                    
+                    const { data } = await tesseractWorker.recognize(canvas);
+                    if (isCancelled) break;
+
+                    const newPage = newPdfDoc.addPage([page.view[2], page.view[3]]);
+                    const pngImageBytes = await new Promise(resolve => canvas.toBlob(blob => { const reader = new FileReader(); reader.onload = () => resolve(new Uint8Array(reader.result)); reader.readAsArrayBuffer(blob); }, 'image/png'));
+                    const pngImage = await newPdfDoc.embedPng(pngImageBytes);
+                    newPage.drawImage(pngImage, { x: 0, y: 0, width: newPage.getWidth(), height: newPage.getHeight() });
+
+                    data.words.forEach(word => {
+                        const { text, bbox, x0, y0, x1, y1 } = word;
+                        const scale = newPage.getWidth() / canvas.width;
+                        const fontSize = Math.min((y1 - y0) * scale, ((x1 - x0) * scale / helveticaFont.widthOfTextAtSize(text, 1)) * 1.0);
+                        if (fontSize > 0 && !isNaN(fontSize)) newPage.drawText(text, { x: x0 * scale, y: newPage.getHeight() - (y1 * scale), font: helveticaFont, size: fontSize, color: rgb(0, 0, 0), opacity: 0 });
+                    });
+                    pagesProcessed++;
+                    updateOverallProgress(pagesProcessed, totalPages);
+                }
+                if (!isCancelled) processedPdfData.push({ name: file.name, doc: newPdfDoc });
+            }
+            if (tesseractWorker) await tesseractWorker.terminate();
+        }
+        
+        function showIndividualDownloadArea() {
+            mainDownloadOptions.classList.add('hidden');
+            individualDownloadView.classList.remove('hidden');
+            individualDownloadView.classList.add('flex');
+            populateIndividualList();
+        }
+
+        function showMergeArea() {
+            mainDownloadOptions.classList.add('hidden');
+            mergeView.classList.remove('hidden');
+            mergeView.classList.add('flex');
+            populateMergeList();
+        }
+        
+        function hideSubViews() {
+            mergeView.classList.add('hidden');
+            mergeView.classList.remove('flex');
+            individualDownloadView.classList.add('hidden');
+            individualDownloadView.classList.remove('flex');
+            mainDownloadOptions.classList.remove('hidden');
+        }
+
+        function populateIndividualList() {
+            individualListContainer.innerHTML = '';
+            selectAllCheckbox.checked = false;
+            processedPdfData.forEach((pdf, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center p-2';
+                item.innerHTML = `<input id="file-check-${index}" data-index="${index}" type="checkbox" class="file-checkbox h-4 w-4 text-indigo-400 bg-transparent border-gray-400 rounded focus:ring-indigo-500"><label for="file-check-${index}" class="ml-3 block text-sm text-white truncate">${pdf.name}</label>`;
+                individualListContainer.appendChild(item);
+            });
+        }
+
+        async function downloadSelectedFiles() {
+            const selectedIndices = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => parseInt(cb.dataset.index, 10));
+            if (selectedIndices.length === 0) {
+                alert("Please select at least one file to download.");
+                return;
+            }
+            for (const index of selectedIndices) {
+                const pdf = processedPdfData[index];
+                const pdfBytes = await pdf.doc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `searchable-${pdf.name}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            }
+        }
+
+        function populateMergeList() {
+            mergeListContainer.innerHTML = '';
+            processedPdfData.forEach((pdf, index) => {
+                const item = document.createElement('div');
+                item.className = 'draggable-item flex items-center p-3 mb-2 bg-black bg-opacity-20 rounded-md border border-white border-opacity-20';
+                item.draggable = true;
+                item.dataset.index = index;
+                item.innerHTML = `<svg class="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg><span class="text-sm text-white truncate">${pdf.name}</span>`;
+                mergeListContainer.appendChild(item);
+            });
+            addDragAndDropListeners();
+        }
+
+        function addDragAndDropListeners() {
+            mergeListContainer.querySelectorAll('.draggable-item').forEach(d => {
+                d.addEventListener('dragstart', () => { draggedItem = d; setTimeout(() => d.classList.add('dragging'), 0); });
+                d.addEventListener('dragend', () => { setTimeout(() => { if(draggedItem) draggedItem.classList.remove('dragging'); draggedItem = null; }, 0); });
+            });
+            mergeListContainer.addEventListener('dragover', e => {
+                e.preventDefault();
+                const afterElement = getDragAfterElement(mergeListContainer, e.clientY);
+                const draggable = document.querySelector('.dragging');
+                if (draggable) {
+                    if (afterElement == null) mergeListContainer.appendChild(draggable);
+                    else mergeListContainer.insertBefore(draggable, afterElement);
+                }
+            });
+            mergeListContainer.addEventListener('drop', () => {
+                const newOrder = Array.from(mergeListContainer.querySelectorAll('.draggable-item')).map(item => {
+                    const originalIndex = parseInt(item.dataset.index, 10);
+                    return processedPdfData.find((p, idx) => idx === originalIndex);
+                });
+                processedPdfData = newOrder;
+                populateMergeList();
+            });
+        }
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.draggable-item:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+                else return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        async function downloadMergedFile() {
+            const { PDFDocument } = PDFLib;
+            const mergedPdf = await PDFDocument.create();
+            for (const pdfData of processedPdfData) {
+                const copiedPages = await mergedPdf.copyPages(pdfData.doc, pdfData.doc.getPageIndices());
+                copiedPages.forEach(page => mergedPdf.addPage(page));
+            }
+            const pdfBytes = await mergedPdf.save();
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `merged-searchable-${new Date().toISOString().replace(/[:.-]/g, '')}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function resetUI() {
+            pdfFiles = [];
+            processedPdfData = [];
+            isCancelled = false;
+            pdfUpload.value = '';
+            
+            updateFileListUI();
+            dropZoneArea.classList.remove('hidden');
+            postProcessArea.classList.add('hidden');
+            postProcessArea.classList.remove('flex');
+            hideSubViews();
+            
+            statusArea.classList.add('hidden');
+            statusArea.classList.remove('flex');
+            updateOverallProgress(0, 1);
+        }
+    </script>
+</body>
+</html>

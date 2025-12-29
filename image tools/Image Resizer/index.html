@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResizrPro - Advanced Image Tool</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            850: '#1f2937',
+                            900: '#111827',
+                            950: '#030712',
+                        }
+                    },
+                    cursor: {
+                        'grab': 'grab',
+                        'grabbing': 'grabbing',
+                    },
+                    zIndex: {
+                        '100': '100',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Transparent pattern background */
+        .bg-pattern {
+            background-color: #f9fafb;
+            background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23e5e7eb' fill-opacity='0.4' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        /* Dark mode pattern */
+        .dark .bg-pattern {
+            background-color: #111827;
+            background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23374151' fill-opacity='0.2' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        /* Custom range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #2563eb;
+            margin-top: -6px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+        }
+
+        .dark input[type=range]::-webkit-slider-runnable-track {
+            background: #374151;
+        }
+
+        /* Hide scrollbar for cleaner fullscreen view */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-gray-50 text-gray-800 min-h-screen flex flex-col selection:bg-blue-100 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300">
+
+    <!-- Navbar -->
+    <nav
+        class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm h-[72px] dark:bg-gray-900 dark:border-gray-800 transition-colors duration-300">
+        <div class="flex items-center gap-3">
+            <div class="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2 rounded-lg shadow-md">
+                <i data-lucide="image" class="w-5 h-5 text-white"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Resizr<span
+                    class="text-blue-600 dark:text-blue-500">Pro</span></h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="theme-toggle-btn"
+                class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors">
+                <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+                <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+            </button>
+            <div
+                class="hidden md:flex items-center gap-2 text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full dark:bg-gray-800 dark:text-gray-400">
+                <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                <span>Client-side Processing</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 max-w-7xl mx-auto px-4 py-8 md:py-12 w-full relative">
+
+        <!-- View 1: Upload Area -->
+        <div id="upload-view" class="transition-all duration-300">
+            <div id="drop-zone"
+                class="relative flex flex-col items-center justify-center min-h-[500px] border-3 border-dashed border-gray-300 rounded-3xl bg-white hover:border-gray-400 hover:shadow-lg transition-all duration-300 cursor-pointer group dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600">
+                <div
+                    class="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-blue-100 group-hover:scale-110 transition-transform duration-300 dark:bg-gray-800 dark:text-blue-400 dark:border-gray-700">
+                    <i data-lucide="upload-cloud" class="w-10 h-10"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-3 text-center dark:text-white">Upload an image</h2>
+                <p class="text-gray-500 mb-8 text-center max-w-md text-base leading-relaxed dark:text-gray-400">
+                    Drag and drop JPG, PNG, WEBP, SVG or GIF. <br />
+                    We process everything instantly in your browser.
+                </p>
+
+                <button id="select-btn"
+                    class="px-8 py-4 bg-gray-900 hover:bg-black text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:scale-95 dark:bg-blue-600 dark:hover:bg-blue-500">
+                    Select Image
+                </button>
+                <input type="file" id="file-input" accept="image/*" class="hidden">
+            </div>
+        </div>
+
+        <!-- View 2: Editor Interface (Hidden by default) -->
+        <div id="editor-view"
+            class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start opacity-0 transition-opacity duration-500">
+
+            <!-- Left Panel: Preview (Sticky) -->
+            <div id="preview-wrapper-col" class="lg:col-span-8 space-y-4 sticky top-[80px] z-30 lg:top-24">
+
+                <!-- Preview Card -->
+                <div id="preview-card"
+                    class="bg-white rounded-3xl shadow-sm border border-gray-200 p-4 md:p-6 flex flex-col h-[45vh] md:h-[50vh] lg:h-[600px] transition-all duration-300 dark:bg-gray-900 dark:border-gray-800 group/card">
+
+                    <!-- Preview Header (Z-20 to stay above viewport) -->
+                    <div class="flex items-center justify-between mb-4 select-none relative z-20">
+                        <div class="flex items-center gap-4">
+                            <h3
+                                class="font-bold text-gray-900 flex items-center gap-2 text-sm md:text-base dark:text-white">
+                                <i data-lucide="eye" class="w-4 h-4 text-gray-500 dark:text-gray-400"></i>
+                                Live Preview
+                            </h3>
+
+                            <!-- Zoom Controls -->
+                            <div
+                                class="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                <button id="zoom-out-btn"
+                                    class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-md text-gray-500 dark:text-gray-400 transition-colors disabled:opacity-50"
+                                    title="Zoom Out">
+                                    <i data-lucide="minus" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <span id="zoom-level-text"
+                                    class="text-[10px] font-mono font-bold w-10 text-center text-gray-600 dark:text-gray-300">100%</span>
+                                <button id="zoom-in-btn"
+                                    class="p-1.5 hover:bg-white dark:hover:bg-gray-700 rounded-md text-gray-500 dark:text-gray-400 transition-colors disabled:opacity-50"
+                                    title="Zoom In">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <!-- Reset Zoom / Fit -->
+                            <button id="zoom-fit-btn"
+                                class="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 dark:text-gray-400 text-xs font-medium px-2 transition-colors hidden md:block"
+                                title="Fit to Screen">
+                                Fit
+                            </button>
+
+                            <!-- Dimensions Badge -->
+                            <div id="preview-dims-badge"
+                                class="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-1 rounded dark:bg-gray-800 dark:text-gray-500 hidden sm:block">
+                                0 x 0
+                            </div>
+
+                            <!-- Maximize Toggle -->
+                            <button id="maximize-btn"
+                                class="text-sm text-gray-500 hover:bg-gray-100 p-1.5 rounded-lg transition-colors flex items-center gap-1 dark:text-gray-400 dark:hover:bg-gray-800"
+                                title="Maximize View">
+                                <!-- Both icons exist, we toggle class 'hidden' -->
+                                <i data-lucide="expand" id="icon-expand" class="w-4 h-4"></i>
+                                <i data-lucide="minimize-2" id="icon-minimize" class="w-4 h-4 hidden"></i>
+                            </button>
+
+                            <!-- Close / Reset Image -->
+                            <button id="reset-btn"
+                                class="text-sm text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors flex items-center gap-1 dark:hover:bg-gray-800/50"
+                                title="Close Image">
+                                <i data-lucide="x" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Viewport (Overflow Hidden) -->
+                    <div id="preview-viewport"
+                        class="flex-1 bg-pattern rounded-2xl border border-gray-200 overflow-hidden flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing dark:border-gray-800 z-10">
+
+                        <!-- Transform Container (Moves & Zooms) -->
+                        <div id="preview-transform-layer"
+                            class="transition-transform duration-75 ease-out origin-center will-change-transform flex items-center justify-center">
+
+                            <!-- Content Container (Rotates, Flips, Filters, Aspect Ratio) -->
+                            <div id="preview-container"
+                                class="relative shadow-2xl transition-all duration-300 ease-out bg-white ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10"
+                                style="transform-origin: center;">
+                                <img id="preview-image" src="" alt="Preview"
+                                    class="w-full h-full object-fill rounded-sm pointer-events-none">
+                                <!-- Border Element for Preview -->
+                                <div id="preview-border"
+                                    class="absolute inset-0 pointer-events-none transition-all duration-200"></div>
+                            </div>
+
+                        </div>
+
+                        <!-- Compare Button (Absolute to viewport, stays in place) -->
+                        <button id="compare-btn"
+                            class="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 shadow-lg px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-white active:scale-95 transition-all flex items-center gap-2 z-10 dark:bg-gray-800/90 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800">
+                            <i data-lucide="git-compare" class="w-4 h-4"></i> Hold to Compare
+                        </button>
+
+                        <!-- Zoom Hint Overlay (Fades out) -->
+                        <div id="zoom-hint"
+                            class="absolute bottom-4 left-4 bg-black/50 text-white text-[10px] px-2 py-1 rounded-md backdrop-blur-sm opacity-0 transition-opacity duration-500 pointer-events-none z-10">
+                            Scroll to Zoom • Drag to Pan
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Info Bar -->
+                <div id="info-bar"
+                    class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4 text-sm dark:bg-gray-900 dark:border-gray-800">
+                    <div class="flex items-center gap-4 md:gap-6">
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Original</span>
+                            <span id="original-dims-text"
+                                class="font-mono text-gray-600 font-medium text-xs md:text-sm dark:text-gray-300">0 x
+                                0</span>
+                        </div>
+                        <div class="w-px h-8 bg-gray-200 dark:bg-gray-700"></div>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">New Size</span>
+                            <span id="new-size-text"
+                                class="font-mono text-blue-600 font-bold text-xs md:text-sm dark:text-blue-400">0 x
+                                0</span>
+                        </div>
+                    </div>
+                    <div
+                        class="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-gray-400"></i>
+                        <span class="hidden md:inline text-xs font-medium text-gray-500 dark:text-gray-400">Est.
+                            Size:</span>
+                        <span id="est-size"
+                            class="font-mono text-xs font-bold text-gray-900 dark:text-white">Calculating...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Controls -->
+            <div class="lg:col-span-4 grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-col gap-5 pb-20 md:pb-0">
+
+                <!-- 1. Dimensions Section (Perfected) -->
+                <div
+                    class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+                    <h3
+                        class="font-bold text-gray-900 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide dark:text-white">
+                        <i data-lucide="maximize" class="w-4 h-4 text-blue-600 dark:text-blue-500"></i> Dimensions
+                    </h3>
+
+                    <!-- Mode Tabs -->
+                    <div class="bg-gray-100 p-1 rounded-xl flex mb-5 dark:bg-gray-800">
+                        <button id="mode-pixel-btn"
+                            class="flex-1 flex items-center justify-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold uppercase tracking-wide transition-all bg-white text-blue-600 shadow-sm dark:bg-gray-700 dark:text-blue-400">
+                            Pixels
+                        </button>
+                        <button id="mode-percent-btn"
+                            class="flex-1 flex items-center justify-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold uppercase tracking-wide transition-all text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            Percent
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3 relative">
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Width</label>
+                                <input type="number" id="width-input" min="1"
+                                    class="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 outline-none rounded-xl px-3 py-3 md:py-2 text-gray-900 font-mono font-medium transition-colors text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:border-blue-500">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-gray-400 uppercase">Height</label>
+                                <input type="number" id="height-input" min="1"
+                                    class="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 outline-none rounded-xl px-3 py-3 md:py-2 text-gray-900 font-mono font-medium transition-colors text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:focus:border-blue-500">
+                            </div>
+                            <!-- Lock Icon Overlay -->
+                            <div id="lock-icon-overlay"
+                                class="absolute left-1/2 top-[60%] md:top-[55%] -translate-x-1/2 -translate-y-1/2 bg-white border border-gray-200 rounded-full p-1.5 text-blue-500 shadow-sm z-10 transition-opacity dark:bg-gray-800 dark:border-gray-600 dark:text-blue-400">
+                                <i data-lucide="lock" class="w-3 h-3"></i>
+                            </div>
+                        </div>
+
+                        <button id="ratio-toggle-btn"
+                            class="w-full flex items-center justify-center gap-2 py-2.5 md:py-2 rounded-lg border text-xs font-bold uppercase tracking-wide transition-all border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-gray-800 dark:border-blue-900/50 dark:text-blue-400 dark:hover:bg-gray-750">
+                            <i id="ratio-icon" data-lucide="lock" class="w-3 h-3"></i> <span
+                                id="ratio-text">Locked</span>
+                        </button>
+
+                        <!-- Presets -->
+                        <div class="pt-3 border-t border-gray-100 dark:border-gray-800">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-2">Presets</p>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button onclick="applyPreset(1280, 720)"
+                                    class="px-2 py-2 md:py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-[10px] font-bold text-gray-600 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700">HD</button>
+                                <button onclick="applyPreset(1920, 1080)"
+                                    class="px-2 py-2 md:py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-[10px] font-bold text-gray-600 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700">FHD</button>
+                                <button onclick="applyPreset(1080, 1080)"
+                                    class="px-2 py-2 md:py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-[10px] font-bold text-gray-600 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700">SQ</button>
+                                <button onclick="applyPreset(1080, 1920)"
+                                    class="px-2 py-2 md:py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded text-[10px] font-bold text-gray-600 transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700">9:16</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Styling Section -->
+                <div
+                    class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+                    <h3
+                        class="font-bold text-gray-900 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide dark:text-white">
+                        <i data-lucide="palette" class="w-4 h-4 text-purple-600 dark:text-purple-400"></i> Styling
+                    </h3>
+
+                    <div class="space-y-5">
+                        <!-- Radius -->
+                        <div>
+                            <div class="flex justify-between mb-2 md:mb-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Corner Radius</label>
+                                <span id="val-radius" class="text-[10px] font-mono font-bold text-gray-400">0px</span>
+                            </div>
+                            <input type="range" id="input-radius" min="0" max="200" value="0"
+                                class="w-full h-2 md:h-auto">
+                        </div>
+
+                        <!-- Border -->
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1">
+                                <div class="flex justify-between mb-2 md:mb-1">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Frame Width</label>
+                                    <span id="val-border-width"
+                                        class="text-[10px] font-mono font-bold text-gray-400">0px</span>
+                                </div>
+                                <input type="range" id="input-border-width" min="0" max="50" value="0"
+                                    class="w-full h-2 md:h-auto">
+                            </div>
+                            <div>
+                                <label
+                                    class="text-[10px] font-bold text-gray-500 uppercase mb-2 md:mb-1 block">Color</label>
+                                <div
+                                    class="relative overflow-hidden rounded-lg w-8 h-8 ring-1 ring-gray-200 dark:ring-gray-600">
+                                    <input type="color" id="input-border-color" value="#000000"
+                                        class="absolute -top-2 -left-2 w-16 h-16 p-0 border-0 cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- 3. Adjustments Section -->
+                <div
+                    class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3
+                            class="font-bold text-gray-900 flex items-center gap-2 text-sm uppercase tracking-wide dark:text-white">
+                            <i data-lucide="sliders" class="w-4 h-4 text-blue-600 dark:text-blue-500"></i> Adjustments
+                        </h3>
+                        <button id="reset-adjustments-btn"
+                            class="text-[10px] font-bold text-blue-600 hover:text-blue-800 uppercase tracking-wide dark:text-blue-400 dark:hover:text-blue-300"
+                            title="Reset Filters">Reset</button>
+                    </div>
+
+                    <div class="space-y-6 md:space-y-4">
+                        <!-- Brightness -->
+                        <div>
+                            <div class="flex justify-between mb-2 md:mb-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Brightness</label>
+                                <span id="val-brightness"
+                                    class="text-[10px] font-mono font-bold text-gray-400">100%</span>
+                            </div>
+                            <input type="range" id="input-brightness" min="0" max="200" value="100"
+                                class="w-full h-2 md:h-auto">
+                        </div>
+
+                        <!-- Contrast -->
+                        <div>
+                            <div class="flex justify-between mb-2 md:mb-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Contrast</label>
+                                <span id="val-contrast"
+                                    class="text-[10px] font-mono font-bold text-gray-400">100%</span>
+                            </div>
+                            <input type="range" id="input-contrast" min="0" max="200" value="100"
+                                class="w-full h-2 md:h-auto">
+                        </div>
+
+                        <!-- Blur -->
+                        <div>
+                            <div class="flex justify-between mb-2 md:mb-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Blur</label>
+                                <span id="val-blur" class="text-[10px] font-mono font-bold text-gray-400">0px</span>
+                            </div>
+                            <input type="range" id="input-blur" min="0" max="20" step="0.5" value="0"
+                                class="w-full h-2 md:h-auto">
+                        </div>
+
+                        <!-- Sepia -->
+                        <div>
+                            <div class="flex justify-between mb-2 md:mb-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Sepia</label>
+                                <span id="val-sepia" class="text-[10px] font-mono font-bold text-gray-400">0%</span>
+                            </div>
+                            <input type="range" id="input-sepia" min="0" max="100" value="0"
+                                class="w-full h-2 md:h-auto">
+                        </div>
+
+                        <!-- Saturation -->
+                        <div>
+                            <div class="flex justify-between mb-2 md:mb-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Saturation</label>
+                                <span id="val-saturation"
+                                    class="text-[10px] font-mono font-bold text-gray-400">100%</span>
+                            </div>
+                            <input type="range" id="input-saturation" min="0" max="200" value="100"
+                                class="w-full h-2 md:h-auto">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Transforms -->
+                <div
+                    class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+                    <h3
+                        class="font-bold text-gray-900 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide dark:text-white">
+                        <i data-lucide="rotate-cw" class="w-4 h-4 text-blue-600 dark:text-blue-500"></i> Transforms
+                    </h3>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <button id="rotate-btn"
+                            class="flex items-center justify-center gap-2 py-3 md:py-2 px-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 transition-all text-xs font-medium text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-blue-400">
+                            <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Rotate 90°
+                        </button>
+                        <button id="grayscale-btn"
+                            class="flex items-center justify-center gap-2 py-3 md:py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-all text-xs font-medium text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700">
+                            <div
+                                class="w-3.5 h-3.5 rounded-full bg-gradient-to-r from-gray-400 to-gray-900 border border-white dark:border-gray-600">
+                            </div> B&W
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="flip-h-btn"
+                            class="flex items-center justify-center gap-2 py-3 md:py-2 px-3 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors text-xs font-medium dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700">
+                            <i data-lucide="flip-horizontal" class="w-3.5 h-3.5"></i> Flip H
+                        </button>
+                        <button id="flip-v-btn"
+                            class="flex items-center justify-center gap-2 py-3 md:py-2 px-3 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors text-xs font-medium dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700">
+                            <i data-lucide="flip-vertical" class="w-3.5 h-3.5"></i> Flip V
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5. Export Settings -->
+                <div
+                    class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 dark:bg-gray-900 dark:border-gray-800">
+                    <h3
+                        class="font-bold text-gray-900 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide dark:text-white">
+                        <i data-lucide="download" class="w-4 h-4 text-blue-600 dark:text-blue-500"></i> Export
+                    </h3>
+
+                    <div class="space-y-4">
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase mb-1.5 block">Format</label>
+                                <select id="format-select"
+                                    class="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 md:p-2.5 outline-none font-medium dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                    <option value="original">Original</option>
+                                    <option value="image/jpeg">JPG</option>
+                                    <option value="image/png">PNG</option>
+                                    <option value="image/webp">WEBP</option>
+                                </select>
+                            </div>
+                            <div class="flex-1" id="quality-wrapper">
+                                <label
+                                    class="text-[10px] font-bold text-gray-500 uppercase mb-1.5 block">Quality</label>
+                                <select id="quality-select"
+                                    class="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 md:p-2.5 outline-none font-medium dark:bg-gray-800 dark:border-gray-700 dark:text-white">
+                                    <option value="1">100% (Best)</option>
+                                    <option value="0.9">90% (High)</option>
+                                    <option value="0.8">80% (Good)</option>
+                                    <option value="0.6">60% (Web)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <button id="download-btn"
+                            class="w-full py-4 rounded-xl flex items-center justify-center gap-3 font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all bg-gradient-to-r from-gray-900 to-black text-white active:scale-[0.98] dark:from-blue-600 dark:to-indigo-600">
+                            <i data-lucide="download" class="w-5 h-5"></i> Export Image
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // --- State Management ---
+        const state = {
+            file: null,
+            image: null,
+            originalDims: { width: 0, height: 0 },
+            targetDims: { width: 0, height: 0 },
+            mode: 'pixel', // 'pixel' | 'percent'
+            keepAspectRatio: true,
+            // Transforms (Content)
+            rotation: 0,
+            flipH: false,
+            flipV: false,
+            // Viewport Transforms
+            zoom: 1,
+            pan: { x: 0, y: 0 },
+            isMaximized: false,
+            isDragging: false,
+            startPan: { x: 0, y: 0 },
+            startMouse: { x: 0, y: 0 },
+            // Adjustments
+            grayscale: false,
+            brightness: 100,
+            contrast: 100,
+            saturation: 100,
+            blur: 0,
+            sepia: 0,
+            // Styling
+            borderRadius: 0,
+            borderWidth: 0,
+            borderColor: '#000000',
+            // Export
+            outputFormat: 'original',
+            quality: 0.9,
+            // System
+            estSize: null,
+            timer: null,
+            theme: 'light'
+        };
+
+        // --- DOM Elements ---
+        const views = {
+            upload: document.getElementById('upload-view'),
+            editor: document.getElementById('editor-view')
+        };
+
+        const inputs = {
+            file: document.getElementById('file-input'),
+            width: document.getElementById('width-input'),
+            height: document.getElementById('height-input'),
+            format: document.getElementById('format-select'),
+            quality: document.getElementById('quality-select'),
+            brightness: document.getElementById('input-brightness'),
+            contrast: document.getElementById('input-contrast'),
+            saturation: document.getElementById('input-saturation'),
+            blur: document.getElementById('input-blur'),
+            sepia: document.getElementById('input-sepia'),
+            radius: document.getElementById('input-radius'),
+            borderWidth: document.getElementById('input-border-width'),
+            borderColor: document.getElementById('input-border-color'),
+        };
+
+        const display = {
+            previewCard: document.getElementById('preview-card'),
+            previewWrapper: document.getElementById('preview-wrapper-col'),
+            previewViewport: document.getElementById('preview-viewport'),
+            previewTransformLayer: document.getElementById('preview-transform-layer'),
+            previewContainer: document.getElementById('preview-container'),
+            previewImg: document.getElementById('preview-image'),
+            previewBorder: document.getElementById('preview-border'),
+
+            originalDims: document.getElementById('original-dims-text'),
+            newSize: document.getElementById('new-size-text'),
+            previewDimsBadge: document.getElementById('preview-dims-badge'),
+            lockOverlay: document.getElementById('lock-icon-overlay'),
+            estSize: document.getElementById('est-size'),
+            zoomLevel: document.getElementById('zoom-level-text'),
+            zoomHint: document.getElementById('zoom-hint'),
+
+            // Value Labels
+            valBrightness: document.getElementById('val-brightness'),
+            valContrast: document.getElementById('val-contrast'),
+            valSaturation: document.getElementById('val-saturation'),
+            valBlur: document.getElementById('val-blur'),
+            valSepia: document.getElementById('val-sepia'),
+            valRadius: document.getElementById('val-radius'),
+            valBorderWidth: document.getElementById('val-border-width'),
+            qualityWrapper: document.getElementById('quality-wrapper')
+        };
+
+        const buttons = {
+            dropZone: document.getElementById('drop-zone'),
+            select: document.getElementById('select-btn'),
+            pixelMode: document.getElementById('mode-pixel-btn'),
+            percentMode: document.getElementById('mode-percent-btn'),
+            ratio: document.getElementById('ratio-toggle-btn'),
+            ratioIcon: document.getElementById('ratio-icon'),
+            ratioText: document.getElementById('ratio-text'),
+            rotate: document.getElementById('rotate-btn'),
+            grayscale: document.getElementById('grayscale-btn'),
+            flipH: document.getElementById('flip-h-btn'),
+            flipV: document.getElementById('flip-v-btn'),
+            download: document.getElementById('download-btn'),
+            reset: document.getElementById('reset-btn'),
+            resetAdjustments: document.getElementById('reset-adjustments-btn'),
+            compare: document.getElementById('compare-btn'),
+            themeToggle: document.getElementById('theme-toggle-btn'),
+            // Zoom
+            zoomIn: document.getElementById('zoom-in-btn'),
+            zoomOut: document.getElementById('zoom-out-btn'),
+            zoomFit: document.getElementById('zoom-fit-btn'),
+            maximize: document.getElementById('maximize-btn')
+        };
+
+        // --- Core Logic ---
+
+        function getEffectiveOriginalDimensions() {
+            const isVertical = state.rotation % 180 !== 0;
+            return {
+                width: isVertical ? state.originalDims.height : state.originalDims.width,
+                height: isVertical ? state.originalDims.width : state.originalDims.height
+            };
+        }
+
+        function calculatePercentages() {
+            const effOrig = getEffectiveOriginalDimensions();
+            if (effOrig.width === 0 || effOrig.height === 0) return { w: 100, h: 100 };
+            return {
+                w: Math.round((state.targetDims.width / effOrig.width) * 100),
+                h: Math.round((state.targetDims.height / effOrig.height) * 100)
+            };
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        // --- Image Processing & UI ---
+
+        function processFile(file) {
+            if (!file) return;
+            state.file = file;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.image = img;
+                    state.originalDims = { width: img.naturalWidth, height: img.naturalHeight };
+                    state.targetDims = { width: img.naturalWidth, height: img.naturalHeight };
+
+                    // Reset Everything
+                    resetState();
+
+                    // Update UI
+                    display.previewImg.src = e.target.result;
+                    switchView('editor');
+                    updateUI();
+                    estimateFileSize();
+
+                    // Show zoom hint briefly
+                    display.zoomHint.classList.remove('opacity-0');
+                    setTimeout(() => display.zoomHint.classList.add('opacity-0'), 3000);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetState() {
+            state.rotation = 0;
+            state.flipH = false;
+            state.flipV = false;
+            state.grayscale = false;
+            state.brightness = 100;
+            state.contrast = 100;
+            state.saturation = 100;
+            state.blur = 0;
+            state.sepia = 0;
+            state.borderRadius = 0;
+            state.borderWidth = 0;
+            state.borderColor = '#000000';
+            state.outputFormat = 'original';
+            state.quality = 0.9;
+            resetZoomPan();
+        }
+
+        function resetZoomPan() {
+            state.zoom = 1;
+            state.pan = { x: 0, y: 0 };
+            state.isMaximized = false;
+        }
+
+        function switchView(viewName) {
+            if (viewName === 'editor') {
+                views.upload.classList.add('hidden');
+                views.editor.classList.remove('hidden');
+                setTimeout(() => views.editor.classList.remove('opacity-0'), 50);
+            } else {
+                views.editor.classList.add('opacity-0');
+                setTimeout(() => {
+                    views.editor.classList.add('hidden');
+                    views.upload.classList.remove('hidden');
+                    inputs.file.value = '';
+                }, 300);
+            }
+        }
+
+        // --- Dimensions Logic (Perfected) ---
+
+        function updateDimensions(type, value) {
+            // Case 1: Empty input - Allow it, do not update state, UI will show what user typed
+            if (value === '') return;
+
+            // Case 2: Parse Number
+            let numValue = parseInt(value);
+            if (isNaN(numValue) || numValue < 0) return;
+
+            // Treat 0 as 1 to avoid math issues
+            numValue = Math.max(1, numValue);
+
+            const effOrig = getEffectiveOriginalDimensions();
+            let newW = state.targetDims.width;
+            let newH = state.targetDims.height;
+
+            if (state.mode === 'pixel') {
+                if (type === 'width') {
+                    newW = numValue;
+                    if (state.keepAspectRatio && effOrig.width > 0) {
+                        // Perfect Ratio Calculation
+                        newH = Math.round(newW * (effOrig.height / effOrig.width));
+                        newH = Math.max(1, newH);
+                    }
+                } else { // type === 'height'
+                    newH = numValue;
+                    if (state.keepAspectRatio && effOrig.height > 0) {
+                        // Perfect Ratio Calculation
+                        newW = Math.round(newH * (effOrig.width / effOrig.height));
+                        newW = Math.max(1, newW);
+                    }
+                }
+            } else { // Percent Mode
+                const ratio = numValue / 100;
+                if (type === 'width') {
+                    newW = Math.round(effOrig.width * ratio);
+                    if (state.keepAspectRatio) {
+                        newH = Math.round(effOrig.height * ratio);
+                    }
+                } else { // type === 'height'
+                    newH = Math.round(effOrig.height * ratio);
+                    if (state.keepAspectRatio) {
+                        newW = Math.round(effOrig.width * ratio);
+                    }
+                }
+            }
+
+            // Ensure non-zero
+            newW = Math.max(1, newW);
+            newH = Math.max(1, newH);
+
+            // Update State
+            state.targetDims = { width: newW, height: newH };
+
+            // Update UI, specifying which control is active so we don't overwrite user cursor
+            updateUI(type);
+            debounceEstimateFileSize();
+        }
+
+        window.applyPreset = (w, h) => {
+            state.targetDims = { width: w, height: h };
+            state.mode = 'pixel';
+            updateUI(); // Full UI refresh
+            debounceEstimateFileSize();
+        };
+
+        function getFilterString() {
+            let filters = [];
+            if (state.grayscale) filters.push('grayscale(100%)');
+            if (state.brightness !== 100) filters.push(`brightness(${state.brightness}%)`);
+            if (state.contrast !== 100) filters.push(`contrast(${state.contrast}%)`);
+            if (state.saturation !== 100) filters.push(`saturate(${state.saturation}%)`);
+            if (state.sepia > 0) filters.push(`sepia(${state.sepia}%)`);
+            if (state.blur > 0) filters.push(`blur(${state.blur}px)`);
+            return filters.join(' ');
+        }
+
+        function updateUI(activeControl = null) {
+            const effOrig = getEffectiveOriginalDimensions();
+            const percents = calculatePercentages();
+
+            // Text Info
+            display.originalDims.textContent = `${state.originalDims.width} x ${state.originalDims.height}`;
+            display.newSize.textContent = `${state.targetDims.width} x ${state.targetDims.height}`;
+            display.previewDimsBadge.textContent = `${state.targetDims.width} x ${state.targetDims.height}`;
+
+            // --- Dimension Inputs ---
+            // Key logic: only update if it's NOT the active control.
+
+            if (state.mode === 'pixel') {
+                if (activeControl !== 'width') inputs.width.value = state.targetDims.width;
+                if (activeControl !== 'height') inputs.height.value = state.targetDims.height;
+            } else {
+                if (activeControl !== 'width') inputs.width.value = percents.w;
+                if (activeControl !== 'height') inputs.height.value = percents.h;
+            }
+
+            // --- Sliders & Styling Inputs ---
+            // Same logic: prevent cursor jumping on sliders
+            if (activeControl !== 'brightness') inputs.brightness.value = state.brightness;
+            if (activeControl !== 'contrast') inputs.contrast.value = state.contrast;
+            if (activeControl !== 'saturation') inputs.saturation.value = state.saturation;
+            if (activeControl !== 'blur') inputs.blur.value = state.blur;
+            if (activeControl !== 'sepia') inputs.sepia.value = state.sepia;
+            if (activeControl !== 'radius') inputs.radius.value = state.borderRadius;
+            if (activeControl !== 'borderWidth') inputs.borderWidth.value = state.borderWidth;
+            if (activeControl !== 'borderColor') inputs.borderColor.value = state.borderColor;
+
+            // Value Labels
+            display.valBrightness.textContent = state.brightness + '%';
+            display.valContrast.textContent = state.contrast + '%';
+            display.valSaturation.textContent = state.saturation + '%';
+            display.valBlur.textContent = state.blur + 'px';
+            display.valSepia.textContent = state.sepia + '%';
+            display.valRadius.textContent = state.borderRadius + 'px';
+            display.valBorderWidth.textContent = state.borderWidth + 'px';
+
+            // Visual feedback for defaults
+            const highlightClass = "text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400";
+            const defaultClass = "text-[10px] font-mono font-bold text-gray-400";
+
+            display.valBrightness.className = state.brightness === 100 ? defaultClass : highlightClass;
+            display.valContrast.className = state.contrast === 100 ? defaultClass : highlightClass;
+            display.valSaturation.className = state.saturation === 100 ? defaultClass : highlightClass;
+            display.valBlur.className = state.blur === 0 ? defaultClass : highlightClass;
+            display.valSepia.className = state.sepia === 0 ? defaultClass : highlightClass;
+            display.valRadius.className = state.borderRadius === 0 ? defaultClass : highlightClass;
+            display.valBorderWidth.className = state.borderWidth === 0 ? defaultClass : highlightClass;
+
+
+            // Mode Buttons
+            const activeBtnClass = "flex-1 flex items-center justify-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold uppercase tracking-wide transition-all bg-white text-blue-600 shadow-sm dark:bg-gray-700 dark:text-blue-400";
+            const inactiveBtnClass = "flex-1 flex items-center justify-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold uppercase tracking-wide transition-all text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200";
+
+            if (state.mode === 'pixel') {
+                buttons.pixelMode.className = activeBtnClass;
+                buttons.percentMode.className = inactiveBtnClass;
+            } else {
+                buttons.pixelMode.className = inactiveBtnClass;
+                buttons.percentMode.className = activeBtnClass;
+            }
+
+            // Aspect Ratio
+            if (state.keepAspectRatio) {
+                buttons.ratio.className = "w-full flex items-center justify-center gap-2 py-2.5 md:py-2 rounded-lg border text-xs font-bold uppercase tracking-wide transition-all border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-gray-800 dark:border-blue-900/50 dark:text-blue-400 dark:hover:bg-gray-750";
+                buttons.ratioIcon.innerHTML = '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M8 11h8"/><path d="M12 11v4"/>';
+                buttons.ratioText.textContent = "Locked";
+                display.lockOverlay.classList.remove('opacity-0');
+                lucide.createIcons();
+            } else {
+                buttons.ratio.className = "w-full flex items-center justify-center gap-2 py-2.5 md:py-2 rounded-lg border text-xs font-bold uppercase tracking-wide transition-all border-dashed border-gray-300 text-gray-400 hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:hover:bg-gray-800";
+                buttons.ratioText.textContent = "Unlocked";
+                display.lockOverlay.classList.add('opacity-0');
+                lucide.createIcons();
+            }
+
+            // Transform Buttons
+            const activeTransform = "flex items-center justify-center gap-2 py-3 md:py-2 px-3 rounded-lg border transition-all text-xs font-medium border-blue-500 bg-blue-50 text-blue-600 dark:bg-gray-800 dark:border-blue-500 dark:text-blue-400";
+            const inactiveTransform = "flex items-center justify-center gap-2 py-3 md:py-2 px-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-all text-xs font-medium text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700";
+
+            buttons.grayscale.className = state.grayscale ? activeTransform : inactiveTransform;
+            buttons.flipH.className = state.flipH ? activeTransform : inactiveTransform;
+            buttons.flipV.className = state.flipV ? activeTransform : inactiveTransform;
+
+            // Preview Styles (Inner Content)
+            const aspectRatio = state.targetDims.width / state.targetDims.height;
+            display.previewContainer.style.aspectRatio = aspectRatio;
+            display.previewContainer.style.transform = `rotate(${state.rotation}deg) scaleX(${state.flipH ? -1 : 1}) scaleY(${state.flipV ? -1 : 1})`;
+            display.previewContainer.style.filter = getFilterString();
+
+            // Preview Border Radius & Frame
+            display.previewImg.style.borderRadius = `${state.borderRadius}px`;
+            display.previewBorder.style.borderRadius = `${state.borderRadius}px`;
+            display.previewBorder.style.border = state.borderWidth > 0 ? `${state.borderWidth}px solid ${state.borderColor}` : 'none';
+
+            // Viewport Transforms (Outer Wrapper: Zoom/Pan)
+            display.previewTransformLayer.style.transform = `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
+
+            // Update Zoom Text
+            display.zoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
+
+            // Maximize State
+            if (state.isMaximized) {
+                // FIXED: Use top-[72px] to sit BELOW navbar, not on top of it
+                display.previewCard.classList.remove('transition-all', 'duration-300'); // Remove transition during max to avoid glitch
+
+                // Remove standard height classes and apply fixed positioning below navbar
+                display.previewCard.classList.remove('h-[45vh]', 'md:h-[50vh]', 'lg:h-[600px]', 'rounded-3xl', 'border');
+                display.previewCard.classList.add('fixed', 'top-[72px]', 'left-0', 'right-0', 'bottom-0', 'z-40', 'm-0', 'rounded-none', 'border-0');
+
+                // Toggle Icons safely using classList
+                const iconExpand = document.getElementById('icon-expand');
+                const iconMinimize = document.getElementById('icon-minimize');
+                if (iconExpand) iconExpand.classList.add('hidden');
+                if (iconMinimize) iconMinimize.classList.remove('hidden');
+
+                buttons.maximize.title = "Exit Maximize (Esc)";
+            } else {
+                display.previewCard.classList.add('transition-all', 'duration-300'); // Restore transition
+
+                // Restore standard classes
+                display.previewCard.classList.add('h-[45vh]', 'md:h-[50vh]', 'lg:h-[600px]', 'rounded-3xl', 'border');
+                display.previewCard.classList.remove('fixed', 'top-[72px]', 'left-0', 'right-0', 'bottom-0', 'z-40', 'm-0', 'rounded-none', 'border-0');
+
+                // Toggle Icons safely
+                const iconExpand = document.getElementById('icon-expand');
+                const iconMinimize = document.getElementById('icon-minimize');
+                if (iconExpand) iconExpand.classList.remove('hidden');
+                if (iconMinimize) iconMinimize.classList.add('hidden');
+
+                buttons.maximize.title = "Maximize View";
+            }
+            // lucide.createIcons(); // Removed recursive call
+
+            // Quality Visibility
+            const format = state.outputFormat;
+            const originalType = state.file ? state.file.type : '';
+            const showQuality = format === 'image/jpeg' || format === 'image/webp' || (format === 'original' && (originalType === 'image/jpeg' || originalType === 'image/webp'));
+
+            if (showQuality) {
+                display.qualityWrapper.classList.remove('opacity-50', 'pointer-events-none');
+            } else {
+                display.qualityWrapper.classList.add('opacity-50', 'pointer-events-none');
+            }
+        }
+
+        // --- File Size Estimation ---
+
+        function debounceEstimateFileSize() {
+            clearTimeout(state.timer);
+            display.estSize.textContent = "Calculating...";
+            state.timer = setTimeout(estimateFileSize, 500);
+        }
+
+        function estimateFileSize() {
+            if (!state.image) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = state.targetDims.width;
+            canvas.height = state.targetDims.height;
+            // No full render here for performance, just simple estimate
+            // But strict accuracy requires full render if format changes
+
+            let mimeType = state.file.type;
+            if (state.outputFormat !== 'original') mimeType = state.outputFormat;
+            else if (state.file.type === 'image/svg+xml') mimeType = 'image/png';
+
+            // A quick rough estimate logic isn't perfect without drawing, 
+            // but drawing complex filters on every slider move is heavy.
+            // We'll skip complex draw for estimate to keep UI snappy.
+
+            // Just for format estimate:
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(state.image, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob((blob) => {
+                if (blob) display.estSize.textContent = formatBytes(blob.size);
+            }, mimeType, parseFloat(state.quality));
+        }
+
+        // --- Event Listeners ---
+
+        // File Upload
+        buttons.dropZone.addEventListener('click', () => inputs.file.click());
+        inputs.file.addEventListener('change', (e) => processFile(e.target.files[0]));
+
+        buttons.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            buttons.dropZone.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-gray-800', 'dark:border-blue-500');
+        });
+        buttons.dropZone.addEventListener('dragleave', () => {
+            buttons.dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-gray-800', 'dark:border-blue-500');
+        });
+        buttons.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            buttons.dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-gray-800', 'dark:border-blue-500');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) processFile(file);
+        });
+
+        // Dimensions
+        inputs.width.addEventListener('input', (e) => updateDimensions('width', e.target.value));
+        inputs.height.addEventListener('input', (e) => updateDimensions('height', e.target.value));
+        buttons.pixelMode.addEventListener('click', () => { state.mode = 'pixel'; updateUI(); });
+        buttons.percentMode.addEventListener('click', () => { state.mode = 'percent'; updateUI(); });
+        buttons.ratio.addEventListener('click', () => { state.keepAspectRatio = !state.keepAspectRatio; updateUI(); });
+
+        // Transforms
+        buttons.rotate.addEventListener('click', () => {
+            state.rotation = (state.rotation + 90) % 360;
+            const oldW = state.targetDims.width;
+            state.targetDims.width = state.targetDims.height;
+            state.targetDims.height = oldW;
+            updateUI();
+            debounceEstimateFileSize();
+        });
+        buttons.grayscale.addEventListener('click', () => { state.grayscale = !state.grayscale; updateUI(); debounceEstimateFileSize(); });
+        buttons.flipH.addEventListener('click', () => { state.flipH = !state.flipH; updateUI(); debounceEstimateFileSize(); });
+        buttons.flipV.addEventListener('click', () => { state.flipV = !state.flipV; updateUI(); debounceEstimateFileSize(); });
+
+        // Adjustments & Styling
+        const bindInput = (el, key) => {
+            el.addEventListener('input', (e) => {
+                const val = e.target.type === 'checkbox' ? e.target.checked : (e.target.type === 'color' ? e.target.value : parseFloat(e.target.value));
+                state[key] = val;
+                updateUI(key);
+                debounceEstimateFileSize();
+            });
+        };
+
+        bindInput(inputs.brightness, 'brightness');
+        bindInput(inputs.contrast, 'contrast');
+        bindInput(inputs.saturation, 'saturation');
+        bindInput(inputs.blur, 'blur');
+        bindInput(inputs.sepia, 'sepia');
+        bindInput(inputs.radius, 'borderRadius');
+        bindInput(inputs.borderWidth, 'borderWidth');
+        bindInput(inputs.borderColor, 'borderColor');
+
+
+        buttons.resetAdjustments.addEventListener('click', () => {
+            state.brightness = 100;
+            state.contrast = 100;
+            state.saturation = 100;
+            state.blur = 0;
+            state.sepia = 0;
+            state.borderRadius = 0;
+            state.borderWidth = 0;
+            state.borderColor = '#000000';
+            updateUI();
+            debounceEstimateFileSize();
+        });
+
+        // Export
+        inputs.format.addEventListener('change', (e) => { state.outputFormat = e.target.value; updateUI(); debounceEstimateFileSize(); });
+        inputs.quality.addEventListener('change', (e) => { state.quality = parseFloat(e.target.value); debounceEstimateFileSize(); });
+
+        // Compare Button
+        const revertStyles = { filter: '', transform: '', borderRadius: '', border: '' };
+        const startCompare = (e) => {
+            if (e.type === 'touchstart') e.preventDefault();
+            revertStyles.filter = display.previewContainer.style.filter;
+            revertStyles.transform = display.previewContainer.style.transform;
+            revertStyles.borderRadius = display.previewImg.style.borderRadius;
+            revertStyles.border = display.previewBorder.style.border;
+
+            display.previewContainer.style.filter = 'none';
+            display.previewContainer.style.transform = 'none';
+            display.previewImg.style.borderRadius = '0px';
+            display.previewBorder.style.borderRadius = '0px';
+            display.previewBorder.style.border = 'none';
+        };
+        const endCompare = () => {
+            display.previewContainer.style.filter = revertStyles.filter;
+            display.previewContainer.style.transform = revertStyles.transform;
+            display.previewImg.style.borderRadius = revertStyles.borderRadius;
+            display.previewBorder.style.borderRadius = revertStyles.borderRadius;
+            display.previewBorder.style.border = revertStyles.border;
+        };
+
+        buttons.compare.addEventListener('mousedown', startCompare);
+        buttons.compare.addEventListener('mouseup', endCompare);
+        buttons.compare.addEventListener('mouseleave', endCompare);
+        buttons.compare.addEventListener('touchstart', startCompare);
+        buttons.compare.addEventListener('touchend', endCompare);
+
+
+        // Reset
+        buttons.reset.addEventListener('click', () => {
+            state.file = null;
+            state.image = null;
+            switchView('upload');
+        });
+
+        // Dark Mode Toggle
+        buttons.themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            state.theme = state.theme === 'light' ? 'dark' : 'light';
+        });
+
+        // --- View Control (Zoom/Pan/Max) ---
+
+        function setZoom(val) {
+            state.zoom = Math.max(0.1, Math.min(5, val));
+            updateUI();
+        }
+
+        buttons.zoomIn.addEventListener('click', () => setZoom(state.zoom + 0.25));
+        buttons.zoomOut.addEventListener('click', () => setZoom(state.zoom - 0.25));
+        buttons.zoomFit.addEventListener('click', () => { resetZoomPan(); updateUI(); });
+
+        buttons.maximize.addEventListener('click', () => {
+            state.isMaximized = !state.isMaximized;
+            updateUI();
+        });
+
+        // Handle ESC key to exit maximized mode
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && state.isMaximized) {
+                state.isMaximized = false;
+                updateUI();
+            }
+        });
+
+        // Pan Logic
+        const viewport = display.previewViewport;
+
+        // Mouse Down / Touch Start
+        const startDrag = (clientX, clientY) => {
+            // Only pan if zoomed in or maximized, or if standard drag behavior desired
+            // Simple check: always allow pan unless fit?
+            state.isDragging = true;
+            state.startMouse = { x: clientX, y: clientY };
+            state.startPan = { ...state.pan };
+            viewport.classList.add('cursor-grabbing');
+            viewport.classList.remove('cursor-grab');
+        };
+
+        viewport.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button')) return; // ignore buttons inside viewport
+            e.preventDefault();
+            startDrag(e.clientX, e.clientY);
+        });
+
+        viewport.addEventListener('touchstart', (e) => {
+            if (e.target.closest('button')) return;
+            // preventDefault might block scrolling page, only do if we want to lock scroll
+            // e.preventDefault(); 
+            const t = e.touches[0];
+            startDrag(t.clientX, t.clientY);
+        });
+
+        // Move
+        const onDrag = (clientX, clientY) => {
+            if (!state.isDragging) return;
+            const dx = clientX - state.startMouse.x;
+            const dy = clientY - state.startMouse.y;
+            state.pan.x = state.startPan.x + dx;
+            state.pan.y = state.startPan.y + dy;
+            updateUI();
+        };
+
+        window.addEventListener('mousemove', (e) => onDrag(e.clientX, e.clientY));
+        window.addEventListener('touchmove', (e) => {
+            if (!state.isDragging) return;
+            // Prevent page scroll while dragging image
+            if (e.cancelable) e.preventDefault();
+            const t = e.touches[0];
+            onDrag(t.clientX, t.clientY);
+        }, { passive: false });
+
+        // End
+        const stopDrag = () => {
+            state.isDragging = false;
+            viewport.classList.remove('cursor-grabbing');
+            viewport.classList.add('cursor-grab');
+        };
+
+        window.addEventListener('mouseup', stopDrag);
+        window.addEventListener('touchend', stopDrag);
+
+        // Wheel Zoom
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = -Math.sign(e.deltaY) * 0.1;
+            setZoom(state.zoom + delta);
+        }, { passive: false });
+
+
+        // Download Logic
+        buttons.download.addEventListener('click', () => {
+            const btn = buttons.download;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader" class="w-5 h-5 animate-spin"></i> Processing...`;
+            lucide.createIcons();
+
+            setTimeout(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = state.targetDims.width;
+                canvas.height = state.targetDims.height;
+                const ctx = canvas.getContext('2d');
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+
+                // Background for non-transparent formats
+                // Note: If using rounded corners, we might want transparency outside?
+                // For JPEG, it will be black/white. For PNG/WEBP it supports transparency.
+                if (state.outputFormat === 'image/jpeg' || (state.outputFormat === 'original' && state.file.type === 'image/jpeg')) {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                // 1. Transform Context
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate((state.rotation * Math.PI) / 180);
+                ctx.scale(state.flipH ? -1 : 1, state.flipV ? -1 : 1);
+
+                // 2. Apply Filters (Blur/Sepia etc.)
+                ctx.filter = getFilterString();
+
+                // 3. Draw with Clipping for Rounded Corners
+                const isVertical = state.rotation % 180 !== 0;
+                const drawW = isVertical ? state.targetDims.height : state.targetDims.width;
+                const drawH = isVertical ? state.targetDims.width : state.targetDims.height;
+
+                // Path for clipping
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, state.borderRadius);
+                } else {
+                    ctx.rect(-drawW / 2, -drawH / 2, drawW, drawH); // Fallback
+                }
+                ctx.clip();
+
+                // Draw Image
+                ctx.drawImage(state.image, -drawW / 2, -drawH / 2, drawW, drawH);
+
+                if (state.borderWidth > 0) {
+                    // Reset filter for border so it's not blurred/grayscale
+                    ctx.filter = 'none';
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        const inset = state.borderWidth / 2;
+                        ctx.roundRect((-drawW / 2) + inset, (-drawH / 2) + inset, drawW - state.borderWidth, drawH - state.borderWidth, Math.max(0, state.borderRadius - inset));
+                    } else {
+                        ctx.rect(-drawW / 2, -drawH / 2, drawW, drawH);
+                    }
+                    ctx.lineWidth = state.borderWidth;
+                    ctx.strokeStyle = state.borderColor;
+                    ctx.stroke();
+                }
+
+
+                // 4. Download
+                let mimeType = state.file.type;
+                if (state.outputFormat !== 'original') mimeType = state.outputFormat;
+                else if (state.file.type === 'image/svg+xml') mimeType = 'image/png';
+
+                const ext = mimeType.split('/')[1];
+                const filename = `resizr-pro-${state.targetDims.width}x${state.targetDims.height}-${Date.now()}.${ext}`;
+
+                canvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }, mimeType, parseFloat(state.quality));
+            }, 50);
+        });
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEIC to JPG/PDF Converter</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Libraries -->
+    <!-- HEIC Conversion -->
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <!-- PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- ZIP Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- File Saver -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+        }
+
+        .drop-zone {
+            transition: all 0.2s ease-in-out;
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='16' ry='16' stroke='%23CBD5E1FF' stroke-width='2' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+        }
+
+        .drop-zone.active {
+            background-color: #eff6ff;
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='16' ry='16' stroke='%233B82F6FF' stroke-width='2' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+            transform: scale(1.01);
+        }
+
+        .card-enter {
+            animation: slideUp 0.3s ease-out forwards;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite;
+            /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen text-slate-800 font-sans">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-brand-600 text-white p-1.5 rounded-lg">
+                    <i data-lucide="image-plus" class="w-5 h-5"></i>
+                </div>
+                <h1 class="font-bold text-lg tracking-tight">HEIC Converter</h1>
+            </div>
+            <div class="hidden sm:flex items-center gap-4 text-sm text-slate-500">
+                <span class="flex items-center gap-1"><i data-lucide="lock" class="w-4 h-4"></i> Privacy First:
+                    Processing is local</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto px-4 py-8">
+
+        <!-- Controls -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <i data-lucide="settings-2" class="w-5 h-5 text-slate-400"></i> Settings
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <!-- Output Format -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-2">Output Format</label>
+                    <div class="flex bg-slate-100 p-1 rounded-lg">
+                        <button onclick="setFormat('image/jpeg')" id="btn-jpeg"
+                            class="flex-1 py-1.5 text-sm font-medium rounded-md bg-white text-brand-600 shadow-sm transition-all">JPG</button>
+                        <button onclick="setFormat('image/png')" id="btn-png"
+                            class="flex-1 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all">PNG</button>
+                    </div>
+                </div>
+
+                <!-- Quality Slider -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-2">Quality: <span
+                            id="quality-val">0.9</span></label>
+                    <input type="range" min="0.5" max="1.0" step="0.1" value="0.9" id="quality-slider"
+                        class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600">
+                    <div class="flex justify-between text-xs text-slate-400 mt-1">
+                        <span>Low Size</span>
+                        <span>High Quality</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div id="drop-zone"
+            class="drop-zone bg-white rounded-3xl p-10 text-center cursor-pointer mb-8 group relative overflow-hidden">
+            <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                multiple accept=".heic,.HEIC">
+
+            <div class="pointer-events-none relative z-0">
+                <div
+                    class="w-16 h-16 bg-blue-50 text-brand-600 rounded-2xl mx-auto flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                    <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">Drop HEIC files here</h3>
+                <p class="text-slate-500">or click to browse from your device</p>
+                <p class="text-xs text-slate-400 mt-4">iPhone Photos • Live Photos • Bursts</p>
+            </div>
+        </div>
+
+        <!-- Action Bar (Hidden initially) -->
+        <div id="action-bar"
+            class="hidden flex flex-col sm:flex-row items-center justify-between bg-slate-800 text-white p-4 rounded-xl mb-6 shadow-lg gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-slate-700 p-2 rounded-lg">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 text-green-400"></i>
+                </div>
+                <div>
+                    <p class="font-medium text-sm"><span id="completed-count">0</span> Files Converted</p>
+                    <p class="text-xs text-slate-400">Ready for download</p>
+                </div>
+            </div>
+            <div class="flex gap-2 w-full sm:w-auto">
+                <button onclick="downloadAllZip()"
+                    class="flex-1 sm:flex-none items-center justify-center gap-2 bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors flex">
+                    <i data-lucide="archive" class="w-4 h-4"></i> Download ZIP
+                </button>
+                <button onclick="downloadAllPdf()"
+                    class="flex-1 sm:flex-none items-center justify-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-500 transition-colors flex">
+                    <i data-lucide="file-text" class="w-4 h-4"></i> Merge PDF
+                </button>
+                <button onclick="clearAll()"
+                    class="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                    title="Clear All">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Gallery Grid -->
+        <div id="gallery" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Cards will be injected here -->
+        </div>
+
+    </main>
+
+    <!-- Template for File Card -->
+    <template id="card-template">
+        <div
+            class="card-enter bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow relative group">
+            <div class="h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                <!-- Image Preview or Placeholder -->
+                <img class="w-full h-full object-cover hidden preview-img" alt="Converted Image">
+                <div class="loading-state flex flex-col items-center gap-2 text-slate-400">
+                    <div class="loader"></div>
+                    <span class="text-xs font-medium">Converting...</span>
+                </div>
+                <!-- Status Badge -->
+                <div
+                    class="absolute top-2 right-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-md status-badge">
+                    Processing
+                </div>
+            </div>
+
+            <div class="p-4">
+                <h4 class="font-medium text-slate-700 truncate file-name mb-1" title="">IMG_1234.HEIC</h4>
+                <div class="flex items-center justify-between mt-3">
+                    <span class="text-xs text-slate-400 file-size">-- KB</span>
+                    <button
+                        class="download-btn disabled:opacity-50 disabled:cursor-not-allowed text-brand-600 hover:bg-brand-50 p-2 rounded-lg transition-colors"
+                        disabled title="Download">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Remove Button -->
+            <button
+                class="remove-btn absolute top-2 left-2 bg-white/90 p-1.5 rounded-full shadow-sm text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </template>
+
+    <script>
+        // --- State Management ---
+        const state = {
+            files: [], // Array of objects: { id, originalFile, convertedBlob, status, name }
+            settings: {
+                format: 'image/jpeg', // or 'image/png'
+                quality: 0.9
+            }
+        };
+
+        // --- DOM Elements ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const gallery = document.getElementById('gallery');
+        const cardTemplate = document.getElementById('card-template');
+        const actionBar = document.getElementById('action-bar');
+        const completedCountEl = document.getElementById('completed-count');
+        const qualitySlider = document.getElementById('quality-slider');
+        const qualityVal = document.getElementById('quality-val');
+
+        // --- Icons Init ---
+        lucide.createIcons();
+
+        // --- Event Listeners ---
+
+        // Drag and Drop Visuals
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add('active');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove('active');
+            }, false);
+        });
+
+        // File Selection
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+            // Reset input so same files can be selected again if needed (after clear)
+            fileInput.value = '';
+        });
+
+        // Settings
+        qualitySlider.addEventListener('input', (e) => {
+            state.settings.quality = parseFloat(e.target.value);
+            qualityVal.innerText = state.settings.quality;
+        });
+
+        window.setFormat = (format) => {
+            state.settings.format = format;
+            document.getElementById('btn-jpeg').className = format === 'image/jpeg'
+                ? "flex-1 py-1.5 text-sm font-medium rounded-md bg-white text-brand-600 shadow-sm transition-all"
+                : "flex-1 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all";
+
+            document.getElementById('btn-png').className = format === 'image/png'
+                ? "flex-1 py-1.5 text-sm font-medium rounded-md bg-white text-brand-600 shadow-sm transition-all"
+                : "flex-1 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all";
+        }
+
+        // --- Core Logic ---
+
+        function handleFiles(fileList) {
+            const newFiles = Array.from(fileList).filter(file => {
+                return file.name.toLowerCase().endsWith('.heic');
+            });
+
+            if (newFiles.length === 0 && fileList.length > 0) {
+                alert("Please select .HEIC files only.");
+                return;
+            }
+
+            newFiles.forEach(file => {
+                const id = Math.random().toString(36).substr(2, 9);
+                const fileObj = {
+                    id,
+                    originalFile: file,
+                    convertedBlob: null,
+                    status: 'pending',
+                    name: file.name
+                };
+
+                state.files.push(fileObj);
+                createCard(fileObj);
+                processFile(fileObj);
+            });
+
+            updateActionBar();
+        }
+
+        function createCard(fileObj) {
+            const clone = cardTemplate.content.cloneNode(true);
+            const card = clone.querySelector('div'); // Root div
+            card.id = `card-${fileObj.id}`;
+
+            clone.querySelector('.file-name').textContent = fileObj.name;
+            clone.querySelector('.file-name').title = fileObj.name;
+            clone.querySelector('.file-size').textContent = (fileObj.originalFile.size / 1024 / 1024).toFixed(2) + ' MB (Original)';
+
+            // Remove handler
+            clone.querySelector('.remove-btn').onclick = () => removeFile(fileObj.id);
+
+            gallery.appendChild(clone);
+            lucide.createIcons();
+        }
+
+        async function processFile(fileObj) {
+            const card = document.getElementById(`card-${fileObj.id}`);
+
+            try {
+                // heic2any returns a blob or an array of blobs
+                const blob = await heic2any({
+                    blob: fileObj.originalFile,
+                    toType: state.settings.format,
+                    quality: state.settings.quality
+                });
+
+                // Handle single blob result (normal case) or multiple (burst photos)
+                // We'll just take the first one for simplicity in this UI
+                const finalBlob = Array.isArray(blob) ? blob[0] : blob;
+
+                fileObj.convertedBlob = finalBlob;
+                fileObj.status = 'done';
+
+                // Update UI
+                const url = URL.createObjectURL(finalBlob);
+                const img = card.querySelector('.preview-img');
+                const loader = card.querySelector('.loading-state');
+                const badge = card.querySelector('.status-badge');
+                const downloadBtn = card.querySelector('.download-btn');
+                const sizeTxt = card.querySelector('.file-size');
+
+                img.src = url;
+                img.classList.remove('hidden');
+                loader.classList.add('hidden');
+
+                badge.textContent = state.settings.format === 'image/jpeg' ? 'JPG' : 'PNG';
+                badge.classList.remove('bg-black/50');
+                badge.classList.add('bg-green-500');
+
+                sizeTxt.textContent = (finalBlob.size / 1024).toFixed(1) + ' KB';
+
+                downloadBtn.disabled = false;
+                downloadBtn.onclick = () => saveAs(finalBlob, getOutputName(fileObj.name));
+
+                updateActionBar();
+
+            } catch (error) {
+                console.error(error);
+                fileObj.status = 'error';
+                const card = document.getElementById(`card-${fileObj.id}`);
+                const badge = card.querySelector('.status-badge');
+                const loader = card.querySelector('.loading-state');
+
+                loader.innerHTML = '<span class="text-red-500 text-xs">Error</span>';
+                badge.textContent = 'Failed';
+                badge.classList.add('bg-red-500');
+            }
+        }
+
+        function removeFile(id) {
+            state.files = state.files.filter(f => f.id !== id);
+            const card = document.getElementById(`card-${id}`);
+            if (card) card.remove();
+            updateActionBar();
+        }
+
+        window.clearAll = () => {
+            state.files = [];
+            gallery.innerHTML = '';
+            updateActionBar();
+        }
+
+        function updateActionBar() {
+            const doneCount = state.files.filter(f => f.status === 'done').length;
+            completedCountEl.textContent = doneCount;
+
+            if (state.files.length > 0) {
+                actionBar.classList.remove('hidden');
+            } else {
+                actionBar.classList.add('hidden');
+            }
+        }
+
+        function getOutputName(originalName) {
+            const ext = state.settings.format === 'image/jpeg' ? 'jpg' : 'png';
+            return originalName.replace(/\.[^/.]+$/, "") + "." + ext;
+        }
+
+        // --- Bulk Actions ---
+
+        window.downloadAllZip = async () => {
+            const zip = new JSZip();
+            const completedFiles = state.files.filter(f => f.status === 'done');
+
+            if (completedFiles.length === 0) return;
+
+            completedFiles.forEach(f => {
+                zip.file(getOutputName(f.name), f.convertedBlob);
+            });
+
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "converted_images.zip");
+        };
+
+        window.downloadAllPdf = () => {
+            const completedFiles = state.files.filter(f => f.status === 'done');
+            if (completedFiles.length === 0) return;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            let processed = 0;
+
+            completedFiles.forEach((f, index) => {
+                const imgUrl = URL.createObjectURL(f.convertedBlob);
+                const imgProps = doc.getImageProperties(imgUrl);
+
+                // Calculate dimensions to fit A4
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const pdfHeight = doc.internal.pageSize.getHeight();
+
+                // Margin
+                const margin = 10;
+                const availableWidth = pdfWidth - (margin * 2);
+                const availableHeight = pdfHeight - (margin * 2);
+
+                const ratio = imgProps.width / imgProps.height;
+                let imgWidth = availableWidth;
+                let imgHeight = availableWidth / ratio;
+
+                // If height overflows, scale by height instead
+                if (imgHeight > availableHeight) {
+                    imgHeight = availableHeight;
+                    imgWidth = availableHeight * ratio;
+                }
+
+                // Center logic
+                const x = (pdfWidth - imgWidth) / 2;
+                const y = margin; // Top align with margin
+
+                if (index > 0) doc.addPage();
+
+                const type = state.settings.format === 'image/png' ? 'PNG' : 'JPEG';
+                doc.addImage(imgUrl, type, x, y, imgWidth, imgHeight);
+            });
+
+            doc.save("merged_images.pdf");
+        };
+
+    </script>
+</body>
+
+</html>

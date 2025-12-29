@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MemeMaster Pro - Ultimate Meme Maker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Expanded Font Library -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Anton&family=Poppins:wght@400;600;700&family=Comic+Neue:wght@700&family=Bangers&family=Creepster&family=Lobster&family=Orbitron:wght@700&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Shadows+Into+Light&display=swap"
+        rel="stylesheet">
+    <style>
+        /* --- FLUID TYPOGRAPHY --- */
+        html {
+            font-size: 12px;
+            /* Mobile < 400px */
+        }
+
+        @media (min-width: 400px) {
+            html {
+                font-size: 13px;
+            }
+        }
+
+        @media (min-width: 640px) {
+            html {
+                font-size: 14px;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            html {
+                font-size: 16px;
+            }
+
+            /* Desktop Standard */
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f172a;
+        }
+
+        .meme-font {
+            font-family: 'Anton', sans-serif;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        canvas {
+            background-image:
+                linear-gradient(45deg, #1e293b 25%, transparent 25%),
+                linear-gradient(-45deg, #1e293b 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #1e293b 75%),
+                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            cursor: default;
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #6366f1;
+            margin-top: -6px;
+            cursor: pointer;
+            box-shadow: 0 0 0 2px #1e293b;
+            transition: transform 0.1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes slideUpFade {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-slide-up {
+            animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes popIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.9) translateY(10px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .animate-pop-in {
+            animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Comparison Slider Styles */
+        .comparison-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            /* Let clicks pass through generally, we enable pointer events on handle */
+        }
+
+        .comparison-before {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        .comparison-handle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: white;
+            z-index: 20;
+            cursor: ew-resize;
+            pointer-events: auto;
+            /* Enable dragging */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .comparison-circle {
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            color: #0f172a;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent 50%, rgba(34, 197, 94, 0.2) 50%, transparent 51%);
+            background-size: 100% 10px;
+            animation: scan 1s linear infinite;
+            pointer-events: none;
+            z-index: 50;
+            display: none;
+        }
+
+        @keyframes scan {
+            from {
+                background-position: 0 0;
+            }
+
+            to {
+                background-position: 0 200px;
+            }
+        }
+    </style>
+</head>
+
+<body class="text-white h-screen flex flex-col overflow-hidden supports-[height:100dvh]:h-[100dvh]">
+
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-800 shrink-0 z-20 shadow-lg relative">
+        <div class="max-w-full mx-auto px-4 h-14 lg:h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-2 lg:space-x-3 group cursor-default">
+                <div
+                    class="bg-gradient-to-br from-indigo-500 to-purple-600 p-1.5 lg:p-2 rounded-lg shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <i data-lucide="zap" class="w-5 h-5 lg:w-6 lg:h-6 text-white"></i>
+                </div>
+                <h1
+                    class="text-lg lg:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 group-hover:from-indigo-300 group-hover:to-purple-300 transition-colors">
+                    MemeMaster <span
+                        class="hidden sm:inline text-xs text-white bg-red-500 px-1.5 py-0.5 rounded ml-1 font-mono shadow-md">PRO</span>
+                </h1>
+            </div>
+
+            <!-- History & Actions -->
+            <div class="flex items-center space-x-2 lg:space-x-4">
+                <div class="flex items-center bg-slate-800 rounded-lg p-1 mr-2 border border-slate-700 shadow-sm">
+                    <button onclick="undo()"
+                        class="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-all active:scale-90"
+                        title="Undo">
+                        <i data-lucide="undo-2" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="redo()"
+                        class="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-all active:scale-90"
+                        title="Redo">
+                        <i data-lucide="redo-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <button onclick="resetCanvas()"
+                    class="text-xs lg:text-sm text-slate-400 hover:text-red-400 flex items-center transition-all px-2 py-1 hover:bg-slate-800 rounded-md active:scale-95">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4 mr-1 transition-transform group-hover:-rotate-180"></i>
+                    <span class="hidden sm:inline">Reset</span>
+                </button>
+                <button id="downloadBtn"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg text-xs lg:text-sm font-semibold flex items-center shadow-lg transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95">
+                    <i data-lucide="download" class="w-4 h-4 mr-1.5"></i> <span class="hidden sm:inline">Save</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-grow flex flex-col lg:flex-row overflow-hidden relative">
+
+        <!-- Canvas Area -->
+        <div class="order-1 lg:order-2 bg-slate-900/50 flex flex-col items-center justify-center p-4 lg:p-10 relative overflow-hidden h-[45vh] lg:h-auto lg:flex-grow shrink-0 z-0 border-b lg:border-b-0 border-slate-800 transition-colors duration-300"
+            id="dropZone">
+
+            <div id="canvasContainer"
+                class="relative shadow-2xl rounded-sm overflow-hidden flex items-center justify-center group w-fit h-fit max-w-full max-h-full">
+                <!-- Main Canvas (Effectively "After" image during comparison) -->
+                <canvas id="editorCanvas"
+                    class="block touch-none max-w-full max-h-full object-contain mx-auto transition-transform duration-300"></canvas>
+
+                <!-- Comparison Overlay -->
+                <div id="comparisonOverlay" class="comparison-container hidden">
+                    <!-- Before Image Layer -->
+                    <div id="compareBefore" class="comparison-before border-r-2 border-white/50">
+                        <img id="compareImg" src="" class="w-full h-full object-contain" alt="Original">
+                        <div
+                            class="absolute bottom-4 left-4 bg-black/50 backdrop-blur px-2 py-1 rounded text-xs text-white font-mono">
+                            ORIGINAL</div>
+                    </div>
+                    <!-- After Label (on canvas behind) -->
+                    <div
+                        class="absolute bottom-4 right-4 bg-indigo-600/80 backdrop-blur px-2 py-1 rounded text-xs text-white font-mono z-0 pointer-events-none">
+                        UPSCALED</div>
+
+                    <!-- Slider Handle -->
+                    <div id="compareHandle" class="comparison-handle" style="left: 50%;">
+                        <div class="comparison-circle">
+                            <i data-lucide="chevrons-left-right" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scanning Effect for Loading -->
+                <div id="scanEffect" class="scan-line"></div>
+            </div>
+
+            <!-- Floating hint -->
+            <div id="canvasHint"
+                class="absolute bottom-2 lg:bottom-6 bg-slate-800/80 backdrop-blur px-3 py-1 lg:px-4 lg:py-2 rounded-full text-[10px] lg:text-xs text-slate-300 pointer-events-none transition-all duration-500 hover:scale-105 shadow-xl border border-white/10">
+                Drag text • Rotate • Draw
+            </div>
+        </div>
+
+        <!-- Sidebar Controls -->
+        <aside
+            class="order-2 lg:order-1 w-full lg:w-96 bg-slate-800 border-r border-slate-700 flex flex-col z-10 shadow-2xl overflow-hidden flex-1 lg:h-auto">
+
+            <!-- Tabs Navigation -->
+            <div class="flex border-b border-slate-700 shrink-0">
+                <button onclick="switchTab('text')" id="tab-text"
+                    class="flex-1 py-3 lg:py-4 flex flex-col lg:flex-row items-center justify-center text-indigo-400 border-b-2 border-indigo-500 bg-slate-700/50 transition-all duration-300 gap-1 active:bg-slate-700">
+                    <i data-lucide="type"
+                        class="w-4 h-4 max-[400px]:w-6 max-[400px]:h-6 lg:w-4 lg:h-4 transition-transform group-hover:scale-110"></i>
+                    <span
+                        class="text-[10px] lg:text-sm font-medium hidden sm:inline min-[1080px]:hidden xl:inline">Text</span>
+                </button>
+                <button onclick="switchTab('draw')" id="tab-draw"
+                    class="flex-1 py-3 lg:py-4 flex flex-col lg:flex-row items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-300 gap-1 active:bg-slate-700">
+                    <i data-lucide="pen-tool"
+                        class="w-4 h-4 max-[400px]:w-6 max-[400px]:h-6 lg:w-4 lg:h-4 transition-transform group-hover:scale-110"></i>
+                    <span
+                        class="text-[10px] lg:text-sm font-medium hidden sm:inline min-[1080px]:hidden xl:inline">Draw</span>
+                </button>
+                <button onclick="switchTab('filters')" id="tab-filters"
+                    class="flex-1 py-3 lg:py-4 flex flex-col lg:flex-row items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-300 gap-1 active:bg-slate-700">
+                    <i data-lucide="wand-2"
+                        class="w-4 h-4 max-[400px]:w-6 max-[400px]:h-6 lg:w-4 lg:h-4 transition-transform group-hover:scale-110"></i>
+                    <span
+                        class="text-[10px] lg:text-sm font-medium hidden sm:inline min-[1080px]:hidden xl:inline">Filters</span>
+                </button>
+                <button onclick="switchTab('enhance')" id="tab-enhance"
+                    class="flex-1 py-3 lg:py-4 flex flex-col lg:flex-row items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-300 gap-1 active:bg-slate-700">
+                    <i data-lucide="sparkles"
+                        class="w-4 h-4 max-[400px]:w-6 max-[400px]:h-6 lg:w-4 lg:h-4 transition-transform group-hover:scale-110"></i>
+                    <span
+                        class="text-[10px] lg:text-sm font-medium hidden sm:inline min-[1080px]:hidden xl:inline">Enhance</span>
+                </button>
+                <button onclick="switchTab('templates')" id="tab-templates"
+                    class="flex-1 py-3 lg:py-4 flex flex-col lg:flex-row items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-300 gap-1 active:bg-slate-700">
+                    <i data-lucide="image"
+                        class="w-4 h-4 max-[400px]:w-6 max-[400px]:h-6 lg:w-4 lg:h-4 transition-transform group-hover:scale-110"></i>
+                    <span
+                        class="text-[10px] lg:text-sm font-medium hidden sm:inline min-[1080px]:hidden xl:inline">Images</span>
+                </button>
+            </div>
+
+            <!-- Scrollable Content Area -->
+            <div class="flex-grow overflow-y-auto p-4 lg:p-6 space-y-6 custom-scrollbar relative bg-slate-800">
+
+                <!-- TEXT TAB -->
+                <div id="panel-text" class="space-y-4 lg:space-y-6 pb-20 lg:pb-0 animate-slide-up">
+                    <div class="flex space-x-2">
+                        <button onclick="addNewText()"
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-500 py-2 lg:py-3 rounded-lg text-sm lg:text-base font-semibold flex justify-center items-center transition-all shadow-lg hover:-translate-y-0.5 active:scale-95">
+                            <i data-lucide="plus" class="w-4 h-4 lg:w-5 lg:h-5 mr-2"></i> Add Text
+                        </button>
+
+                        <div class="relative">
+                            <button onclick="toggleEmojiPicker()" id="emojiBtn"
+                                class="bg-slate-700 hover:bg-slate-600 p-2 lg:p-3 rounded-lg transition-all h-full flex items-center justify-center hover:scale-105 active:scale-95"
+                                title="Emoji">
+                                <i data-lucide="smile" class="w-5 h-5 lg:w-5 lg:h-5"></i>
+                            </button>
+
+                            <div id="emojiPicker"
+                                class="hidden absolute right-0 top-full mt-2 w-64 bg-slate-800 border border-slate-600 rounded-xl p-3 grid grid-cols-5 gap-2 shadow-2xl z-50 origin-top-right">
+                                <button onclick="addSpecificEmoji('😂')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">😂</button>
+                                <button onclick="addSpecificEmoji('🔥')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">🔥</button>
+                                <button onclick="addSpecificEmoji('💀')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">💀</button>
+                                <button onclick="addSpecificEmoji('🤡')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">🤡</button>
+                                <button onclick="addSpecificEmoji('💯')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">💯</button>
+                                <button onclick="addSpecificEmoji('🍆')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">🍆</button>
+                                <button onclick="addSpecificEmoji('🤔')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">🤔</button>
+                                <button onclick="addSpecificEmoji('😎')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">😎</button>
+                                <button onclick="addSpecificEmoji('👀')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">👀</button>
+                                <button onclick="addSpecificEmoji('💩')"
+                                    class="text-2xl hover:bg-slate-700 p-1 rounded transition-transform hover:scale-125">💩</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="selectedTextControls"
+                        class="bg-slate-700/50 rounded-xl p-3 lg:p-4 border border-slate-600 hidden animate-pop-in">
+                        <h3
+                            class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2 lg:mb-3 flex justify-between items-center">
+                            Selected Text
+                            <button onclick="deleteSelectedText()"
+                                class="text-red-400 hover:text-red-300 p-1 hover:bg-red-400/10 rounded transition-colors"><i
+                                    data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </h3>
+
+                        <div class="space-y-4">
+                            <textarea id="textContent" rows="2"
+                                class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-white text-sm focus:border-indigo-500 focus:outline-none resize-none transition-colors"
+                                placeholder="Type here..."></textarea>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="text-xs text-slate-400 block mb-1">Fill / Stroke</label>
+                                    <div class="flex space-x-2">
+                                        <input type="color" id="textColor"
+                                            class="w-full h-8 rounded bg-transparent cursor-pointer hover:scale-105 transition-transform">
+                                        <input type="color" id="textStrokeColor"
+                                            class="w-full h-8 rounded bg-transparent cursor-pointer hover:scale-105 transition-transform">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-400 block mb-1">Font</label>
+                                    <select id="textFont"
+                                        class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-sm focus:outline-none appearance-none font-sans focus:border-indigo-500 transition-colors">
+                                        <option value="Anton" style="font-family: 'Anton'">Impact (Classic)</option>
+                                        <option value="Poppins" style="font-family: 'Poppins'">Poppins (Modern)</option>
+                                        <option value="Oswald" style="font-family: 'Oswald'">Oswald (Tall)</option>
+                                        <option value="Bangers" style="font-family: 'Bangers'">Bangers (Loud)</option>
+                                        <option value="Comic Neue" style="font-family: 'Comic Neue'">Comic (Funny)
+                                        </option>
+                                        <option value="Permanent Marker" style="font-family: 'Permanent Marker'">Marker
+                                            (Hand)</option>
+                                        <option value="Lobster" style="font-family: 'Lobster'">Lobster (Fancy)</option>
+                                        <option value="Pacifico" style="font-family: 'Pacifico'">Pacifico (Brush)
+                                        </option>
+                                        <option value="Creepster" style="font-family: 'Creepster'">Creepster (Scary)
+                                        </option>
+                                        <option value="Orbitron" style="font-family: 'Orbitron'">Orbitron (Sci-Fi)
+                                        </option>
+                                        <option value="Shadows Into Light" style="font-family: 'Shadows Into Light'">
+                                            Shadows (Messy)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="flex justify-between text-xs text-slate-400 mb-1">
+                                        <span>Size</span>
+                                        <span id="textSizeVal" class="text-slate-500">50</span>
+                                    </label>
+                                    <input type="range" id="textSize" min="10" max="150"
+                                        class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                <div>
+                                    <label class="flex justify-between text-xs text-slate-400 mb-1">
+                                        <span>Rotation</span>
+                                        <span id="textRotVal" class="text-slate-500">0°</span>
+                                    </label>
+                                    <input type="range" id="textRotation" min="-180" max="180" value="0"
+                                        class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                <div>
+                                    <label class="flex justify-between text-xs text-slate-400 mb-1">
+                                        <span>Stroke Width</span>
+                                        <span id="textStrokeVal" class="text-slate-500">2</span>
+                                    </label>
+                                    <input type="range" id="textStrokeWidth" min="0" max="20" value="2"
+                                        class="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer">
+                                </div>
+                                <div class="flex items-center space-x-2 mt-2">
+                                    <input type="checkbox" id="textShadow"
+                                        class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-600 cursor-pointer">
+                                    <label for="textShadow"
+                                        class="text-xs text-slate-300 cursor-pointer select-none">Drop Shadow</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center text-slate-500 text-xs lg:text-sm italic animate-pulse" id="noSelectionMsg">
+                        Tap text to edit, drag to move.
+                    </div>
+                </div>
+
+                <!-- DRAW TAB -->
+                <div id="panel-draw" class="hidden space-y-4 lg:space-y-6 pb-20 lg:pb-0">
+                    <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg">
+                        <span class="font-medium text-sm">Enable Drawing</span>
+                        <button id="toggleDraw" onclick="toggleDrawingMode()"
+                            class="w-10 h-6 lg:w-12 lg:h-6 rounded-full bg-slate-600 relative transition-colors duration-300 focus:outline-none shadow-inner">
+                            <div
+                                class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-transform duration-300 shadow-sm">
+                            </div>
+                        </button>
+                    </div>
+
+                    <div id="drawControls" class="opacity-50 pointer-events-none transition-all duration-300">
+                        <div class="mb-4">
+                            <label class="text-xs text-slate-400 block mb-2">Brush Color</label>
+                            <div class="flex gap-2 flex-wrap">
+                                <button onclick="setBrushColor('#ef4444')"
+                                    class="w-8 h-8 rounded-full bg-red-500 ring-2 ring-offset-2 ring-offset-slate-800 ring-transparent hover:ring-white transition-all hover:scale-110 active:scale-90"></button>
+                                <button onclick="setBrushColor('#22c55e')"
+                                    class="w-8 h-8 rounded-full bg-green-500 hover:ring-2 ring-white transition-all hover:scale-110 active:scale-90"></button>
+                                <button onclick="setBrushColor('#3b82f6')"
+                                    class="w-8 h-8 rounded-full bg-blue-500 hover:ring-2 ring-white transition-all hover:scale-110 active:scale-90"></button>
+                                <button onclick="setBrushColor('#ffff00')"
+                                    class="w-8 h-8 rounded-full bg-yellow-400 hover:ring-2 ring-white transition-all hover:scale-110 active:scale-90"></button>
+                                <button onclick="setBrushColor('#ffffff')"
+                                    class="w-8 h-8 rounded-full bg-white hover:ring-2 ring-indigo-500 transition-all hover:scale-110 active:scale-90"></button>
+                                <button onclick="setBrushColor('#000000')"
+                                    class="w-8 h-8 rounded-full bg-black border border-slate-600 hover:ring-2 ring-white transition-all hover:scale-110 active:scale-90"></button>
+
+                                <label class="cursor-pointer group">
+                                    <input type="color" onchange="setBrushColor(this.value)" class="invisible w-0 h-0">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 ring-2 ring-offset-2 ring-offset-slate-800 ring-transparent group-hover:ring-white flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-90">
+                                        <i data-lucide="plus" class="w-4 h-4 text-white"></i>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-2">Brush Size: <span
+                                    id="brushSizeVal">5</span>px</label>
+                            <input type="range" id="brushSize" min="1" max="20" value="5" class="w-full">
+                        </div>
+                        <button onclick="clearDrawings()"
+                            class="mt-6 w-full py-2 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/10 transition-colors text-sm active:bg-red-500/20">
+                            Clear Drawings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FILTERS TAB -->
+                <div id="panel-filters" class="hidden space-y-4 pb-20 lg:pb-0">
+                    <h3 class="text-sm font-semibold text-slate-300 mb-2">Image Effects</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="applyFilter('none')"
+                            class="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-all hover:-translate-y-0.5 active:scale-95 border border-transparent focus:border-indigo-500">Normal</button>
+                        <button onclick="applyFilter('grayscale(100%)')"
+                            class="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-all hover:-translate-y-0.5 active:scale-95 border border-transparent focus:border-indigo-500">B
+                            & W</button>
+                        <button onclick="applyFilter('sepia(100%)')"
+                            class="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-all hover:-translate-y-0.5 active:scale-95 border border-transparent focus:border-indigo-500">Sepia</button>
+                        <button onclick="applyFilter('invert(100%)')"
+                            class="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-all hover:-translate-y-0.5 active:scale-95 border border-transparent focus:border-indigo-500">Invert</button>
+                        <button onclick="applyFilter('contrast(150%) brightness(110%)')"
+                            class="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-all hover:-translate-y-0.5 active:scale-95 border border-transparent focus:border-indigo-500">Boost</button>
+                        <button onclick="applyFilter('blur(3px)')"
+                            class="p-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-all hover:-translate-y-0.5 active:scale-95 border border-transparent focus:border-indigo-500">Blur</button>
+                    </div>
+
+                    <div class="mt-4 lg:mt-6 pt-4 lg:pt-6 border-t border-slate-700">
+                        <button onclick="applyFilter('contrast(200%) saturate(300%) brightness(110%) blur(0.5px)')"
+                            class="w-full p-4 bg-gradient-to-r from-orange-600 to-red-600 rounded-xl font-bold text-white shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center">
+                            <i data-lucide="flame" class="w-5 h-5 mr-2 animate-pulse"></i> DEEP FRY
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ENHANCE TAB (NEW) -->
+                <div id="panel-enhance" class="hidden space-y-4 pb-20 lg:pb-0">
+                    <h3 class="text-sm font-semibold text-slate-300 mb-2">AI Enhancement</h3>
+
+                    <div class="bg-slate-700/30 p-4 rounded-xl border border-slate-700">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                                <i data-lucide="scan" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-medium text-sm text-white">Smart Upscaler</h4>
+                                <p class="text-xs text-slate-400">Enhance resolution and details</p>
+                            </div>
+                        </div>
+
+                        <button id="upscaleBtn" onclick="mockUpscale()"
+                            class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium text-sm shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center group relative overflow-hidden">
+                            <span class="relative z-10 flex items-center">
+                                <i data-lucide="sparkles" class="w-4 h-4 mr-2 group-hover:animate-spin"></i> Upscale
+                                (2x)
+                            </span>
+                            <div
+                                class="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            </div>
+                        </button>
+                    </div>
+
+                    <div id="enhanceControls" class="hidden opacity-0 transition-opacity duration-500">
+                        <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+                            <span>Original</span>
+                            <span>Enhanced</span>
+                        </div>
+                        <p class="text-xs text-slate-500 text-center italic">Drag the slider on the image to compare.
+                        </p>
+                        <button onclick="closeEnhance()"
+                            class="mt-4 w-full py-2 border border-slate-600 text-slate-400 rounded-lg hover:bg-slate-700 text-xs transition-colors">
+                            Exit Comparison
+                        </button>
+                    </div>
+                </div>
+
+                <!-- IMAGES TAB -->
+                <div id="panel-templates" class="hidden space-y-4 lg:space-y-6 pb-20 lg:pb-0">
+
+                    <!-- Upload -->
+                    <div class="relative group cursor-pointer transition-transform hover:scale-[1.01]">
+                        <input type="file" id="imageInput" accept="image/*"
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                        <div
+                            class="border-2 border-dashed border-slate-600 rounded-xl p-6 lg:p-8 text-center group-hover:border-indigo-500 group-hover:bg-slate-700/30 transition-all duration-300">
+                            <i data-lucide="upload"
+                                class="w-6 h-6 lg:w-8 lg:h-8 mx-auto mb-2 text-indigo-400 group-hover:scale-110 transition-transform"></i>
+                            <span class="text-sm font-medium text-slate-300 group-hover:text-white">Upload Image</span>
+                        </div>
+                    </div>
+
+                    <!-- Gallery -->
+                    <div>
+                        <h4 class="text-xs uppercase text-slate-500 font-bold mb-3 tracking-wider">Templates</h4>
+                        <div class="grid grid-cols-2 gap-2" id="templateGrid">
+                            <!-- Injected JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        // --- App State ---
+        const state = {
+            texts: [
+                { id: 1, text: "TOP TEXT", x: 300, y: 50, size: 50, rotation: 0, color: "#ffffff", stroke: "#000000", strokeWidth: 2, font: "Anton", shadow: false },
+                { id: 2, text: "BOTTOM TEXT", x: 300, y: 550, size: 50, rotation: 0, color: "#ffffff", stroke: "#000000", strokeWidth: 2, font: "Anton", shadow: false }
+            ],
+            drawings: [], // array of lines { points: [{x,y}], color, width }
+            bgImage: null,
+            filter: 'none',
+
+            // Interaction State
+            selectedTextId: null,
+            isDragging: false,
+            isDrawing: false,
+            dragOffset: { x: 0, y: 0 },
+            currentDrawLine: null,
+            isComparing: false,
+
+            // Undo/Redo
+            history: [],
+            historyStep: -1,
+
+            // Settings
+            brushColor: '#ef4444',
+            brushSize: 5
+        };
+
+        const canvas = document.getElementById('editorCanvas');
+        const ctx = canvas.getContext('2d');
+        const BASE_WIDTH = 600;
+        const BASE_HEIGHT = 600;
+
+        // --- Templates ---
+        const templates = [
+            { src: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=600', name: 'Doge' },
+            { src: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=600', name: 'Cat' },
+            { src: 'https://images.unsplash.com/photo-1513569771920-c9e1d31714b0?q=80&w=600', name: 'Success' },
+            { src: 'https://images.unsplash.com/photo-1517849845537-4d257902454a?q=80&w=600', name: 'Waiting' },
+            { src: 'https://images.unsplash.com/photo-1531259683007-016a7b628fc3?q=80&w=600', name: 'Batman' },
+            { src: 'https://images.unsplash.com/photo-1507808973436-a4ed7b5e87c9?q=80&w=600', name: 'Squirrel' }
+        ];
+
+        // --- Initialization ---
+        function init() {
+            // Load templates
+            const grid = document.getElementById('templateGrid');
+            templates.forEach((t, index) => {
+                const div = document.createElement('div');
+                div.className = "aspect-square rounded-lg overflow-hidden border border-slate-700 cursor-pointer hover:border-indigo-500 hover:ring-2 ring-indigo-500/50 transition-all hover:scale-105 active:scale-95 relative group";
+                // Staggered entry animation
+                div.style.animation = `popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards ${index * 0.05}s`;
+                div.style.opacity = '0'; // Start hidden for animation
+                div.innerHTML = `<img src="${t.src}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy">`;
+                div.onclick = () => loadImages(t.src);
+                grid.appendChild(div);
+            });
+
+            canvas.width = BASE_WIDTH;
+            canvas.height = BASE_HEIGHT;
+
+            loadImages(templates[1].src);
+
+            // Listeners
+            canvas.addEventListener('mousedown', handlePointerDown);
+            canvas.addEventListener('mousemove', handlePointerMove);
+            canvas.addEventListener('mouseup', handlePointerUp);
+            canvas.addEventListener('mouseleave', handlePointerUp);
+
+            canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+            canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+            canvas.addEventListener('touchend', handlePointerUp);
+
+            // Comparison Slider Listeners
+            const comparisonContainer = document.getElementById('canvasContainer');
+            comparisonContainer.addEventListener('mousemove', handleCompareMove);
+            comparisonContainer.addEventListener('touchmove', handleCompareMove, { passive: false });
+
+            // Inputs
+            const inputIds = ['textContent', 'textSize', 'textColor', 'textStrokeColor', 'textFont', 'textRotation', 'textStrokeWidth', 'textShadow'];
+            inputIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', updateSelectedText);
+                    // For sliders, adding a 'change' listener to save history on release
+                    if (el.type === 'range' || el.type === 'color' || el.type === 'checkbox') {
+                        el.addEventListener('change', () => saveState());
+                    }
+                }
+            });
+
+            document.getElementById('brushSize').addEventListener('input', (e) => {
+                state.brushSize = parseInt(e.target.value);
+                document.getElementById('brushSizeVal').innerText = state.brushSize;
+            });
+            document.getElementById('imageInput').addEventListener('change', handleUpload);
+            document.getElementById('downloadBtn').addEventListener('click', download);
+
+            const dropZone = document.getElementById('dropZone');
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-indigo-900/20'); dropZone.classList.add('scale-[1.01]'); });
+            dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('bg-indigo-900/20'); dropZone.classList.remove('scale-[1.01]'); });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('bg-indigo-900/20');
+                dropZone.classList.remove('scale-[1.01]');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    loadFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            // Add initial state
+            setTimeout(() => saveState(), 500);
+        }
+
+        // --- New: Toggle Emoji Picker ---
+        function toggleEmojiPicker() {
+            const picker = document.getElementById('emojiPicker');
+            const btn = document.getElementById('emojiBtn');
+            if (picker.classList.contains('hidden')) {
+                picker.classList.remove('hidden');
+                picker.classList.add('animate-pop-in'); // Add animation
+                btn.classList.add('bg-indigo-600', 'text-white', 'ring-2', 'ring-indigo-400');
+            } else {
+                picker.classList.add('hidden');
+                picker.classList.remove('animate-pop-in');
+                btn.classList.remove('bg-indigo-600', 'text-white', 'ring-2', 'ring-indigo-400');
+            }
+        }
+
+        // --- History / Undo / Redo ---
+        function saveState() {
+            // Remove future states if we are in middle of history
+            if (state.historyStep < state.history.length - 1) {
+                state.history = state.history.slice(0, state.historyStep + 1);
+            }
+
+            // Deep copy needed for array/objects
+            const snapshot = {
+                texts: JSON.parse(JSON.stringify(state.texts)),
+                drawings: JSON.parse(JSON.stringify(state.drawings)),
+                filter: state.filter
+            };
+
+            // Limit history size
+            if (state.history.length > 20) state.history.shift();
+
+            state.history.push(snapshot);
+            state.historyStep = state.history.length - 1;
+        }
+
+        function undo() {
+            if (state.historyStep > 0) {
+                state.historyStep--;
+                restoreState(state.history[state.historyStep]);
+            }
+        }
+
+        function redo() {
+            if (state.historyStep < state.history.length - 1) {
+                state.historyStep++;
+                restoreState(state.history[state.historyStep]);
+            }
+        }
+
+        function restoreState(snapshot) {
+            state.texts = JSON.parse(JSON.stringify(snapshot.texts));
+            state.drawings = JSON.parse(JSON.stringify(snapshot.drawings));
+            state.filter = snapshot.filter;
+            state.selectedTextId = null; // clear selection on undo
+            syncUI();
+            render();
+        }
+
+        // --- Core Render Loop ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Background
+            if (state.bgImage) {
+                ctx.save();
+                ctx.filter = state.filter;
+                ctx.drawImage(state.bgImage, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#cbd5e1';
+                ctx.textAlign = 'center';
+                ctx.font = '20px Poppins';
+                ctx.fillText('No Image Loaded', canvas.width / 2, canvas.height / 2);
+            }
+
+            // 2. Draw Drawings
+            ctx.save();
+            ctx.filter = state.filter;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            state.drawings.forEach(line => {
+                if (line.points.length < 2) return;
+                ctx.beginPath();
+                ctx.strokeStyle = line.color;
+                ctx.lineWidth = line.width;
+                ctx.moveTo(line.points[0].x, line.points[0].y);
+                for (let i = 1; i < line.points.length; i++) {
+                    ctx.lineTo(line.points[i].x, line.points[i].y);
+                }
+                ctx.stroke();
+            });
+            ctx.restore();
+
+            // 3. Draw Text
+            if (state.filter.includes('contrast')) {
+                ctx.filter = state.filter;
+            } else {
+                ctx.filter = 'none';
+            }
+
+            state.texts.forEach(t => {
+                ctx.save();
+
+                // Rotation Logic: Translate to center of text, rotate, draw at 0,0
+                ctx.translate(t.x, t.y);
+                ctx.rotate((t.rotation * Math.PI) / 180);
+
+                ctx.font = `900 ${t.size}px '${t.font}', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Shadow
+                if (t.shadow) {
+                    ctx.shadowColor = "rgba(0,0,0,0.8)";
+                    ctx.shadowBlur = 10;
+                    ctx.shadowOffsetX = 5;
+                    ctx.shadowOffsetY = 5;
+                } else {
+                    ctx.shadowColor = "transparent";
+                }
+
+                ctx.fillStyle = t.color;
+                ctx.strokeStyle = t.stroke;
+                ctx.lineWidth = t.strokeWidth;
+
+                ctx.strokeText(t.text, 0, 0); // Drawn at 0,0 because we translated
+                ctx.fillText(t.text, 0, 0);
+
+                // Selection Box (If selected)
+                if (t.id === state.selectedTextId && !state.isDrawing && !state.isComparing) {
+                    // Turn off shadow for the selection box
+                    ctx.shadowColor = "transparent";
+
+                    const metrics = ctx.measureText(t.text);
+                    const width = metrics.width;
+                    const height = t.size;
+
+                    ctx.strokeStyle = '#6366f1';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(-width / 2 - 10, -height / 2 - 5, width + 20, height + 10);
+                }
+
+                ctx.restore();
+            });
+            ctx.filter = 'none';
+        }
+
+        // --- Math Helpers for Hit Detection ---
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function isPointInRotatedRect(x, y, t, ctx) {
+            // Get dimensions
+            ctx.font = `900 ${t.size}px '${t.font}', sans-serif`;
+            const metrics = ctx.measureText(t.text);
+            const w = metrics.width + 20; // + padding
+            const h = t.size + 10;
+
+            // Translate point back relative to text center
+            const dx = x - t.x;
+            const dy = y - t.y;
+
+            // Rotate point backwards
+            const angleRad = (-t.rotation * Math.PI) / 180;
+            const rx = dx * Math.cos(angleRad) - dy * Math.sin(angleRad);
+            const ry = dx * Math.sin(angleRad) + dy * Math.cos(angleRad);
+
+            // Check axis-aligned bounds
+            return Math.abs(rx) <= w / 2 && Math.abs(ry) <= h / 2;
+        }
+
+        // --- Interaction Handlers ---
+
+        function handlePointerDown(e) {
+            if (state.isComparing) return; // Disable canvas interaction during compare
+            if (e.touches) e.preventDefault();
+            const pos = getPos(e);
+
+            if (state.isDrawing) {
+                saveState(); // Save before drawing line
+                state.currentDrawLine = {
+                    points: [{ x: pos.x, y: pos.y }],
+                    color: state.brushColor,
+                    width: state.brushSize
+                };
+                state.drawings.push(state.currentDrawLine);
+                render();
+                return;
+            }
+
+            // Advanced Hit Detection (supports rotation)
+            let clickedText = null;
+            // Iterate backwards to select top-most
+            for (let i = state.texts.length - 1; i >= 0; i--) {
+                if (isPointInRotatedRect(pos.x, pos.y, state.texts[i], ctx)) {
+                    clickedText = state.texts[i];
+                    break;
+                }
+            }
+
+            if (clickedText) {
+                saveState(); // Save state before drag starts
+                state.selectedTextId = clickedText.id;
+                state.isDragging = true;
+                // Just track start pos for simple dragging logic without complex rotation math for offset
+                state.dragOffset = { x: pos.x, y: pos.y };
+                state.originalTextPos = { x: clickedText.x, y: clickedText.y };
+                syncUI();
+            } else {
+                state.selectedTextId = null;
+                syncUI();
+            }
+            render();
+        }
+
+        function handlePointerMove(e) {
+            if (state.isComparing) return;
+            if (e.touches) e.preventDefault();
+            const pos = getPos(e);
+
+            // 1. Cursor Styling Logic
+            if (state.isDrawing) {
+                canvas.style.cursor = 'crosshair';
+            } else if (state.isDragging) {
+                canvas.style.cursor = 'grabbing';
+            } else {
+                // Check if hovering over any text
+                let isHovering = false;
+                for (let i = state.texts.length - 1; i >= 0; i--) {
+                    if (isPointInRotatedRect(pos.x, pos.y, state.texts[i], ctx)) {
+                        isHovering = true;
+                        break;
+                    }
+                }
+                canvas.style.cursor = isHovering ? 'move' : 'default';
+            }
+
+            // 2. Action Logic
+            if (state.isDrawing && state.currentDrawLine) {
+                state.currentDrawLine.points.push(pos);
+                render();
+                return;
+            }
+
+            if (state.isDragging && state.selectedTextId) {
+                const t = state.texts.find(t => t.id === state.selectedTextId);
+                if (t) {
+                    // Calculate delta
+                    const dx = pos.x - state.dragOffset.x;
+                    const dy = pos.y - state.dragOffset.y;
+                    t.x = state.originalTextPos.x + dx;
+                    t.y = state.originalTextPos.y + dy;
+                    render();
+                }
+            }
+        }
+
+        function handlePointerUp(e) {
+            state.isDragging = false;
+            state.currentDrawLine = null;
+        }
+
+        // --- Logic & Helpers ---
+
+        function loadImages(src) {
+            saveState(); // Save before loading new image
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                state.bgImage = img;
+                const maxDim = 800;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    const ratio = Math.min(maxDim / w, maxDim / h);
+                    w *= ratio;
+                    h *= ratio;
+                }
+                canvas.width = w;
+                canvas.height = h;
+
+                // Smart reset positions for standard texts
+                state.texts.forEach(t => {
+                    if (t.text === "TOP TEXT") { t.x = w / 2; t.y = 50; }
+                    if (t.text === "BOTTOM TEXT") { t.x = w / 2; t.y = h - 50; }
+                });
+                render();
+            };
+            img.src = src;
+        }
+
+        function handleUpload(e) {
+            if (e.target.files && e.target.files[0]) loadFile(e.target.files[0]);
+        }
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => loadImages(e.target.result);
+            reader.readAsDataURL(file);
+        }
+
+        // --- UI Operations ---
+
+        function switchTab(tab) {
+            ['text', 'draw', 'filters', 'templates', 'enhance'].forEach(t => {
+                document.getElementById(`panel-${t}`).classList.add('hidden');
+                document.getElementById(`panel-${t}`).classList.remove('animate-slide-up'); // Reset animation
+                const btn = document.getElementById(`tab-${t}`);
+                if (btn) btn.className = "flex-1 py-3 lg:py-4 flex flex-col lg:flex-row items-center justify-center text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition-all duration-300 gap-1 active:bg-slate-700";
+            });
+            const panel = document.getElementById(`panel-${tab}`);
+            panel.classList.remove('hidden');
+
+            // Trigger reflow to restart animation
+            void panel.offsetWidth;
+            panel.classList.add('animate-slide-up');
+
+            const activeBtn = document.getElementById(`tab-${tab}`);
+            activeBtn.className = "flex-1 py-3 lg:py-4 flex flex-col lg:flex-row items-center justify-center text-indigo-400 border-b-2 border-indigo-500 bg-slate-700/50 transition-all duration-300 gap-1 active:bg-slate-700";
+        }
+
+        function addNewText() {
+            saveState();
+            const id = Date.now();
+            state.texts.push({
+                id: id,
+                text: "NEW TEXT",
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                size: 40,
+                rotation: 0,
+                color: "#ffffff",
+                stroke: "#000000",
+                strokeWidth: 2,
+                font: "Anton",
+                shadow: false
+            });
+            state.selectedTextId = id;
+            syncUI();
+            render();
+        }
+
+        function addSpecificEmoji(emoji) {
+            saveState();
+            const id = Date.now();
+            state.texts.push({
+                id: id,
+                text: emoji,
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                size: 80,
+                rotation: 0,
+                color: "#ffffff",
+                stroke: "transparent",
+                strokeWidth: 0,
+                font: "Poppins",
+                shadow: false
+            });
+            state.selectedTextId = id;
+            toggleEmojiPicker(); // Close picker after selection
+            syncUI();
+            render();
+        }
+
+        // Retained random generator for main button
+        function addEmoji() {
+            const emojis = ["😂", "🔥", "💯", "🤡", "💀", "🍆", "🅱️", "🗿", "🤔", "💩"];
+            addSpecificEmoji(emojis[Math.floor(Math.random() * emojis.length)]);
+        }
+
+        function deleteSelectedText() {
+            if (!state.selectedTextId) return;
+            saveState();
+            state.texts = state.texts.filter(t => t.id !== state.selectedTextId);
+            state.selectedTextId = null;
+            syncUI();
+            render();
+        }
+
+        function syncUI() {
+            const controls = document.getElementById('selectedTextControls');
+            const msg = document.getElementById('noSelectionMsg');
+
+            if (state.selectedTextId) {
+                controls.classList.remove('hidden');
+                msg.classList.add('hidden');
+
+                const t = state.texts.find(t => t.id === state.selectedTextId);
+                if (t) {
+                    document.getElementById('textContent').value = t.text;
+                    document.getElementById('textSize').value = t.size;
+                    document.getElementById('textSizeVal').innerText = t.size;
+                    document.getElementById('textColor').value = t.color;
+                    document.getElementById('textStrokeColor').value = t.stroke;
+                    document.getElementById('textStrokeWidth').value = t.strokeWidth;
+                    document.getElementById('textStrokeVal').innerText = t.strokeWidth;
+                    document.getElementById('textRotation').value = t.rotation;
+                    document.getElementById('textRotVal').innerText = t.rotation + '°';
+                    document.getElementById('textFont').value = t.font;
+                    document.getElementById('textShadow').checked = t.shadow || false;
+                }
+            } else {
+                controls.classList.add('hidden');
+                msg.classList.remove('hidden');
+            }
+        }
+
+        function updateSelectedText(e) {
+            if (!state.selectedTextId) return;
+            const t = state.texts.find(t => t.id === state.selectedTextId);
+            if (!t) return;
+
+            // Don't save state on every character input or slider drag, relying on 'change' events or manual saves
+
+            if (e.target.id === 'textContent') {
+                t.text = e.target.value.toUpperCase();
+                if (t.font !== 'Anton') t.text = e.target.value;
+            } else if (e.target.id === 'textSize') {
+                t.size = parseInt(e.target.value);
+                document.getElementById('textSizeVal').innerText = t.size;
+            } else if (e.target.id === 'textColor') {
+                t.color = e.target.value;
+            } else if (e.target.id === 'textStrokeColor') {
+                t.stroke = e.target.value;
+            } else if (e.target.id === 'textStrokeWidth') {
+                t.strokeWidth = parseInt(e.target.value);
+                document.getElementById('textStrokeVal').innerText = t.strokeWidth;
+            } else if (e.target.id === 'textRotation') {
+                t.rotation = parseInt(e.target.value);
+                document.getElementById('textRotVal').innerText = t.rotation + '°';
+            } else if (e.target.id === 'textFont') {
+                t.font = e.target.value;
+                saveState(); // Dropdown change is immediate
+            } else if (e.target.id === 'textShadow') {
+                t.shadow = e.target.checked;
+                saveState(); // Checkbox change is immediate
+            }
+
+            render();
+        }
+
+        function toggleDrawingMode() {
+            state.isDrawing = !state.isDrawing;
+            const btn = document.getElementById('toggleDraw');
+            const controls = document.getElementById('drawControls');
+
+            if (state.isDrawing) {
+                btn.classList.replace('bg-slate-600', 'bg-indigo-500');
+                btn.querySelector('div').classList.add('translate-x-5', 'lg:translate-x-6');
+                controls.classList.remove('opacity-50', 'pointer-events-none');
+                state.selectedTextId = null;
+                syncUI();
+                render();
+            } else {
+                btn.classList.replace('bg-indigo-500', 'bg-slate-600');
+                btn.querySelector('div').classList.remove('translate-x-5', 'lg:translate-x-6');
+                controls.classList.add('opacity-50', 'pointer-events-none');
+                render(); // to update cursor
+            }
+        }
+
+        function setBrushColor(c) {
+            state.brushColor = c;
+        }
+
+        function clearDrawings() {
+            saveState();
+            state.drawings = [];
+            render();
+        }
+
+        function applyFilter(f) {
+            saveState();
+            state.filter = f;
+            render();
+        }
+
+        function resetCanvas() {
+            saveState();
+            state.texts = [
+                { id: 1, text: "TOP TEXT", x: canvas.width / 2, y: 50, size: 50, rotation: 0, color: "#ffffff", stroke: "#000000", strokeWidth: 2, font: "Anton", shadow: false },
+                { id: 2, text: "BOTTOM TEXT", x: canvas.width / 2, y: canvas.height - 50, size: 50, rotation: 0, color: "#ffffff", stroke: "#000000", strokeWidth: 2, font: "Anton", shadow: false }
+            ];
+            state.drawings = [];
+            state.filter = 'none';
+            state.selectedTextId = null;
+            state.isDrawing = false;
+            state.isComparing = false;
+            document.getElementById('comparisonOverlay').classList.add('hidden');
+
+            if (document.getElementById('toggleDraw').classList.contains('bg-indigo-500')) toggleDrawingMode();
+
+            syncUI();
+            render();
+        }
+
+        function download() {
+            const link = document.createElement('a');
+            link.download = `meme-master-pro-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
+            link.click();
+        }
+
+        // --- MOCK UPSCALE LOGIC ---
+        function mockUpscale() {
+            // 1. Show scanning effect
+            const scan = document.getElementById('scanEffect');
+            scan.style.display = 'block';
+
+            // 2. Disable button
+            const btn = document.getElementById('upscaleBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Processing...`;
+            btn.disabled = true;
+
+            // 3. Capture Current State as "Original"
+            const originalData = canvas.toDataURL();
+            document.getElementById('compareImg').src = originalData;
+
+            // 4. Simulate Processing Delay
+            setTimeout(() => {
+                scan.style.display = 'none';
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                lucide.createIcons();
+
+                // 5. Apply "Upscale" Effect (Simulated via sharpen/contrast)
+                // In a real app, you'd replace canvas data with result from API
+                saveState();
+                state.filter = 'contrast(1.1) saturate(1.1)'; // Visual Pop
+                render();
+
+                // 6. Enable Comparison UI
+                state.isComparing = true;
+                state.selectedTextId = null; // Deselect text
+                state.isDrawing = false;
+                syncUI();
+
+                document.getElementById('comparisonOverlay').classList.remove('hidden');
+                document.getElementById('enhanceControls').classList.remove('hidden', 'opacity-0');
+
+                // Reset slider to center
+                updateSlider(50);
+
+            }, 2000);
+        }
+
+        function closeEnhance() {
+            state.isComparing = false;
+            document.getElementById('comparisonOverlay').classList.add('hidden');
+            document.getElementById('enhanceControls').classList.add('hidden', 'opacity-0');
+            state.filter = 'none'; // Reset mock filter
+            render();
+        }
+
+        function handleCompareMove(e) {
+            if (!state.isComparing) return;
+
+            const rect = document.getElementById('canvasContainer').getBoundingClientRect();
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
+            // Calculate percentage
+            let x = clientX - rect.left;
+            let percent = (x / rect.width) * 100;
+
+            // Clamp
+            percent = Math.max(0, Math.min(100, percent));
+
+            updateSlider(percent);
+        }
+
+        function updateSlider(percent) {
+            const handle = document.getElementById('compareHandle');
+            const beforeLayer = document.getElementById('compareBefore');
+
+            handle.style.left = `${percent}%`;
+            beforeLayer.style.width = `${percent}%`;
+        }
+
+        // Start
+        window.addEventListener('load', init);
+
+    </script>
+</body>
+
+</html>

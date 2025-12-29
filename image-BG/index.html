@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Background Remover & Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drop-zone {
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .drop-zone--over {
+            background-color: #e9e9e9;
+            border-color: #4f46e5;
+        }
+        .checkerboard {
+            background-image: url('data:image/svg+xml,%3Csvg width=\'20\' height=\'20\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Crect width=\'10\' height=\'10\' x=\'0\' y=\'0\' fill=\'%23fff\'/%3E%3Crect width=\'10\' height=\'10\' x=\'10\' y=\'10\' fill=\'%23fff\'/%3E%3Crect width=\'10\' height=\'10\' x=\'0\' y=\'10\' fill=\'%23e0e0e0\'/%3E%3Crect width=\'10\' height=\'10\' x=\'10\' y=\'0\' fill=\'%23e0e0e0\'/%3E%3C/svg%3E');
+        }
+        .color-option {
+            transition: transform 0.1s ease-in-out;
+        }
+        .color-option.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px #4f46e5;
+        }
+        .canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #canvas-wrapper {
+             position: relative;
+        }
+        .layer-item {
+            transition: background-color 0.2s;
+        }
+        .layer-item.selected {
+            background-color: #e0e7ff;
+            border-color: #4f46e5;
+        }
+        .layer-item.dragging-over {
+            outline: 2px dashed #4f46e5;
+        }
+        .layer-item.is-dragging {
+            opacity: 0.5;
+        }
+        #download-modal-backdrop, #crop-view {
+            transition: opacity 0.2s ease-in-out;
+        }
+        #download-modal-panel {
+             transition: all 0.2s ease-in-out;
+        }
+        #download-preview-wrapper {
+            max-height: 250px;
+        }
+        #layers-list.collapsed {
+            max-height: 250px; /* Approx 3 items */
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen py-8">
+
+    <div class="container mx-auto p-4 max-w-7xl">
+        <div class="bg-white rounded-lg shadow-xl p-6 md:p-8">
+            <header class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Image Background Remover & Editor</h1>
+                <p class="text-gray-500 mt-2">Upload an image, then compose your scene with powerful layer controls.</p>
+            </header>
+
+            <main>
+                <!-- Upload Area -->
+                <div id="upload-container">
+                    <div id="drop-zone" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer">
+                        <svg class="w-12 h-12 text-gray-400 mb-4 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                        <p class="text-gray-600 font-medium">Drag & drop an image or <span class="text-indigo-600 font-semibold">click here</span> to upload</p>
+                        <p class="text-gray-500 text-sm mt-1">PNG, JPG, WEBP supported</p>
+                        <input type="file" id="file-input" class="hidden" accept="image/png, image/jpeg, image/webp" multiple="false">
+                    </div>
+                </div>
+
+                <!-- Processing/Results Area -->
+                <div id="result-container" class="hidden">
+                    <div id="loading-state" class="text-center py-12 hidden">
+                        <div role="status" class="flex flex-col items-center">
+                            <svg aria-hidden="true" class="w-10 h-10 text-gray-200 animate-spin dark:text-gray-600 fill-indigo-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/><path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/></svg>
+                            <p class="mt-4 text-lg font-medium text-gray-600">Removing background...</p>
+                        </div>
+                    </div>
+
+                    <div id="result-display" class="hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            
+                            <!-- Left Panel: Controls -->
+                            <div class="lg:col-span-3 order-2 lg:order-1">
+                                <div class="space-y-6 bg-gray-50 p-4 rounded-lg border">
+                                    <div id="background-options">
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Background</h3>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <button data-bg="transparent" class="color-option selected w-9 h-9 rounded-full border-2 checkerboard" title="Transparent"></button>
+                                            <button data-bg="#FFFFFF" class="color-option w-9 h-9 rounded-full border-2 bg-white" title="White"></button>
+                                            <button data-bg="#000000" class="color-option w-9 h-9 rounded-full border-2 bg-black" title="Black"></button>
+                                            <label for="color-picker" class="w-9 h-9 rounded-full border-2 cursor-pointer flex items-center justify-center bg-gray-100" title="Custom Color"><svg class="w-5 h-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.47 2.118a2.25 2.25 0 01-1.928 2.15A3 3 0 004.29 21.32a3 3 0 005.24-2.198c.195-.025.385-.05.57-.08a3.001 3.001 0 002.13-2.13c-.03-.185-.055-.375-.08-.57zM12 15a3 3 0 100-6 3 3 0 000 6z" /><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><input type="color" id="color-picker" value="#ffffff" class="opacity-0 absolute w-0 h-0"></label>
+                                            <label for="bg-image-input" class="w-9 h-9 rounded-full border-2 cursor-pointer flex items-center justify-center bg-gray-100" title="Upload Image"><svg class="w-5 h-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg><input type="file" id="bg-image-input" class="hidden" accept="image/png, image/jpeg, image/webp"></label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="object-controls" class="hidden">
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Selected Object</h3>
+                                        <div class="space-y-4">
+                                            <!-- Opacity -->
+                                            <div>
+                                                <label for="opacity-slider" class="block text-sm font-medium text-gray-600 mb-1">Opacity: <span id="opacity-value">100</span>%</label>
+                                                <input type="range" id="opacity-slider" min="0" max="100" value="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                            </div>
+
+                                            <!-- Actions -->
+                                            <div class="grid grid-cols-4 gap-2">
+                                                 <button id="crop-btn" title="Crop Image" class="p-2 rounded-md hover:bg-gray-200 flex justify-center items-center gap-2 text-sm border bg-white">
+                                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" /></svg>
+                                                    Crop
+                                                </button>
+                                                <button id="clone-btn" title="Clone Image" class="p-2 rounded-md hover:bg-gray-200 flex justify-center items-center gap-2 text-sm border bg-white">
+                                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
+                                                    Clone
+                                                </button>
+                                                <button id="flip-x-btn" title="Flip Horizontal" class="p-2 rounded-md hover:bg-gray-200 flex justify-center items-center gap-2 text-sm border bg-white">
+                                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.18-3.185m-7.528 0l-3.182-3.182m0 0a8.25 8.25 0 0111.664 0l3.18 3.183" /></svg>
+                                                    H
+                                                </button>
+                                                <button id="flip-y-btn" title="Flip Vertical" class="p-2 rounded-md hover:bg-gray-200 flex justify-center items-center gap-2 text-sm border bg-white">
+                                                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.18-3.185m-7.528 0l-3.182-3.182m0 0a8.25 8.25 0 0111.664 0l3.18 3.183" /></svg>
+                                                    V
+                                                </button>
+                                            </div>
+
+                                            <!-- Movement -->
+                                            <div class="grid grid-cols-5 gap-1">
+                                                <div></div>
+                                                <button id="move-up-btn" title="Move Up" class="p-2 rounded-md hover:bg-gray-200 flex justify-center border bg-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg></button>
+                                                <div></div>
+                                                <button id="move-left-btn" title="Move Left" class="p-2 rounded-md hover:bg-gray-200 flex justify-center border bg-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+                                                <div class="p-2 flex justify-center items-center"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div>
+                                                <button id="move-right-btn" title="Move Right" class="p-2 rounded-md hover:bg-gray-200 flex justify-center border bg-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
+                                                <div></div>
+                                                <button id="move-down-btn" title="Move Down" class="p-2 rounded-md hover:bg-gray-200 flex justify-center border bg-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
+                                                <div></div>
+                                            </div>
+                                            <button id="delete-btn" title="Delete" class="p-2 w-full rounded-md bg-red-100 text-red-600 hover:bg-red-200 flex justify-center items-center gap-2"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.02-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>Delete Object</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Center Panel: Canvas with floating layers -->
+                            <div class="lg:col-span-9 order-1 lg:order-2">
+                                <div id="canvas-wrapper" class="checkerboard rounded-lg w-full aspect-[4/3]">
+                                   <canvas id="editor-canvas"></canvas>
+                                   <div id="layers-panel-container" class="absolute top-4 right-4 z-10 w-56">
+                                       <div class="bg-white/80 backdrop-blur-sm p-3 rounded-lg border shadow-lg flex flex-col max-h-[calc(100%-2rem)]">
+                                           <h3 class="text-base font-semibold text-gray-700 mb-2 text-center flex-shrink-0">Layers</h3>
+                                           <div id="layers-list" class="space-y-2 overflow-y-auto"></div>
+                                           <button id="toggle-layers-btn" class="hidden text-sm font-semibold text-indigo-600 hover:text-indigo-800 pt-2 mt-2 border-t flex-shrink-0">+ View More</button>
+                                       </div>
+                                   </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 text-center flex flex-col sm:flex-row justify-center items-center gap-4">
+                            <button id="download-btn" class="w-full sm:w-auto bg-green-600 text-white font-semibold py-3 px-6 rounded-md hover:bg-green-700">Download Image</button>
+                            <button id="upload-another-btn" class="w-full sm:w-auto bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-md hover:bg-gray-300">Reset</button>
+                        </div>
+                    </div>
+                    <div id="error-message" class="hidden mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md"><strong class="font-bold">Error:</strong> <span id="error-text"></span></div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Crop View Modal -->
+    <div id="crop-view" class="hidden fixed inset-0 z-50 bg-gray-800 bg-opacity-90 flex flex-col items-center justify-center p-8">
+        <div id="crop-canvas-wrapper" class="max-w-[90vw] max-h-[80vh] bg-white rounded-lg shadow-xl">
+            <canvas id="crop-canvas"></canvas>
+        </div>
+        <div id="crop-actions-modal" class="mt-4 flex items-center gap-4">
+            <button id="cancel-crop-btn-modal" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-gray-700">Cancel</button>
+            <button id="confirm-crop-btn-modal" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-indigo-700">Confirm Crop</button>
+        </div>
+    </div>
+    
+    <div id="download-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div id="download-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-50"></div>
+        <div id="download-modal-panel" class="bg-white rounded-lg shadow-xl w-full max-w-lg z-10">
+            <h3 class="text-2xl font-bold text-gray-800 p-6 border-b">Download Options</h3>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <div>
+                        <label for="download-preset" class="block text-sm font-medium text-gray-700">Size Presets</label>
+                        <select id="download-preset" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            <option value="custom">Custom</option>
+                            <option value="1080x1080">Instagram Post (Square 1:1)</option>
+                            <option value="1080x1350">Instagram Post (Portrait 4:5)</option>
+                            <option value="1080x1920">Instagram Story (9:16)</option>
+                            <option value="1200x630">Facebook/LinkedIn Post</option>
+                            <option value="1600x900">Twitter/X Post (16:9)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="download-width" class="block text-sm font-medium text-gray-700">Width (px)</label>
+                        <input type="number" id="download-width" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    </div>
+                    <div>
+                        <label for="download-height" class="block text-sm font-medium text-gray-700">Height (px)</label>
+                        <input type="number" id="download-height" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    </div>
+                    <div>
+                        <label for="download-format" class="block text-sm font-medium text-gray-700">Format</label>
+                        <select id="download-format" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            <option value="png">PNG (transparency)</option>
+                            <option value="jpeg">JPEG</option>
+                        </select>
+                    </div>
+                    <div id="jpeg-quality-container" class="hidden">
+                        <label for="jpeg-quality" class="block text-sm font-medium text-gray-700">JPEG Quality: <span id="jpeg-quality-value">95</span>%</label>
+                        <input type="range" id="jpeg-quality" min="10" max="100" value="95" class="w-full h-2 bg-gray-200 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+                    <div id="download-preview-wrapper" class="w-full checkerboard rounded-md border aspect-video overflow-hidden flex items-center justify-center bg-gray-100">
+                        <img id="download-preview-image" src="" alt="Download Preview" class="max-w-full max-h-full object-contain">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+                <button id="cancel-download-btn" class="bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
+                <button id="confirm-download-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700">Confirm & Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const uploadContainer = document.getElementById('upload-container');
+        const resultContainer = document.getElementById('result-container');
+        const loadingState = document.getElementById('loading-state');
+        const resultDisplay = document.getElementById('result-display');
+        const downloadBtn = document.getElementById('download-btn');
+        const uploadAnotherBtn = document.getElementById('upload-another-btn');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const backgroundOptions = document.getElementById('background-options');
+        const colorPicker = document.getElementById('color-picker');
+        const bgImageInput = document.getElementById('bg-image-input');
+        const objectControls = document.getElementById('object-controls');
+        const deleteBtn = document.getElementById('delete-btn');
+        const moveUpBtn = document.getElementById('move-up-btn');
+        const moveDownBtn = document.getElementById('move-down-btn');
+        const moveLeftBtn = document.getElementById('move-left-btn');
+        const moveRightBtn = document.getElementById('move-right-btn');
+        const layersList = document.getElementById('layers-list');
+        const opacitySlider = document.getElementById('opacity-slider');
+        const opacityValue = document.getElementById('opacity-value');
+        const flipXBtn = document.getElementById('flip-x-btn');
+        const flipYBtn = document.getElementById('flip-y-btn');
+        const toggleLayersBtn = document.getElementById('toggle-layers-btn');
+        const cropBtn = document.getElementById('crop-btn');
+        const cloneBtn = document.getElementById('clone-btn');
+        
+        // Crop Modal
+        const cropView = document.getElementById('crop-view');
+        const confirmCropBtnModal = document.getElementById('confirm-crop-btn-modal');
+        const cancelCropBtnModal = document.getElementById('cancel-crop-btn-modal');
+
+
+        const downloadModal = document.getElementById('download-modal');
+        const downloadModalBackdrop = document.getElementById('download-modal-backdrop');
+        const downloadWidthInput = document.getElementById('download-width');
+        const downloadHeightInput = document.getElementById('download-height');
+        const downloadPresetSelect = document.getElementById('download-preset');
+        const downloadFormatSelect = document.getElementById('download-format');
+        const jpegQualityContainer = document.getElementById('jpeg-quality-container');
+        const jpegQualitySlider = document.getElementById('jpeg-quality');
+        const jpegQualityValue = document.getElementById('jpeg-quality-value');
+        const cancelDownloadBtn = document.getElementById('cancel-download-btn');
+        const confirmDownloadBtn = document.getElementById('confirm-download-btn');
+        const downloadPreviewImage = document.getElementById('download-preview-image');
+        const downloadPreviewWrapper = document.getElementById('download-preview-wrapper');
+
+        let fabricCanvas, cropCanvas;
+        let layerCounter = 0;
+        const keyboardHandler = handleKeyboard.bind(this);
+        let isCropping = false;
+        let objectToCrop;
+
+        const API_URL = 'https://image-background-remover-7swv.onrender.com';
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => { clearTimeout(timeout); func(...args); };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drop-zone--over'); });
+        ['dragleave', 'dragend'].forEach(type => dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over')));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drop-zone--over'); handleFile(e.dataTransfer.files[0]); });
+        
+        uploadAnotherBtn.addEventListener('click', resetUI);
+        
+        downloadBtn.addEventListener('click', openDownloadModal);
+        cancelDownloadBtn.addEventListener('click', closeDownloadModal);
+        downloadModalBackdrop.addEventListener('click', closeDownloadModal);
+        confirmDownloadBtn.addEventListener('click', handleConfirmDownload);
+        downloadPresetSelect.addEventListener('change', handlePresetChange);
+        downloadFormatSelect.addEventListener('change', () => jpegQualityContainer.classList.toggle('hidden', downloadFormatSelect.value !== 'jpeg'));
+        jpegQualitySlider.addEventListener('input', () => jpegQualityValue.textContent = jpegQualitySlider.value);
+        
+        const debouncedUpdatePreview = debounce(updateDownloadPreview, 300);
+        [downloadWidthInput, downloadHeightInput].forEach(el => el.addEventListener('input', () => {
+            downloadPresetSelect.value = 'custom';
+            debouncedUpdatePreview();
+        }));
+
+        backgroundOptions.addEventListener('click', (e) => {
+            if (e.target.matches('.color-option')) {
+                const bg = e.target.dataset.bg;
+                updateSelectedColor(e.target);
+                fabricCanvas.backgroundColor = (bg === 'transparent') ? '' : bg;
+                fabricCanvas.renderAll();
+            }
+        });
+
+        colorPicker.addEventListener('input', (e) => {
+            updateSelectedColor(null);
+            fabricCanvas.backgroundColor = e.target.value;
+            fabricCanvas.renderAll();
+        });
+
+        bgImageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => addImageToCanvas(event.target.result, true);
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        const moveObject = (dx, dy) => {
+            const activeObject = fabricCanvas.getActiveObject();
+            if (activeObject) {
+                activeObject.left += dx;
+                activeObject.top += dy;
+                activeObject.setCoords();
+                fabricCanvas.renderAll();
+            }
+        };
+        moveUpBtn.addEventListener('click', () => moveObject(0, -10));
+        moveDownBtn.addEventListener('click', () => moveObject(0, 10));
+        moveLeftBtn.addEventListener('click', () => moveObject(-10, 0));
+        moveRightBtn.addEventListener('click', () => moveObject(10, 0));
+
+        deleteBtn.addEventListener('click', () => {
+            fabricCanvas.getActiveObjects().forEach(obj => fabricCanvas.remove(obj));
+            fabricCanvas.discardActiveObject().renderAll();
+        });
+        
+        opacitySlider.addEventListener('input', (e) => {
+            const activeObject = fabricCanvas.getActiveObject();
+            if (activeObject) {
+                activeObject.set('opacity', parseInt(e.target.value, 10) / 100);
+                opacityValue.textContent = e.target.value;
+                fabricCanvas.renderAll();
+            }
+        });
+
+        flipXBtn.addEventListener('click', () => {
+            const activeObject = fabricCanvas.getActiveObject();
+            if (activeObject) {
+                activeObject.toggle('flipX');
+                fabricCanvas.renderAll();
+            }
+        });
+
+        flipYBtn.addEventListener('click', () => {
+            const activeObject = fabricCanvas.getActiveObject();
+            if (activeObject) {
+                activeObject.toggle('flipY');
+                fabricCanvas.renderAll();
+            }
+        });
+
+        cloneBtn.addEventListener('click', () => {
+            const activeObject = fabricCanvas.getActiveObject();
+            if (activeObject) {
+                activeObject.clone((cloned) => {
+                    layerCounter++;
+                    cloned.set({
+                        left: cloned.left + 20,
+                        top: cloned.top + 20,
+                        data: { ...cloned.data, id: Date.now(), name: `Layer ${layerCounter}` },
+                        evented: true,
+                    });
+                    fabricCanvas.add(cloned);
+                    fabricCanvas.setActiveObject(cloned);
+                });
+            }
+        });
+
+        toggleLayersBtn.addEventListener('click', () => {
+            layersList.classList.toggle('collapsed');
+            if (layersList.classList.contains('collapsed')) {
+                const totalLayers = fabricCanvas.getObjects().filter(o => !o.isCropZone).length;
+                toggleLayersBtn.textContent = `+ ${totalLayers - 3} more`;
+            } else {
+                toggleLayersBtn.textContent = '- Collapse';
+            }
+        });
+
+        cropBtn.addEventListener('click', enterCropMode);
+        cancelCropBtnModal.addEventListener('click', exitCropMode);
+        confirmCropBtnModal.addEventListener('click', applyCrop);
+
+        // --- UI & Canvas Functions ---
+        function initCanvas() {
+            if (fabricCanvas) fabricCanvas.dispose();
+            const wrapper = document.getElementById('canvas-wrapper');
+            fabricCanvas = new fabric.Canvas('editor-canvas', {
+                width: wrapper.offsetWidth,
+                height: wrapper.offsetHeight,
+                backgroundColor: '',
+                preserveObjectStacking: true,
+            });
+
+            fabric.Object.prototype.transparentCorners = false;
+            fabric.Object.prototype.cornerColor = '#4f46e5';
+            fabric.Object.prototype.cornerStyle = 'circle';
+            fabric.Object.prototype.borderColor = '#4f46e5';
+
+            fabricCanvas.on({
+                'selection:created': updateControls,
+                'selection:updated': updateControls,
+                'selection:cleared': updateControls,
+                'object:added': () => { updateLayers(); updateObjectLocking(); },
+                'object:removed': () => { updateLayers(); updateObjectLocking(); },
+                'object:modified': updateLayers,
+            });
+            
+            document.addEventListener('keydown', keyboardHandler);
+            new ResizeObserver(() => {
+                fabricCanvas.setDimensions({
+                    width: wrapper.offsetWidth,
+                    height: wrapper.offsetHeight
+                });
+            }).observe(wrapper);
+        }
+
+        function updateObjectLocking() {
+            const activeObject = fabricCanvas.getActiveObject();
+            fabricCanvas.forEachObject(obj => {
+                if(obj.isCropZone) return; 
+                const isSelected = obj === activeObject;
+                obj.set({
+                    selectable: isSelected,
+                    evented: isSelected,
+                    borderColor: isSelected ? '#4f46e5' : 'transparent'
+                });
+            });
+            fabricCanvas.renderAll();
+        }
+
+        function updateControls(e) {
+            updateObjectLocking();
+            if (e && e.selected && e.selected.length === 1) {
+                const selectedObject = e.selected[0];
+                const currentOpacity = Math.round((selectedObject.opacity || 1) * 100);
+                opacitySlider.value = currentOpacity;
+                opacityValue.textContent = currentOpacity;
+                objectControls.classList.remove('hidden');
+            } else {
+                objectControls.classList.add('hidden');
+            }
+            updateLayers();
+        }
+
+        function updateSelectedColor(selectedElement) {
+            document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+            if (selectedElement) selectedElement.classList.add('selected');
+        }
+        
+        function showLoading() {
+            uploadContainer.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+            loadingState.classList.remove('hidden');
+            resultDisplay.classList.add('hidden');
+        }
+
+        function addImageToCanvas(dataUrl, isBackground = false) {
+             fabric.Image.fromURL(dataUrl, (img) => {
+                layerCounter++;
+                img.set({ data: { id: Date.now(), name: `Layer ${layerCounter}` }, crossOrigin: 'anonymous' });
+                
+                if (isBackground) {
+                    img.scaleToWidth(fabricCanvas.width);
+                    fabricCanvas.add(img);
+                    img.sendToBack();
+                    fabricCanvas.discardActiveObject().renderAll();
+                } else {
+                    const maxDim = Math.min(fabricCanvas.width, fabricCanvas.height) * 0.7;
+                    img.scaleToWidth(maxDim);
+                    fabricCanvas.add(img);
+                    fabricCanvas.centerObject(img);
+                    fabricCanvas.setActiveObject(img);
+                }
+                
+                fabricCanvas.renderAll();
+             }, { crossOrigin: 'anonymous' });
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+            uploadContainer.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+        }
+
+        function resetUI() {
+            fileInput.value = '';
+            uploadContainer.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+            if (fabricCanvas) fabricCanvas.dispose();
+            layerCounter = 0;
+            document.removeEventListener('keydown', keyboardHandler);
+        }
+
+        function updateLayers() {
+            const layerCollapseThreshold = 3;
+            layersList.innerHTML = '';
+            const objects = fabricCanvas.getObjects().slice().reverse();
+            const activeObjects = fabricCanvas.getActiveObjects();
+
+            const visibleObjects = objects.filter(o => !o.isCropZone);
+
+            visibleObjects.forEach((obj) => {
+                if (!obj.data?.id) obj.data = { id: Date.now() + Math.random(), name: `Layer ${layerCounter}`};
+                const item = document.createElement('div');
+                item.className = 'layer-item flex items-center p-2 border rounded-md cursor-grab active:cursor-grabbing gap-3';
+                item.draggable = true;
+                item.dataset.id = obj.data.id;
+                
+                if (activeObjects.includes(obj)) item.classList.add('selected');
+                
+                const thumbWrapper = document.createElement('div');
+                thumbWrapper.className = 'w-12 h-12 flex-shrink-0 checkerboard rounded-md flex items-center justify-center';
+                const thumb = document.createElement('img');
+                thumb.src = obj.toDataURL({ format: 'png', width: 48, height: 48 });
+                thumb.className = 'max-w-full max-h-full object-contain pointer-events-none';
+                thumbWrapper.appendChild(thumb);
+                item.appendChild(thumbWrapper);
+                
+                const name = document.createElement('span');
+                name.textContent = obj.data.name;
+                name.className = 'text-sm font-medium text-gray-700 truncate pointer-events-none';
+                item.appendChild(name);
+                
+                item.addEventListener('click', () => { if (!isCropping) fabricCanvas.setActiveObject(obj).renderAll()});
+                
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', obj.data.id);
+                    setTimeout(() => e.target.classList.add('is-dragging'), 0);
+                });
+                item.addEventListener('dragend', (e) => e.target.classList.remove('is-dragging'));
+                item.addEventListener('dragover', (e) => { e.preventDefault(); item.classList.add('dragging-over'); });
+                item.addEventListener('dragleave', () => item.classList.remove('dragging-over'));
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    item.classList.remove('dragging-over');
+                    const draggedId = parseFloat(e.dataTransfer.getData('text/plain'));
+                    const draggedObj = fabricCanvas.getObjects().find(o => o.data.id === draggedId);
+                    const targetObj = obj;
+                    
+                    if (draggedObj && draggedObj !== targetObj) {
+                        fabricCanvas.moveTo(draggedObj, fabricCanvas.getObjects().indexOf(targetObj));
+                        fabricCanvas.renderAll();
+                        updateLayers();
+                    }
+                });
+                layersList.appendChild(item);
+            });
+            
+            if (visibleObjects.length > layerCollapseThreshold) {
+                toggleLayersBtn.classList.remove('hidden');
+                layersList.classList.add('collapsed');
+                toggleLayersBtn.textContent = `+ ${visibleObjects.length - layerCollapseThreshold} more`;
+            } else {
+                toggleLayersBtn.classList.add('hidden');
+                layersList.classList.remove('collapsed');
+            }
+        }
+        
+        function handleKeyboard(e) {
+            if (isCropping) return;
+            const step = e.shiftKey ? 10 : 1;
+            switch (e.key) {
+                case 'ArrowUp': moveObject(0, -step); e.preventDefault(); break;
+                case 'ArrowDown': moveObject(0, step); e.preventDefault(); break;
+                case 'ArrowLeft': moveObject(-step, 0); e.preventDefault(); break;
+                case 'ArrowRight': moveObject(step, 0); e.preventDefault(); break;
+            }
+        }
+        
+        function openDownloadModal() {
+            fabricCanvas.renderAll();
+            downloadWidthInput.value = Math.round(fabricCanvas.width);
+            downloadHeightInput.value = Math.round(fabricCanvas.height);
+            updateDownloadPreview();
+            downloadModal.classList.remove('hidden');
+        }
+
+        function closeDownloadModal() {
+            downloadModal.classList.add('hidden');
+        }
+        
+        function handlePresetChange() {
+            const value = downloadPresetSelect.value;
+            if (value === 'custom') return;
+
+            const [width, height] = value.split('x').map(Number);
+            downloadWidthInput.value = width;
+            downloadHeightInput.value = height;
+            
+            updateDownloadPreview();
+        }
+
+        function updateDownloadPreview() {
+            const width = parseInt(downloadWidthInput.value, 10);
+            const height = parseInt(downloadHeightInput.value, 10);
+            if (width > 0 && height > 0) {
+                downloadPreviewWrapper.style.aspectRatio = `${width} / ${height}`;
+            }
+            downloadPreviewImage.src = fabricCanvas.toDataURL({format: 'png', quality: 0.1});
+        }
+        
+        function handleConfirmDownload() {
+            const format = downloadFormatSelect.value;
+            const quality = parseFloat(jpegQualitySlider.value) / 100;
+            const targetWidth = parseInt(downloadWidthInput.value, 10);
+            const targetHeight = parseInt(downloadHeightInput.value, 10);
+
+            const dataURL = fabricCanvas.toDataURL({
+                format: format,
+                quality: format === 'jpeg' ? quality : 1,
+                width: targetWidth,
+                height: targetHeight
+            });
+
+            const link = document.createElement('a');
+            link.download = `edited-image-${targetWidth}x${targetHeight}.${format}`;
+            link.href = dataURL;
+            link.click();
+            closeDownloadModal();
+        }
+
+        // --- CROP LOGIC ---
+        function enterCropMode() {
+            if (isCropping) return;
+            objectToCrop = fabricCanvas.getActiveObject();
+            if (!objectToCrop || objectToCrop.type !== 'image') return;
+
+            isCropping = true;
+            resultDisplay.classList.add('hidden');
+            cropView.classList.remove('hidden');
+
+            const cropCanvasEl = document.getElementById('crop-canvas');
+            const cropWrapper = document.getElementById('crop-canvas-wrapper');
+            
+            if (cropCanvas) cropCanvas.dispose();
+            cropCanvas = new fabric.Canvas(cropCanvasEl);
+            
+            // Use the original image element for high-quality cropping
+            const originalImgElement = objectToCrop._element;
+            
+            const maxWidth = cropWrapper.offsetWidth;
+            const maxHeight = cropWrapper.offsetHeight;
+            const scale = Math.min(maxWidth / originalImgElement.width, maxHeight / originalImgElement.height, 1);
+            
+            cropCanvas.setDimensions({ width: originalImgElement.width * scale, height: originalImgElement.height * scale });
+
+            const imgInstance = new fabric.Image(originalImgElement, {
+                left: 0, top: 0,
+                scaleX: scale, scaleY: scale,
+                selectable: false, evented: false
+            });
+            cropCanvas.add(imgInstance);
+            
+            const cropRect = new fabric.Rect({
+                left: 0, top: 0,
+                width: imgInstance.getScaledWidth(), height: imgInstance.getScaledHeight(),
+                fill: 'transparent',
+                stroke: '#4f46e5', strokeWidth: 2,
+                cornerColor: 'white', cornerStrokeColor: '#4f46e5', cornerStyle: 'circle',
+                transparentCorners: false,
+                lockRotation: true,
+            });
+            cropCanvas.add(cropRect);
+            cropCanvas.setActiveObject(cropRect);
+            cropCanvas.renderAll();
+
+            cropRect.on('moving', () => constrainCropRect(imgInstance.getBoundingRect()));
+            cropRect.on('scaling', () => constrainCropRect(imgInstance.getBoundingRect()));
+        }
+        
+        function constrainCropRect(bounds) {
+             const cropBox = cropCanvas.getActiveObject();
+             if (!cropBox) return;
+
+             const boxBounds = cropBox.getBoundingRect();
+            
+             if (boxBounds.left < bounds.left) cropBox.set({ left: bounds.left });
+             if (boxBounds.top < bounds.top) cropBox.set({ top: bounds.top });
+             if (boxBounds.left + boxBounds.width > bounds.left + bounds.width) {
+                 cropBox.set({ left: bounds.left + bounds.width - boxBounds.width });
+             }
+             if (boxBounds.top + boxBounds.height > bounds.top + bounds.height) {
+                 cropBox.set({ top: bounds.top + bounds.height - boxBounds.height });
+             }
+             cropBox.setCoords();
+        }
+
+        function exitCropMode() {
+            isCropping = false;
+            cropView.classList.add('hidden');
+            resultDisplay.classList.remove('hidden');
+            if (cropCanvas) cropCanvas.dispose();
+            cropCanvas = null;
+            objectToCrop = null;
+        }
+
+        function applyCrop() {
+            if (!cropCanvas) {
+                exitCropMode();
+                return;
+            }
+
+            const cropRect = cropCanvas.getActiveObject();
+            const imageOnCropCanvas = cropCanvas.getObjects().find(o => o.type === 'image');
+
+            // Create an in-memory canvas for high-quality cropping
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const sourceImage = objectToCrop._element; // The original full-res HTMLImageElement
+
+            // Calculate crop area relative to the original image dimensions
+            const scaleFactor = sourceImage.width / imageOnCropCanvas.getScaledWidth();
+            const cropX = (cropRect.left - imageOnCropCanvas.left) * scaleFactor;
+            const cropY = (cropRect.top - imageOnCropCanvas.top) * scaleFactor;
+            const cropWidth = cropRect.getScaledWidth() * scaleFactor;
+            const cropHeight = cropRect.getScaledHeight() * scaleFactor;
+
+            tempCanvas.width = cropWidth;
+            tempCanvas.height = cropHeight;
+
+            tempCtx.drawImage(sourceImage, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+            
+            const croppedDataURL = tempCanvas.toDataURL('image/png');
+            
+            const originalData = objectToCrop.data;
+            const originalIndex = fabricCanvas.getObjects().indexOf(objectToCrop);
+            const originalProps = {
+                left: objectToCrop.left,
+                top: objectToCrop.top,
+                angle: objectToCrop.angle,
+                scaleX: objectToCrop.scaleX,
+                scaleY: objectToCrop.scaleY,
+            };
+
+            fabric.Image.fromURL(croppedDataURL, (newImg) => {
+                newImg.set({ ...originalProps, data: originalData, crossOrigin: 'anonymous' });
+                
+                // Adjust scale to maintain visual size
+                const originalVisualWidth = objectToCrop.getScaledWidth();
+                newImg.scaleToWidth(originalVisualWidth);
+                
+                newImg.setCoords();
+
+                fabricCanvas.remove(objectToCrop);
+                fabricCanvas.add(newImg);
+                fabricCanvas.moveTo(newImg, originalIndex);
+                fabricCanvas.setActiveObject(newImg);
+                
+                exitCropMode();
+            }, { crossOrigin: 'anonymous' });
+        }
+
+
+        async function handleFile(file) {
+            if (!file) return;
+            showLoading();
+            uploadContainer.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+            initCanvas();
+
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const response = await fetch(API_URL, { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => null);
+                    throw new Error(errorData?.error || `An unexpected error occurred.`);
+                }
+                const blob = await response.blob();
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    loadingState.classList.add('hidden');
+                    resultDisplay.classList.remove('hidden');
+                    addImageToCanvas(e.target.result);
+                };
+                reader.readAsDataURL(blob);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message);
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+
+
