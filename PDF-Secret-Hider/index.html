@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Secret Hider</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"></script>
+    
+    <!-- pdf-lib.js -->
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+    <style>
+        /* Custom styles */
+        #pdf-canvas {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            width: 100%;
+            height: auto;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background: #f8f9fa;
+            border-radius: 8px;
+            -webkit-overflow-scrolling: touch; /* for smooth scrolling on iOS */
+        }
+        
+        /* Message Box Styling */
+        .message-box {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-weight: 500;
+            z-index: 100;
+            transform: translateX(calc(100% + 20px));
+            transition: transform 0.3s ease-in-out;
+        }
+        .message-box.show {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Responsive Main Container -->
+    <div class="bg-white rounded-lg shadow-2xl p-4 sm:p-6 md:p-10 w-full max-w-4xl">
+        
+        <!-- Header -->
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-6">
+            PDF Secret Hider
+        </h1>
+
+        <!-- START NEW CONTENT: Icon Preview -->
+        <div class="mb-4 p-3 bg-gray-200 rounded-lg flex justify-center items-center gap-4">
+            <p class="text-sm font-medium text-gray-700">Icon Preview:</p>
+            <img id="img-preview-white" alt="White Lock" class="w-8 h-8 bg-gray-700 p-1 rounded">
+            <img id="img-preview-black" alt="Black Lock" class="w-8 h-8 bg-white p-1 rounded border border-gray-300">
+        </div>
+        <!-- END NEW CONTENT -->
+
+        <!-- Mode Selection -->
+        <div id="mode-selection" class="text-center">
+            <p class="text-base sm:text-lg text-gray-600 mb-6">How would you like to use this app?</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center">
+                
+                <!-- Create Mode Button -->
+                <label for="pdf-upload" class="w-full md:w-1/2 cursor-pointer bg-blue-600 text-white px-4 py-3 sm:px-6 sm:py-4 rounded-lg font-semibold shadow-md hover:bg-blue-700 transition duration-300 text-center text-base sm:text-lg">
+                    Create New Project
+                    <span class="block text-xs sm:text-sm font-normal text-blue-100">(Upload a .pdf file)</span>
+                </label>
+                <input type="file" id="pdf-upload" class="hidden" accept=".pdf" onchange="handleFileSelect(event, 'create')">
+                
+                <!-- View Mode Button -->
+                <label for="project-upload" class="w-full md:w-1/2 cursor-pointer bg-green-600 text-white px-4 py-3 sm:px-6 sm:py-4 rounded-lg font-semibold shadow-md hover:bg-green-700 transition duration-300 text-center text-base sm:text-lg">
+                    Open Existing Project
+                    <span class="block text-xs sm:text-sm font-normal text-green-100">(Upload a .json file)</span>
+                </label>
+                <input type="file" id="project-upload" class="hidden" accept=".json" onchange="handleFileSelect(event, 'view')">
+            </div>
+        </div>
+
+        <!-- Main App View -->
+        <div id="app-view" class="hidden">
+            
+            <!-- PDF Viewer -->
+            <div class="mb-4 p-2 sm:p-4 bg-gray-50 rounded-lg shadow-inner">
+                
+                <!-- Top Page Navigation -->
+                <div class="flex items-center justify-between mb-4">
+                    <button id="prev-page" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-3 sm:py-2 sm:px-4 rounded-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base">
+                        &larr; Previous
+                    </button>
+                    <div class="text-sm sm:text-lg font-medium text-gray-700 text-center">
+                        Page <span id="page-num"></span> of <span id="page-count"></span>
+                    </div>
+                    <button id="next-page" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-3 sm:py-2 sm:px-4 rounded-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base">
+                        Next &rarr;
+                    </button>
+                </div>
+                
+                <!-- Canvas Container -->
+                <div id="canvas-container" class="relative">
+                    <canvas id="pdf-canvas"></canvas>
+                </div>
+                
+                <!-- Instructions -->
+                <p id="creator-instructions" class="hidden text-center text-blue-600 mt-4 font-medium text-sm sm:text-base">
+                    Click and drag on the PDF to select an area to hide.
+                </p>
+                <p id="viewer-instructions" class="hidden text-center text-green-600 mt-4 font-medium text-sm sm:text-base">
+                    Click a locked area to enter a password and unlock it.
+                </p>
+                
+                <!-- Bottom Page Navigation -->
+                <div class="flex items-center justify-between mt-4">
+                    <button id="prev-page-bottom" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-3 sm:py-2 sm:px-4 rounded-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base">
+                        &larr; Previous
+                    </button>
+                    <div class="text-sm sm:text-lg font-medium text-gray-700 text-center">
+                        Page <span id="page-num-bottom"></span> of <span id="page-count-bottom"></span>
+                    </div>
+                    <button id="next-page-bottom" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-3 sm:py-2 sm:px-4 rounded-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base">
+                        Next &rarr;
+                    </button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col md:flex-row gap-4 flex-wrap">
+                
+                <!-- Create Mode Button -->
+                <button id="save-project-btn" class="hidden w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 sm:py-3 sm:px-6 rounded-lg shadow-md transition duration-300 text-sm sm:text-base">
+                    Save Project File (.json)
+                </button>
+                
+                <!-- View Mode Buttons -->
+                <button id="download-pdf-btn" class="hidden w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 sm:py-3 sm:px-6 rounded-lg shadow-md transition duration-300 text-sm sm:text-base">
+                    Download Original PDF
+                </button>
+                <button id="download-redacted-pdf-btn" class="hidden w-full md:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 sm:py-3 sm:px-6 rounded-lg shadow-md transition duration-300 text-sm sm:text-base">
+                    Download Redacted PDF
+                </button>
+                
+                <!-- Redaction Style -->
+                <div id="redaction-style-container" class="hidden w-full md:w-auto flex flex-col md:flex-row gap-4">
+                    <div>
+                        <label for="redaction-style" class="text-sm font-medium text-gray-700 sr-only">Redaction Style:</label>
+                        <select id="redaction-style" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 sm:py-3 h-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base">
+                            <option value="erase">Style: Erase Content</option>
+                            <option value="solid">Style: Solid Color</option>
+                            <option value="lock">Style: Solid + Lock Icon</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="redaction-color" class="text-sm font-medium text-gray-700 sr-only">Redaction Color:</label>
+                        <select id="redaction-color" class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 sm:py-3 h-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base">
+                            <option value="none">Color: None (Erase)</option>
+                            <option value="black">Color: Black</option>
+                            <option value="red">Color: Red</option>
+                            <option value="blue">Color: Blue</option>
+                            <option value="white">Color: White</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button id="download-json-btn" class="hidden w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 sm:py-3 sm:px-6 rounded-lg shadow-md transition duration-300 text-sm sm:text-base">
+                    Download Project File (.json)
+                </button>
+                
+                <!-- Reset Button -->
+                <button id="reset-app-btn" class="w-full md:w-auto bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 sm:py-3 sm:px-6 rounded-lg shadow-md transition duration-300 text-sm sm:text-base">
+                    Close Project & Start Over
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 shadow-2xl w-full max-w-sm">
+            <h3 id="modal-title" class="text-lg sm:text-xl font-bold mb-4 text-gray-800">Set Password</h3>
+            <p id="modal-desc" class="text-sm sm:text-base text-gray-600 mb-4">Enter a password for this secret area.</p>
+            <input type="password" id="password-input" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter password...">
+            <div class="flex gap-4">
+                <button id="modal-cancel-btn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-300 text-sm sm:text-base">
+                    Cancel
+                </button>
+                <button id="modal-confirm-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 text-sm sm:text-base">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Download Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 shadow-2xl w-full max-w-sm">
+            <h3 id="confirm-title" class="text-lg sm:text-xl font-bold mb-4 text-gray-800">Confirm Download</h3>
+            <p id="confirm-desc" class="text-sm sm:text-base text-gray-600 mb-4">You have 0 locked secrets. Do you want to download the PDF with this content permanently hidden?</p>
+            <div class="flex gap-4">
+                <button id="confirm-cancel-btn" class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-300 text-sm sm:text-base">
+                    Cancel
+                </button>
+                <button id="confirm-ok-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 text-sm sm:text-base">
+                    Download
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 shadow-2xl w-full max-w-sm text-center">
+            <p class="text-lg font-medium text-gray-800">Generating Redacted PDF...</p>
+            <p class="text-gray-600 mt-2">This may take a moment.</p>
+        </div>
+    </div>
+
+    <!-- Message Box -->
+    <div id="message-box" class="message-box bg-red-500 text-white py-3 px-5 rounded-lg shadow-lg">
+        <p id="message-text"></p>
+    </div>
+
+    <script>
+        // Set worker source for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // --- DOM Elements ---
+        const modeSelection = document.getElementById('mode-selection');
+        const appView = document.getElementById('app-view');
+        const canvas = document.getElementById('pdf-canvas');
+        const ctx = canvas.getContext('2d');
+        const pageNumEl = document.getElementById('page-num');
+        const pageCountEl = document.getElementById('page-count');
+        const prevPageBtn = document.getElementById('prev-page');
+        const nextPageBtn = document.getElementById('next-page');
+        const pageNumBottomEl = document.getElementById('page-num-bottom');
+        const pageCountBottomEl = document.getElementById('page-count-bottom');
+        const prevPageBtnBottom = document.getElementById('prev-page-bottom');
+        const nextPageBtnBottom = document.getElementById('next-page-bottom');
+        const saveProjectBtn = document.getElementById('save-project-btn');
+        const downloadPdfBtn = document.getElementById('download-pdf-btn');
+        const downloadRedactedPdfBtn = document.getElementById('download-redacted-pdf-btn');
+        const downloadJsonBtn = document.getElementById('download-json-btn');
+        const redactionStyleContainer = document.getElementById('redaction-style-container');
+        const redactionStyleSelect = document.getElementById('redaction-style');
+        const redactionColorSelect = document.getElementById('redaction-color');
+        const resetAppBtn = document.getElementById('reset-app-btn');
+        const creatorInstructions = document.getElementById('creator-instructions');
+        const viewerInstructions = document.getElementById('viewer-instructions');
+        const modal = document.getElementById('password-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const passwordInput = document.getElementById('password-input');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmTitle = document.getElementById('confirm-title');
+        const confirmDesc = document.getElementById('confirm-desc');
+        const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+        const confirmOkBtn = document.getElementById('confirm-ok-btn');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        // --- App State ---
+        let pdfDoc = null;
+        let currentPage = 1;
+        let pageRendering = false;
+        let pageNumPending = null;
+        let scale = 1.5; // Default rendering scale
+        let appMode = null; // 'create' or 'view'
+        let originalPdfBase64 = null; // For saving in 'create' mode
+        let loadedProjectJSON = null; // Store the string content of the loaded .json
+        let secrets = []; // Array of {id, page, x, y, w, h, password, unlocked}
+        
+        // --- Creator Mode State ---
+        let isDrawing = false;
+        let selectionRect = {}; // {x, y, w, h}
+        
+        // --- Modal State ---
+        let currentModalCallback = null;
+        let currentSecretId = null;
+        let currentConfirmCallback = null;
+
+        // --- Constants ---
+        // 64x64 White Lock Icon PNG (Base64)
+        const WHITE_LOCK_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAB2AAAAdgB+lymcgAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAReSURBVHic7dxriJVVFMfx981EExVlWCCCF6lI6hFlQhQWJkEYBGGhVUEh4kG8CyIuBPGgiLvBFRdiEVQQBNlQYaF8RUyMiSgMVhcVZpgvS5rL4rjNnDNnZs49M2fOfHzgMOfe+zS/c8/MnHvuLQkAAAAAAAAAAAAAAACAtiSptSRdJukLyZIkX0m6StIzkt5IelCStiR9lqTdJNtJOkPSbZK+lPTfJNtJ+l7SpZJOkPSeJG+T9Iqkn0t6XNI3kt5L+iXpeZLeSHpJ0hOSbpL0q6RbJX1ckq5Jui3pOElXSHpZ0uOSbpL0uKSPJX1N0r2SrpD0oKRHJX1R0v2SPpb0TUlHJP1M0p9J+lDSp5I+luTnJP1L0j2SrpP0eZLeSfphqj+k5LekfyyN/r3kv4v6X5X+T+O/kPSHJP0g6d8k3Uf/3pP+RdK/Szpa+j+L/v8v6f8kHUn6VdKvkj6p/B/mP5L0X0uStkr6WtIvkn6V9OEkH5b+FfTfK/03kt5I+rL0/y/9T0n6StJvSPp3Sc9IelDS/5G0vyT/j6RfJP1D0u+SXJX0d0mfkbRB0lGSrpL0v6S/Iv0/kj6W9IOkv0r6vSRfkrRH0nNJ3pP0aZJ+l/SnJG9I+k3Sh5K+lHSHpM9JeknSa5JckPQRSe+V9P5Z/lSSr5L+XtJ3JH0u6ctJ/knSL5L+lqRnJWmR9G/TfS7pcUnfkvSzpF9LekjSz5P8p6RvSfp2bvp3kj4n6RclfbZ8H5f0L0n/LulPZvrHkv4nSZ+T9N9mfy/pf0v6MUl/WtZnJP1V1qdK+qSkX0r6T5J+m+0Lkv4l6bOlfSHpfyZ9RNI/kvQkSfelvS/pq5L+StJ3Sfpnkn4gycdlPUDSD0p6RNI3S/tA0nOSrpL0FUm/k/Rpkp5O+lPSe5K8mPUDSc9IekfSe5KeSfq4JAdlPUDSw5Iel/RBSc+V9IGkz0v6X5I+LenDJT1AWkHSO5JekXSpJAdlPUDSO5K+Jemlkv6Q5EMlPUBSJOmrJN0i6ZGSepj1AUmdJN0p6RNJD8p6gKSvkvSGpCckPUDSN5L+kKR/lPUBSSckHZP0PUnPkvQASe9KepakXyT5QZIPkvQASe8k3UjSK5L0LknPSHoApd8lOSFpJ9P9KUnXSToiyUclPUBSo0mPSpJXSvoPST6V9ACpC0kXSnqY7gNJX0r6U5J/SnoApWclOSLpZ7P9AUnPJP1C0h8kfSDpAUk/kvSjpMcm+QJJTyS9WtKfkj4g6QGUPkxyWNJxkn4lSbcBPUDSE5J+IumT8r6ZpA9IekDSY5I+Jum7kp6S9ACph0i6JelzJP1A0rNJ+nGSfijpApIeIOkByccl/VeSXpL0KUkPSHpA0gOUnpD0gKQHS3qApAclPUBSt0n6WtJDJP02SQ9IekDSp5IeIOl+SY9JekDS3ZLeWJb1AUmfkvQASeckvSrpNkkPSHpA0gOUPkDSe5JeI+kBkv6fpAclPUBSc0lfkvSMpAdIekDSwZIeIOlJkvYkfU/SY5IekPQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgL/0FzSbb2/o0TxyAAAAAElFTkSuQmCC';
+        // 64x64 Black Lock Icon PNG (Base64)
+        const BLACK_LOCK_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAB2AAAAdgB+lymcgAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAARNSURBVHic7dxriJVVFMfx983EFBXlWCCCF6mI6hFlQhQWJkEYBGGhVUEh4kG8CyIuBPGgiLvBFRdiEVQQBNlQYaF8RUyMiSgMVhcVZpgvS5rL4rjNnDNnZs49M2fOfHzgMOfe+zS/c8/MnHvuLQkAAAAAAAAAAAAAAACAthmS1iV9IemSpCcl/Sbpi6Q3JD0syVclXZWkM8kmkl5L+meSTSS9JelPSzaR9Iqkr5P0kKRXJH0l6WtJX5H0kaQXS/qopC9LeknS3yX9XtLPJV0r6RNJL5b0saQXSzpT0gWSPpL0a0kXS3pY0qOSrpL0taSLJV0r6UtJL5D0taQXSnqxLGclvVXSN5JekvSxpJdKeliS/yTpb0kXS/pe0oOSrpL0taQXSlpI+lHSp5J+KOn+sv63JH0s6QtJX0r6RNLnkv4p6QtJn5P0taSXSnqspNclPSnpVUl/lPSpJFem+zXp1El/l/SppJdI+lXSl5JelPSFpLckPSnpaUlXSzpL0uGSrpX0laQXS3q0pFclvSjplUlPS/q6pA9K+kXSi5L+IelVSc9JukDSF5JelfS5pNclvSnpoUlXS/qrpBelPSXpp5K+KOmLkr4s6T5Jf5X0sKR/SvpL0iuSvpb0kKSXJP1A0veS/ivpy5I+JOnLkv4m6VdJv5P0sKRvS/qpJFem+xXpKUlXSPqDpN9L+qKkVyQ9Iulvkv4s6TGSrpP0laRXJL0gyWtJP5D0qKR/JOmvkv4u6ZdJv5P0ryX9RNI3JH1V0h+SvkvSK5L+Iek3S/o/kn4n6QtJrybpB5J+WNYDJP0g6TGSvkvWAyT9UNK3JH1U1gMk/Sjpi5LeKesBkr4n6WNJf1LWAyR9XtLvJH1Q1gMkfUrS1yR9WNYDJP1B0reS/qSsx0kPS/qOpO9LelLW4yR9KOmvkn6orMdJ+oCk1yS9RtYjJP0fSV+Q9BjJ35X1CEk/lXRJ0suSvpb1CEkvS/qbpJclPS3rAZI+K+lPSR9JelLW4yS9RtK/kvQBSe9KekDSF5JeI+kBSX+S9JSkv0p6ANKXJH1B0reS/irprSQ9QNI3JH1S0vuS/pD0AUlfkvSppHelPUDSo5LeK+nfSnoApScl/VLS1yS9I+kBkr4u6QtJX5H0AUmfkvSxpH8k6QFKL5T0qKR3Jf0x6QGS/ijpQUnvSXpU0gMkPSLpKUmPSfI9SU9JelfSlyR9QNIDlJ4q6QtJn5f0qaQHSPqYpMck/VXSAyR9TtJXJX1G0gMkPSLpYUn3SnoApTckXZH0MUkPkPSLpO9KelDSByQ9QNIDlB4u6TGSnpP0AUkvSnpS0gMkPUBSp0nvlPQASb+W9ABJD1BytKQHSBqV9ABJD1DyZkkPkPQASf+W9ABJD1DyZkkPkPSfpQUkvUPSAyQ9QNLLkr4v6QGSHiDpBOkPSXqApAdIekBS+pKeIOkByr4l6QGSHiDpAUoPkPQASe+S9IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwL/0B1R/tQyS5Qn+AAAAAElFTkSuQmCC';
+
+        // --- Utility Functions ---
+
+        function showMessage(message, type = 'error') {
+            messageText.textContent = message;
+            if (type === 'error') {
+                messageBox.classList.remove('bg-green-500');
+                messageBox.classList.add('bg-red-500');
+            } else {
+                messageBox.classList.remove('bg-red-500');
+                messageBox.classList.add('bg-green-500');
+            }
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 3000);
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+        
+        function base64ToUint8Array(base64) {
+            try {
+                // Ensure the base64 string is properly formatted (remove header if exists)
+                const base64Data = base64.split(',')[1] || base64;
+                
+                // Pad the string if necessary
+                const paddedBase64 = base64Data.padEnd(base64Data.length + (4 - base64Data.length % 4) % 4, '=');
+                
+                const binaryString = atob(paddedBase64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes;
+            } catch (e) {
+                console.error("Error in base64ToUint8Array:", e);
+                console.error("Failed to decode base64 string (first 50 chars):", base64.substring(0, 50));
+                // Propagate the error
+                throw new Error(`Failed to decode base64 string: ${e.message}`);
+            }
+        }
+
+        // --- App Logic ---
+
+        function handleFileSelect(event, mode) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            appMode = mode;
+            if (mode === 'create' && file.type === 'application/pdf') {
+                loadPdfForCreation(file);
+            } else if (mode === 'view' && file.type === 'application/json') {
+                loadProjectForViewing(file);
+            } else {
+                showMessage(`Invalid file type. Expected ${mode === 'create' ? '.pdf' : '.json'}`);
+                event.target.value = null;
+            }
+        }
+
+        async function loadPdfForCreation(file) {
+            try {
+                originalPdfBase64 = await fileToBase64(file);
+                const pdfData = base64ToUint8Array(originalPdfBase64);
+                
+                await loadPdfDocument(pdfData);
+                
+                modeSelection.classList.add('hidden');
+                appView.classList.remove('hidden');
+                saveProjectBtn.classList.remove('hidden');
+                downloadPdfBtn.classList.add('hidden');
+                downloadRedactedPdfBtn.classList.add('hidden');
+                downloadJsonBtn.classList.add('hidden');
+                redactionStyleContainer.classList.add('hidden');
+                creatorInstructions.classList.remove('hidden');
+                viewerInstructions.classList.add('hidden');
+
+                addCanvasListeners();
+
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                showMessage(`Could not load PDF file: ${error.message}`);
+                resetApp();
+            }
+        }
+
+        function loadProjectForViewing(file) {
+            const reader = new FileReader();
+            reader.readAsText(file, 'UTF-8');
+            reader.onload = async (evt) => {
+                try {
+                    loadedProjectJSON = evt.target.result;
+                    const projectData = JSON.parse(loadedProjectJSON);
+                    if (!projectData.pdfData || !projectData.secrets) {
+                        throw new Error('Invalid project file structure.');
+                    }
+                    
+                    originalPdfBase64 = projectData.pdfData;
+                    secrets = projectData.secrets.map(s => ({ ...s, unlocked: false }));
+                    const pdfData = base64ToUint8Array(originalPdfBase64);
+
+                    await loadPdfDocument(pdfData);
+
+                    modeSelection.classList.add('hidden');
+                    appView.classList.remove('hidden');
+                    saveProjectBtn.classList.add('hidden');
+                    downloadPdfBtn.classList.remove('hidden');
+                    downloadRedactedPdfBtn.classList.remove('hidden');
+                    downloadJsonBtn.classList.remove('hidden');
+                    redactionStyleContainer.classList.remove('hidden');
+                    creatorInstructions.classList.add('hidden');
+                    viewerInstructions.classList.remove('hidden');
+                    
+                    addCanvasListeners();
+
+                } catch (error) {
+                    console.error('Error loading project:', error);
+                    showMessage(`Could not load project file: ${error.message}`);
+                    resetApp();
+                }
+            };
+            reader.onerror = () => {
+                showMessage('Failed to read project file.');
+                resetApp();
+            };
+        }
+
+        async function loadPdfDocument(pdfData) {
+            pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+            pageCountEl.textContent = pdfDoc.numPages;
+            pageCountBottomEl.textContent = pdfDoc.numPages;
+            currentPage = 1;
+            await renderPage(currentPage);
+        }
+
+        async function renderPage(num) {
+            if (pageRendering) {
+                pageNumPending = num;
+                return;
+            }
+            pageRendering = true;
+
+            try {
+                const page = await pdfDoc.getPage(num);
+                const viewport = page.getViewport({ scale: scale });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
+
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+
+                await page.render(renderContext).promise;
+            } catch (renderError) {
+                console.error("Error rendering page:", renderError);
+                showMessage("Failed to render PDF page. The file might be corrupted.");
+            } finally {
+                pageRendering = false;
+            }
+
+            pageNumEl.textContent = num;
+            pageNumBottomEl.textContent = num;
+            prevPageBtn.disabled = num <= 1;
+            prevPageBtnBottom.disabled = num <= 1;
+            nextPageBtn.disabled = num >= pdfDoc.numPages;
+            nextPageBtnBottom.disabled = num >= pdfDoc.numPages;
+
+            drawOverlays();
+
+            if (pageNumPending !== null) {
+                const pending = pageNumPending;
+                pageNumPending = null;
+                await renderPage(pending);
+            }
+        }
+
+        function queueRenderPage(num) {
+            if (pageRendering) {
+                pageNumPending = num;
+            } else {
+                renderPage(num);
+            }
+        }
+
+        function onPrevPage() {
+            if (currentPage <= 1) return;
+            currentPage--;
+            queueRenderPage(currentPage);
+        }
+
+        function onNextPage() {
+            if (currentPage >= pdfDoc.numPages) return;
+            currentPage++;
+            queueRenderPage(currentPage);
+        }
+
+        function drawOverlays() {
+            const pageSecrets = secrets.filter(s => s.page === currentPage);
+            
+            pageSecrets.forEach(secret => {
+                if (appMode === 'create' || (appMode === 'view' && !secret.unlocked)) {
+                    if(appMode === 'view' && !secret.unlocked) {
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                        ctx.fillRect(secret.x, secret.y, secret.w, secret.h);
+                        ctx.fillStyle = 'white';
+                        ctx.font = `${Math.min(secret.w, secret.h) * 0.5}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('🔒', secret.x + secret.w / 2, secret.y + secret.h / 2);
+                    } else if (appMode === 'create') {
+                        ctx.fillStyle = 'rgba(0, 0, 255, 0.3)';
+                        ctx.strokeStyle = 'rgba(0, 0, 255, 0.8)';
+                        ctx.lineWidth = 2;
+                        ctx.fillRect(secret.x, secret.y, secret.w, secret.h);
+                        ctx.strokeRect(secret.x, secret.y, secret.w, secret.h);
+                    }
+                }
+            });
+        }
+        
+        // --- Event Handlers ---
+
+        prevPageBtn.addEventListener('click', onPrevPage);
+        nextPageBtn.addEventListener('click', onNextPage);
+        prevPageBtnBottom.addEventListener('click', onPrevPage);
+        nextPageBtnBottom.addEventListener('click', onNextPage);
+        resetAppBtn.addEventListener('click', resetApp);
+        
+        function resetApp() {
+            pdfDoc = null;
+            currentPage = 1;
+            appMode = null;
+            originalPdfBase64 = null;
+            loadedProjectJSON = null;
+            secrets = [];
+            isDrawing = false;
+            selectionRect = {};
+            
+            document.getElementById('pdf-upload').value = null;
+            document.getElementById('project-upload').value = null;
+
+            appView.classList.add('hidden');
+            modeSelection.classList.remove('hidden');
+
+            downloadPdfBtn.classList.add('hidden');
+            downloadJsonBtn.classList.add('hidden');
+            downloadRedactedPdfBtn.classList.add('hidden');
+            redactionStyleContainer.classList.add('hidden');
+            redactionColorSelect.classList.add('hidden');
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            canvas.onmousedown = null;
+            canvas.onmousemove = null;
+            canvas.onmouseup = null;
+            canvas.onclick = null;
+            
+            // Remove style listener
+            redactionStyleSelect.removeEventListener('change', handleStyleChange);
+        }
+
+        // --- Password Modal ---
+        function showPasswordModal(title, desc, confirmText, callback) {
+            modalTitle.textContent = title;
+            modalDesc.textContent = desc;
+            modalConfirmBtn.textContent = confirmText;
+            passwordInput.value = '';
+            modal.classList.remove('hidden');
+            passwordInput.focus();
+            currentModalCallback = callback;
+        }
+
+        function hideModal() {
+            modal.classList.add('hidden');
+            currentModalCallback = null;
+            currentSecretId = null;
+        }
+
+        modalCancelBtn.addEventListener('click', () => {
+            hideModal();
+            if (appMode === 'create') renderPage(currentPage);
+        });
+        
+        modalConfirmBtn.addEventListener('click', () => {
+            if (currentModalCallback) {
+                currentModalCallback(passwordInput.value);
+            }
+        });
+
+        // --- Confirmation Modal ---
+        function showConfirmModal(title, desc, confirmText, callback) {
+            confirmTitle.textContent = title;
+            confirmDesc.textContent = desc;
+            confirmOkBtn.textContent = confirmText;
+            confirmModal.classList.remove('hidden');
+            currentConfirmCallback = callback;
+        }
+
+        function hideConfirmModal() {
+            confirmModal.classList.add('hidden');
+            currentConfirmCallback = null;
+        }
+
+        confirmCancelBtn.addEventListener('click', hideConfirmModal);
+        
+        confirmOkBtn.addEventListener('click', () => {
+            if (currentConfirmCallback) {
+                currentConfirmCallback();
+            }
+            hideConfirmModal();
+        });
+        
+        // --- New: Handle Style Changes ---
+        function handleStyleChange() {
+            const style = redactionStyleSelect.value;
+            if (style === 'erase') {
+                redactionColorSelect.classList.add('hidden');
+                redactionColorSelect.value = 'none';
+            } else {
+                redactionColorSelect.classList.remove('hidden');
+                if (redactionColorSelect.value === 'none') {
+                    redactionColorSelect.value = 'black'; // Default to black
+                }
+            }
+        }
+
+
+        // --- Creator Mode: Drawing ---
+        function addCanvasListeners() {
+            if (appMode === 'create') {
+                canvas.onmousedown = handleCreatorMouseDown;
+                canvas.onmousemove = handleCreatorMouseMove;
+                canvas.onmouseup = handleCreatorMouseUp;
+                canvas.onclick = null;
+                saveProjectBtn.addEventListener('click', handleSaveProject);
+                downloadPdfBtn.removeEventListener('click', handleDownloadPdf);
+                downloadJsonBtn.removeEventListener('click', handleDownloadJson);
+                downloadRedactedPdfBtn.removeEventListener('click', handleDownloadRedactedPdf);
+            } else if (appMode === 'view') {
+                canvas.onmousedown = null;
+                canvas.onmousemove = null;
+                canvas.onmouseup = null;
+                canvas.onclick = handleViewerClick;
+                saveProjectBtn.removeEventListener('click', handleSaveProject);
+                downloadPdfBtn.addEventListener('click', handleDownloadPdf);
+                downloadJsonBtn.addEventListener('click', handleDownloadJson);
+                downloadRedactedPdfBtn.addEventListener('click', handleDownloadRedactedPdf);
+                
+                // Add listener for style changes
+                redactionStyleSelect.addEventListener('change', handleStyleChange);
+                // Run once on load to set initial state
+                handleStyleChange();
+            }
+        }
+        
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Scale mouse coordinates back to native canvas coordinates
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            return { x, y };
+        }
+
+        function handleCreatorMouseDown(e) {
+            e.preventDefault();
+            isDrawing = true;
+            const { x, y } = getCanvasCoords(e);
+            selectionRect = { x, y, w: 0, h: 0 };
+        }
+
+        function handleCreatorMouseMove(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const { x, y } = getCanvasCoords(e);
+            
+            renderPage(currentPage).then(() => {
+                selectionRect.w = x - selectionRect.x;
+                selectionRect.h = y - selectionRect.y;
+                
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(selectionRect.x, selectionRect.y, selectionRect.w, selectionRect.h);
+            });
+        }
+
+        function handleCreatorMouseUp(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            e.preventDefault();
+            
+            // Ensure width and height are positive
+            if (selectionRect.w < 0) {
+                selectionRect.x += selectionRect.w;
+                selectionRect.w = -selectionRect.w;
+            }
+            if (selectionRect.h < 0) {
+                selectionRect.y += selectionRect.h;
+                selectionRect.h = -selectionRect.h;
+            }
+            
+            // Ignore tiny accidental drags
+            if (selectionRect.w < 10 || selectionRect.h < 10) {
+                renderPage(currentPage);
+                return;
+            }
+            
+            showPasswordModal(
+                'Create Secret',
+                'Set a password for this new secret area.',
+                'Save Secret',
+                (password) => {
+                    if (!password) {
+                        showMessage('Password cannot be empty.');
+                        return;
+                    }
+                    secrets.push({
+                        id: Date.now().toString(),
+                        page: currentPage,
+                        x: selectionRect.x,
+                        y: selectionRect.y,
+                        w: selectionRect.w,
+                        h: selectionRect.h,
+                        password: password
+                    });
+                    hideModal();
+                    renderPage(currentPage);
+                    showMessage('Secret area saved!', 'success');
+                }
+            );
+        }
+        
+        // --- Viewer Mode: Clicking ---
+        function handleViewerClick(e) {
+            e.preventDefault();
+            const { x, y } = getCanvasCoords(e);
+            
+            const clickedSecret = secrets.find(s => 
+                s.page === currentPage &&
+                !s.unlocked &&
+                x >= s.x && x <= s.x + s.w &&
+                y >= s.y && y <= s.y + s.h
+            );
+            
+            if (clickedSecret) {
+                currentSecretId = clickedSecret.id;
+                showPasswordModal(
+                    'Unlock Secret',
+                    'Enter the password to reveal this content.',
+                    'Unlock',
+                    (password) => {
+                        if (password === clickedSecret.password) {
+                            clickedSecret.unlocked = true;
+                            hideModal();
+                            renderPage(currentPage);
+                            showMessage('Content unlocked!', 'success');
+                        } else {
+                            showMessage('Incorrect password.');
+                        }
+                    }
+                );
+            }
+        }
+        
+        // --- Creator Mode: Saving ---
+        function handleSaveProject() {
+            if (!originalPdfBase64 || secrets.length === 0) {
+                showMessage('No PDF loaded or no secret areas created.');
+                return;
+            }
+            
+            const projectData = {
+                pdfData: originalPdfBase64,
+                secrets: secrets
+            };
+            
+            const jsonString = JSON.stringify(projectData);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'pdf-project.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showMessage('Project file saved!', 'success');
+        }
+
+        // --- Viewer Mode: Downloading ---
+        function proceedWithOriginalDownload() {
+            if (!originalPdfBase64) {
+                showMessage('No PDF data found in this project.');
+                return;
+            }
+            
+            const a = document.createElement('a');
+            a.href = originalPdfBase64;
+            a.download = 'original.pdf';
+            document.body.appendChild(a);
+a.click();
+            document.body.removeChild(a);
+        }
+
+        function handleDownloadPdf() {
+            if (!originalPdfBase64) {
+                showMessage('No PDF data found in this project.');
+                return;
+            }
+            
+            showConfirmModal(
+                'Download Original PDF?',
+                'Please be aware that the author has restricted some content in this project. Are you sure you want to download the original, fully revealed PDF?',
+                'Download',
+                () => { proceedWithOriginalDownload(); }
+            );
+        }
+
+        function handleDownloadJson() {
+            if (!loadedProjectJSON) {
+                showMessage('No project data loaded.');
+                return;
+            }
+            
+            const blob = new Blob([loadedProjectJSON], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'project.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Redacted PDF Download Logic
+        function handleDownloadRedactedPdf() {
+            const lockedSecrets = secrets.filter(s => !s.unlocked);
+            const lockedCount = lockedSecrets.length;
+            const totalSecrets = secrets.length;
+
+            if (totalSecrets === 0) {
+                showMessage('No secrets in this project. Downloading original PDF.', 'success');
+                handleDownloadPdf();
+                return;
+            }
+
+            if (lockedCount > 0) {
+                showConfirmModal(
+                    'Confirm Download',
+                    `You have ${lockedCount} locked secret(s). Do you want to download the PDF with this content permanently redacted?`,
+                    'Download',
+                    () => { generateRedactedPdf(lockedSecrets, redactionStyleSelect.value, redactionColorSelect.value); }
+                );
+            } else {
+                showConfirmModal(
+                    'Download Original PDF',
+                    'All secrets are unlocked. This will download the original, un-redacted PDF.',
+                    'Download',
+                    () => { proceedWithOriginalDownload(); }
+                );
+            }
+        }
+
+        async function generateRedactedPdf(lockedSecrets, style, color) {
+            loadingOverlay.classList.remove('hidden');
+            try {
+                const { PDFDocument, rgb } = PDFLib;
+                
+                // Color mapping
+                const colors = {
+                    black: rgb(0, 0, 0),
+                    red: rgb(1, 0, 0),
+                    blue: rgb(0, 0, 1),
+                    white: rgb(1, 1, 1)
+                };
+
+                const existingPdfBytes = base64ToUint8Array(originalPdfBase64);
+                const pdfDoc = await PDFDocument.load(existingPdfBytes);
+                const pages = pdfDoc.getPages();
+
+                // --- FIX: Embed images ONCE at the document level ---
+                // Pre-embed icons to avoid embedding them inside the loop
+                const iconBytesWhite = base64ToUint8Array(WHITE_LOCK_BASE64);
+                const iconBytesBlack = base64ToUint8Array(BLACK_LOCK_BASE64);
+                
+                const iconImageWhite = await pdfDoc.embedPng(iconBytesWhite);
+                const iconImageBlack = await pdfDoc.embedPng(iconBytesBlack);
+                // --- END FIX ---
+
+
+                for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const pageSecrets = lockedSecrets.filter(s => s.page === (i + 1));
+
+                    if (pageSecrets.length > 0) {
+                        const { width: pageWidth, height: pageHeight } = page.getSize();
+                        
+                        const redactionAreasPdf = pageSecrets.map(secret => {
+                            const pdfX = secret.x / scale;
+                            const pdfY = secret.y / scale;
+                            const pdfW = secret.w / scale;
+                            const pdfH = secret.h / scale;
+                            return {
+                                x: pdfX,
+                                y: pageHeight - pdfY - pdfH, // Convert top-left to bottom-left Y
+                                width: pdfW,
+                                height: pdfH
+                            };
+                        });
+
+                        if (style === 'erase') {
+                            // "Erase" content by drawing a solid white rectangle over it.
+                            redactionAreasPdf.forEach(area => {
+                                page.drawRectangle({
+                                    x: area.x,
+                                    y: area.y,
+                                    width: area.width,
+                                    height: area.height,
+                                    color: rgb(1, 1, 1), // Solid white
+                                    borderColor: rgb(1, 1, 1), // White border
+                                    borderWidth: 0, // No border visible
+                                });
+                            });
+                        } else {
+                            // --- Solid Color or Lock Icon ---
+                            const boxColor = colors[color] || colors.black;
+                            const borderColor = boxColor;
+                            const borderWidth = 0;
+
+                            // Step 1: Draw the colored rectangles
+                            redactionAreasPdf.forEach(area => {
+                                page.drawRectangle({
+                                    x: area.x,
+                                    y: area.y,
+                                    width: area.width,
+                                    height: area.height,
+                                    color: boxColor,
+                                    borderColor: borderColor,
+                                    borderWidth: borderWidth,
+                                });
+                            });
+
+                            // Step 2 (Optional): Draw lock icons
+                            if (style === 'lock') {
+                                // --- FIX: Use the pre-embedded image ---
+                                const iconImage = (color === 'white') ? iconImageBlack : iconImageWhite;
+                                // --- END FIX ---
+
+                                redactionAreasPdf.forEach(area => {
+                                    const iconSize = Math.min(area.width * 0.5, area.height * 0.5, 32);
+                                    if (iconSize < 5) return; 
+
+                                    const iconX = area.x + (area.width - iconSize) / 2;
+                                    const iconY = area.y + (area.height - iconSize) / 2;
+
+                                    page.drawImage(iconImage, {
+                                        x: iconX,
+                                        y: iconY,
+                                        width: iconSize,
+                                        height: iconSize,
+                                        opacity: 1,
+                                    });
+                                 });
+                            }
+                        }
+                    }
+                }
+
+                const pdfBytes = await pdfDoc.save();
+                
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'redacted.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showMessage('Redacted PDF saved!', 'success');
+
+            } catch (err) {
+                console.error('Error generating redacted PDF:', err);
+                showMessage(`Could not generate redacted PDF: ${err.message}`);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        }
+
+        // --- START NEW CONTENT: Set Icon Previews ---
+        // We set this at the end of the script so the constants are defined.
+        document.getElementById('img-preview-white').src = WHITE_LOCK_BASE64;
+        document.getElementById('img-preview-black').src = BLACK_LOCK_BASE64;
+        // --- END NEW CONTENT ---
+    </script>
+
+</body>
+</html>
+

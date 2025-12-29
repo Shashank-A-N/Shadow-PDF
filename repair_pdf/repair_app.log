@@ -1,0 +1,49 @@
+2025-08-12 15:27:34,801 - INFO - ==========================================================
+2025-08-12 15:27:34,803 - INFO - PDF Repair Server v2.0.0 Starting Up
+2025-08-12 15:27:34,803 - INFO - Debug Mode: True
+2025-08-12 15:27:34,804 - INFO - ==========================================================
+2025-08-12 15:27:35,940 - INFO - ==========================================================
+2025-08-12 15:27:35,941 - INFO - PDF Repair Server v2.0.0 Starting Up
+2025-08-12 15:27:35,941 - INFO - Debug Mode: True
+2025-08-12 15:27:35,942 - INFO - ==========================================================
+2025-08-12 15:27:48,363 - INFO - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] Received file for repair: merged-1754903450631_repaired (1).pdf
+2025-08-12 15:27:48,364 - INFO - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 1: Attempting repair with pikepdf.
+2025-08-12 15:27:48,467 - WARNING - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 1 FAILED: Pikepdf could not process the file. Reason: stream <_io.BytesIO object at 0x0000014838DAA390>: unable to find trailer dictionary while recovering damaged file
+2025-08-12 15:27:48,468 - INFO - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 2: Attempting recovery with PyPDF2.
+2025-08-12 15:27:48,597 - WARNING - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 2 FAILED: PyPDF2 could not process the file. Reason: EOF marker not found
+2025-08-12 15:27:48,598 - INFO - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 3: Attempting deep scan recovery with PyMuPDF.
+2025-08-12 15:27:48,664 - ERROR - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 3 FAILED: PyMuPDF could not recover the file. Reason: Failed to open stream
+2025-08-12 15:27:48,666 - ERROR - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] All repair methods failed for file: merged-1754903450631_repaired (1).pdf
+2025-08-12 15:31:32,333 - INFO - __main__ - ==========================================================
+2025-08-12 15:31:32,333 - INFO - __main__ - PDF Repair Server v3.0.0 Starting Up
+2025-08-12 15:31:32,334 - INFO - __main__ - Debug Mode: True
+2025-08-12 15:31:32,334 - INFO - __main__ - ==========================================================
+2025-08-12 15:31:33,391 - INFO - __main__ - ==========================================================
+2025-08-12 15:31:33,392 - INFO - __main__ - PDF Repair Server v3.0.0 Starting Up
+2025-08-12 15:31:33,392 - INFO - __main__ - Debug Mode: True
+2025-08-12 15:31:33,392 - INFO - __main__ - ==========================================================
+2025-08-12 15:31:43,782 - INFO - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] Received file for repair: merged-1754903450631_repaired (1).pdf
+2025-08-12 15:31:43,782 - INFO - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 1: Attempting repair with pikepdf.
+2025-08-12 15:31:43,840 - WARNING - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 1 FAILED: stream <_io.BytesIO object at 0x00000163A627A390>: unable to find trailer dictionary while recovering damaged file
+2025-08-12 15:31:43,840 - INFO - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 2: Attempting recovery with PyPDF2.
+2025-08-12 15:31:43,935 - WARNING - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 2 FAILED: EOF marker not found
+2025-08-12 15:31:43,936 - INFO - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 3: Attempting deep scan recovery with PyMuPDF.
+2025-08-12 15:31:43,995 - WARNING - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 3 FAILED: Failed to open stream
+2025-08-12 15:31:43,997 - INFO - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 4: Attempting repair with external qpdf tool.
+2025-08-12 15:31:44,000 - INFO - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] Executing command: qpdf --recover C:\Users\shash\AppData\Local\Temp\tmpyoceqel_.pdf C:\Users\shash\AppData\Local\Temp\tmpyoceqel__repaired.pdf
+2025-08-12 15:31:44,005 - ERROR - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 4 FAILED: qpdf execution failed. Check if qpdf is installed and in the system PATH. Error: [WinError 2] The system cannot find the file specified
+2025-08-12 15:31:44,007 - INFO - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 5: All repairs failed. Attempting raw content salvage.
+2025-08-12 15:31:44,016 - ERROR - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] STAGE 5 FAILED: Content salvage failed. Reason: Failed to open stream
+2025-08-12 15:31:44,016 - ERROR - __main__ - [4fe9b6d52a7b93e02226d927a8f6860c33a0b542a630f3f8f12986b1121556b6] All recovery methods failed for file: merged-1754903450631_repaired (1).pdf
+2025-08-12 15:42:40,450 - INFO - __main__ - ==========================================================
+2025-08-12 15:42:40,452 - INFO - __main__ - PDF Repair Server v3.0.0 Starting Up
+2025-08-12 15:42:40,452 - INFO - __main__ - Debug Mode: True
+2025-08-12 15:42:40,454 - INFO - __main__ - ==========================================================
+2025-08-12 15:42:43,295 - INFO - __main__ - ==========================================================
+2025-08-12 15:42:43,296 - INFO - __main__ - PDF Repair Server v3.0.0 Starting Up
+2025-08-12 15:42:43,296 - INFO - __main__ - Debug Mode: True
+2025-08-12 15:42:43,296 - INFO - __main__ - ==========================================================
+2025-08-12 15:42:50,230 - INFO - __main__ - [d7932f4c34e0907bfc5978dd5f6fbee261af84bcc7f426263ec2da361f41ef5a] Received file for repair: merged-1754903450631.pdf
+2025-08-12 15:42:50,231 - INFO - __main__ - [d7932f4c34e0907bfc5978dd5f6fbee261af84bcc7f426263ec2da361f41ef5a] STAGE 1: Attempting repair with pikepdf.
+2025-08-12 15:42:50,331 - INFO - __main__ - [d7932f4c34e0907bfc5978dd5f6fbee261af84bcc7f426263ec2da361f41ef5a] STAGE 1 SUCCESS: Pikepdf repair successful.
+2025-08-12 15:42:50,332 - INFO - __main__ - [d7932f4c34e0907bfc5978dd5f6fbee261af84bcc7f426263ec2da361f41ef5a] Repair process successful using method: pikepdf (Standard Repair)

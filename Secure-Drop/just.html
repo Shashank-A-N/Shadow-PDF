@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shashank A N | Editorial Portfolio</title>
+    
+    <!-- Fonts: Manrope (Sans) & Playfair Display (Serif) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        /* --------------------------------------------------
+         * 1. CORE VARIABLES & RESET
+         * -------------------------------------------------- */
+        :root {
+            --bg-color: #f4f4f0; /* Off-white / Cream */
+            --text-color: #1a1a1a;
+            --accent-color: #d1d1cf; /* Light Grey for lines */
+            --highlight: #000000;
+            
+            --font-sans: 'Manrope', sans-serif;
+            --font-serif: 'Playfair Display', serif;
+            
+            --spacing-unit: 8vw; /* Fluid spacing */
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html { 
+            scroll-behavior: smooth; 
+            font-size: 16px;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-sans);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            cursor: default;
+        }
+
+        a { text-decoration: none; color: inherit; cursor: pointer; }
+        ul { list-style: none; }
+
+        /* --------------------------------------------------
+         * 2. TYPOGRAPHY
+         * -------------------------------------------------- */
+        h1, h2, h3 { font-weight: normal; line-height: 1.1; }
+        
+        .display-text {
+            font-family: var(--font-serif);
+            font-size: clamp(4rem, 12vw, 10rem);
+            letter-spacing: -0.03em;
+            color: var(--highlight);
+            line-height: 0.9;
+        }
+
+        .section-header {
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .section-header::before {
+            content: '';
+            width: 10px; height: 10px;
+            background: var(--text-color);
+            border-radius: 50%;
+        }
+
+        p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            max-width: 60ch;
+            color: #444;
+        }
+
+        /* --------------------------------------------------
+         * 3. LAYOUT & GRID
+         * -------------------------------------------------- */
+        .grid-lines {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: -1;
+            padding: 0 5vw;
+        }
+        .line {
+            width: 1px;
+            height: 100%;
+            background: rgba(0,0,0,0.05);
+        }
+
+        .container {
+            padding: 0 5vw;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        section {
+            padding: var(--spacing-unit) 0;
+            border-bottom: 1px solid var(--accent-color);
+        }
+
+        /* --------------------------------------------------
+         * 4. NAVIGATION (Minimal)
+         * -------------------------------------------------- */
+        .navbar {
+            position: fixed;
+            top: 0; left: 0; width: 100%;
+            padding: 2rem 5vw;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: transparent; /* Keeping it clean */
+            mix-blend-mode: difference;
+            color: white; /* Visible on light bg via difference mode */
+        }
+
+        .logo { font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        .nav-links { display: flex; gap: 2rem; }
+        .nav-link { 
+            font-size: 0.9rem; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em; 
+            position: relative;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px; left: 0; width: 0; height: 1px;
+            background: currentColor;
+            transition: width 0.3s;
+        }
+        .nav-link:hover::after { width: 100%; }
+
+        /* --------------------------------------------------
+         * 5. HERO SECTION
+         * -------------------------------------------------- */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding-top: 15vh;
+        }
+
+        .hero-intro {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            font-family: var(--font-sans);
+        }
+
+        .hero-scroll-btn {
+            margin-top: 10vh;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(10px); }
+        }
+
+        /* --------------------------------------------------
+         * 6. ABOUT (Split Layout)
+         * -------------------------------------------------- */
+        .about-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5vw;
+            align-items: start;
+        }
+
+        .about-img-container {
+            width: 100%;
+            height: 80vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .about-img {
+            width: 100%;
+            height: 120%; /* Taller for parallax */
+            object-fit: cover;
+            transform: translateY(-10%);
+            transition: transform 0.1s linear; /* Smooth parallax */
+        }
+
+        .about-text {
+            padding-top: 5rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--accent-color);
+            font-size: 1.1rem;
+        }
+        .stat-label { color: #666; }
+        .stat-val { font-weight: 500; }
+
+        /* --------------------------------------------------
+         * 7. PROJECT LIST (Hover Reveal)
+         * -------------------------------------------------- */
+        .project-list {
+            position: relative;
+        }
+
+        .project-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 3rem 0;
+            border-top: 1px solid var(--text-color);
+            cursor: pointer;
+            transition: padding 0.3s;
+        }
+        
+        .project-item:last-child { border-bottom: 1px solid var(--text-color); }
+
+        .project-item:hover {
+            padding-left: 2rem;
+            background: #eaeaea;
+        }
+
+        .project-title {
+            font-family: var(--font-serif);
+            font-size: clamp(2rem, 4vw, 4rem);
+            font-style: italic;
+        }
+
+        .project-tags {
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Floating Project Image Preview */
+        .project-preview {
+            position: fixed;
+            width: 400px;
+            height: 500px; /* Vertical ratio */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            pointer-events: none;
+            z-index: 50;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+            opacity: 0;
+        }
+        
+        .project-preview video, .project-preview img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+
+        .project-item:hover ~ .project-preview {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        /* JS will update the src of .project-preview img based on hover */
+
+        /* --------------------------------------------------
+         * 8. SKILLS (Clean Grid)
+         * -------------------------------------------------- */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2rem;
+        }
+
+        .skill-col h3 {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--text-color);
+            padding-bottom: 1rem;
+        }
+
+        .skill-list li {
+            font-size: 1.1rem;
+            margin-bottom: 0.8rem;
+            color: #555;
+        }
+
+        /* --------------------------------------------------
+         * 9. FOOTER
+         * -------------------------------------------------- */
+        footer {
+            padding: 5vw 5vw;
+            background: var(--text-color);
+            color: var(--bg-color);
+        }
+
+        .footer-header {
+            font-family: var(--font-serif);
+            font-size: clamp(3rem, 8vw, 6rem);
+            margin-bottom: 3rem;
+            line-height: 1;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 3rem;
+            font-size: 1.2rem;
+        }
+        
+        .footer-links a { border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 5px; }
+        .footer-links a:hover { border-color: white; }
+
+        /* --------------------------------------------------
+         * 10. RESPONSIVE
+         * -------------------------------------------------- */
+        @media (max-width: 768px) {
+            .about-grid { grid-template-columns: 1fr; }
+            .skills-grid { grid-template-columns: 1fr 1fr; }
+            .project-preview { display: none; } /* Disable hover preview on mobile */
+            .project-title { font-size: 2rem; }
+            .display-text { font-size: 15vw; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Background Grid Lines -->
+    <div class="grid-lines">
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo">Shashank A N</div>
+        <div class="nav-links">
+            <a href="#projects" class="nav-link">Work</a>
+            <a href="#about" class="nav-link">About</a>
+            <a href="#contact" class="nav-link">Contact</a>
+        </div>
+    </nav>
+
+    <!-- Project Preview Container (Hidden until hover) -->
+    <div class="project-preview" id="preview-box">
+        <video id="preview-video" src="" muted loop autoplay playsinline></video>
+    </div>
+
+    <div class="container">
+        
+        <!-- HERO -->
+        <section class="hero">
+            <div class="hero-intro">Hello, I am Shashank.</div>
+            <h1 class="display-text">
+                Full Stack <br>
+                <span style="font-family: var(--font-sans); font-size: 0.5em; letter-spacing: -0.02em; display:block; margin-top: -20px; margin-bottom: 20px;">& Embedded Systems</span>
+                Developer.
+            </h1>
+            <div class="hero-scroll-btn">
+                <i class="fas fa-arrow-down"></i> Scroll to Explore
+            </div>
+        </section>
+
+        <!-- ABOUT -->
+        <section id="about">
+            <div class="section-header">01 — The Profile</div>
+            <div class="about-grid">
+                <div class="about-img-container">
+                    <img src="img_mine.png" alt="Profile" class="about-img parallax-img" onerror="this.src='https://placehold.co/600x800/d1d1cf/1a1a1a?text=Shashank'">
+                </div>
+                <div class="about-text">
+                    <h2 style="font-family: var(--font-serif); font-size: 3rem; margin-bottom: 2rem;">Bridging the physical and digital worlds.</h2>
+                    <p style="margin-bottom: 3rem;">
+                        I am an Electronics & Communication Engineering student with a dual passion: hardware precision and software scalability. I build intelligent systems that not only exist on the web but interact with the real world through IoT and embedded sensors.
+                    </p>
+                    
+                    <div class="stat-row">
+                        <span class="stat-label">Education</span>
+                        <span class="stat-val">B.E. (8.5 CGPA)</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Location</span>
+                        <span class="stat-val">Bangalore, India</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Experience</span>
+                        <span class="stat-val">3 Internships</span>
+                    </div>
+                    
+                    <a href="resume.pdf" style="display: inline-block; margin-top: 3rem; border-bottom: 1px solid black; padding-bottom: 5px; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.1em;">Download Resume</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- PROJECTS (The List) -->
+        <section id="projects">
+            <div class="section-header">02 — Selected Works</div>
+            
+            <div class="project-list">
+                
+                <!-- Project 1 -->
+                <div class="project-item" data-video="lifi.mp4" onclick="openModal('Hybrid Li-Fi', 'An innovative communication system combining Li-Fi and Wi-Fi for enhanced reliability.', ['Arduino', 'C++', 'IoT'])">
+                    <div class="project-title">Hybrid Li-Fi System</div>
+                    <div class="project-tags">Hardware / C++</div>
+                </div>
+
+                <!-- Project 2 -->
+                <div class="project-item" data-video="face.mp4" onclick="openModal('Face Attendance', 'Automated attendance tracking using Python OpenCV and machine learning.', ['Python', 'OpenCV', 'ML'])">
+                    <div class="project-title">Face Attendance AI</div>
+                    <div class="project-tags">Python / AI</div>
+                </div>
+
+                <!-- Project 3 -->
+                <div class="project-item" data-video="bmtc.mp4" onclick="openModal('Namma BMTC', 'Offline-first bus navigation app for Bengaluru powered by Gemini AI.', ['React', 'Gemini', 'PWA'])">
+                    <div class="project-title">Namma BMTC AI</div>
+                    <div class="project-tags">React / PWA</div>
+                </div>
+
+                <!-- Project 4 -->
+                <div class="project-item" data-video="SPDF.mp4" onclick="openModal('Shadow PDF', 'Browser-based all-in-one PDF toolkit for editing and conversion.', ['JavaScript', 'Tools'])">
+                    <div class="project-title">Shadow PDF</div>
+                    <div class="project-tags">Web Tool / JS</div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- SKILLS -->
+        <section>
+            <div class="section-header">03 — Expertise</div>
+            <div class="skills-grid">
+                <div class="skill-col">
+                    <h3>Languages</h3>
+                    <ul class="skill-list">
+                        <li>Python</li>
+                        <li>JavaScript (ES6+)</li>
+                        <li>Embedded C</li>
+                        <li>SQL</li>
+                    </ul>
+                </div>
+                <div class="skill-col">
+                    <h3>Web Stack</h3>
+                    <ul class="skill-list">
+                        <li>React.js</li>
+                        <li>Django</li>
+                        <li>Tailwind CSS</li>
+                        <li>HTML5 / CSS3</li>
+                    </ul>
+                </div>
+                <div class="skill-col">
+                    <h3>Hardware</h3>
+                    <ul class="skill-list">
+                        <li>Arduino</li>
+                        <li>ESP32 / IoT</li>
+                        <li>Sensors & Actuators</li>
+                        <li>PCB Design Basics</li>
+                    </ul>
+                </div>
+                <div class="skill-col">
+                    <h3>Tools</h3>
+                    <ul class="skill-list">
+                        <li>Git / GitHub</li>
+                        <li>Docker</li>
+                        <li>VS Code</li>
+                        <li>OpenCV</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- FOOTER -->
+    <footer id="contact">
+        <div class="footer-header">Let's create something<br><i>remarkable.</i></div>
+        <div class="footer-links">
+            <a href="mailto:shashankan077@example.com">Email</a>
+            <a href="#">LinkedIn</a>
+            <a href="#">GitHub</a>
+            <a href="#">Instagram</a>
+        </div>
+        <div style="margin-top: 5rem; opacity: 0.5; font-size: 0.9rem;">&copy; 2025 Shashank A N.</div>
+    </footer>
+
+    <!-- Simple JS Modal -->
+    <script>
+        // 1. IMAGE/VIDEO PREVIEW ON HOVER
+        const projectItems = document.querySelectorAll('.project-item');
+        const previewBox = document.getElementById('preview-box');
+        const previewVideo = document.getElementById('preview-video');
+
+        projectItems.forEach(item => {
+            item.addEventListener('mouseenter', () => {
+                const videoSrc = item.getAttribute('data-video');
+                previewVideo.src = videoSrc;
+                // Move preview box to mouse position logic handled via CSS sibling hover for simplicity
+                // but let's add JS tracking for better accuracy if needed. 
+                // For this style, the fixed centered preview is more "Editorial".
+                previewBox.style.opacity = '1';
+                previewBox.style.transform = 'translate(-50%, -50%) scale(1)';
+            });
+            
+            item.addEventListener('mouseleave', () => {
+                previewBox.style.opacity = '0';
+                previewBox.style.transform = 'translate(-50%, -50%) scale(0.9)';
+                setTimeout(() => { previewVideo.src = ""; }, 300); // Clear source after fade
+            });
+        });
+
+        // 2. PARALLAX SCROLL EFFECT
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const parallaxImgs = document.querySelectorAll('.parallax-img');
+            
+            parallaxImgs.forEach(img => {
+                const speed = 0.15;
+                const offset = -(scrolled * speed);
+                img.style.transform = `translateY(${offset}px)`;
+            });
+        });
+
+        // 3. SIMPLE ALERT FOR MODAL (Keeps code minimal)
+        function openModal(title, desc, techs) {
+            alert(`${title}\n\n${desc}\n\nTech Stack: ${techs.join(', ')}`);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Permission Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for Inter font */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        /* Style to disable password input when checkbox is checked */
+        input[type="password"]:disabled {
+            background-color: #f3f4f6;
+            cursor: not-allowed;
+        }
+        .view-screen {
+            transition: opacity 0.2s ease-in-out;
+        }
+        #permissionEditor {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md m-4 relative">
+        
+        <div id="globalToast" 
+             class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-11/12 p-4 rounded-lg shadow-lg z-10 transition-all duration-300">
+            
+            <button id="toastCloseBtn" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            
+            <span id="toastMessage"></span>
+            
+            </div>
+
+        <div id="mainView" class="view-screen space-y-4">
+            <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">PDF Permission Manager</h1>
+            <p class="text-center text-gray-600 pb-4">What would you like to do?</p>
+            
+            <button id="btnGoToRestrict"
+                    class="w-full bg-blue-600 text-white p-4 rounded-lg font-semibold
+                           flex items-center justify-center space-x-2
+                           hover:bg-blue-700 focus:outline-none focus:ring-2
+                           focus:ring-blue-500 focus:ring-opacity-50
+                           transition duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>Add Restrictions</span>
+            </button>
+            
+            <button id="btnGoToUnrestrict"
+                    class="w-full bg-red-600 text-white p-4 rounded-lg font-semibold
+                           flex items-center justify-center space-x-2
+                           hover:bg-red-700 focus:outline-none focus:ring-2
+                           focus:ring-red-500 focus:ring-opacity-50
+                           transition duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Edit / Remove Restrictions</span>
+            </button>
+        </div>
+
+        <div id="restrictView" class="view-screen space-y-6 hidden">
+            <div class="flex items-center mb-4">
+                <button class="backBtn p-2 rounded-full hover:bg-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <h1 class="text-xl font-bold text-center text-gray-800 flex-grow">Add Restrictions</h1>
+            </div>
+            <div>
+                <label for="pdfFile" class="block text-sm font-medium text-gray-700 mb-1">1. Upload PDF</label>
+                <input type="file" id="pdfFile" accept="application/pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border rounded-lg p-2.5">
+            </div>
+            <div>
+                <label for="ownerPassword" class="block text-sm font-medium text-gray-700 mb-1">2. Set Author/Owner Password</label>
+                <input type="password" id="ownerPassword" placeholder="Enter a new password" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors">
+            </div>
+            <div class="flex items-center">
+                <input id="generateOwner" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                <label for="generateOwner" class="ml-2 block text-sm text-gray-900">Or, generate a new secure password</label>
+            </div>
+            <fieldset class="border border-gray-300 rounded-lg p-4">
+                <legend class="text-sm font-medium text-gray-700 px-2">3. Choose Restrictions</legend>
+                <div class="space-y-3 mt-2">
+                    <div class="flex items-center">
+                        <input id="restrictCopy" type="checkbox" checked class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="restrictCopy" class="ml-2 block text-sm text-gray-900">Restrict Copying Content</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input id="restrictPrinting" type="checkbox" checked class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="restrictPrinting" class="ml-2 block text-sm text-gray-900">Restrict Printing</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input id="restrictModifying" type="checkbox" checked class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="restrictModifying" class="ml-2 block text-sm text-gray-900">Restrict Modifying Document</LabeL>
+                    </div>
+                    <div class="flex items-center">
+                        <input id="restrictAnnotations" type="checkbox" checked class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="restrictAnnotations" class="ml-2 block text-sm text-gray-900">Restrict Adding Annotations</label>
+                    </div>
+                </div>
+            </fieldset>
+            <button id="processBtn" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-200">
+                Apply Restrictions & Download
+            </button>
+        </div>
+
+        <div id="unrestrictView" class="view-screen space-y-6 hidden">
+            <div class="flex items-center mb-4">
+                <button class="backBtn p-2 rounded-full hover:bg-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <h1 class="text-xl font-bold text-center text-gray-800 flex-grow">Edit/Remove Restrictions</h1>
+            </div>
+            
+            <div>
+                <label for="pdfFileUnrestrict" class="block text-sm font-medium text-gray-700 mb-1">
+                    1. Upload Restricted PDF
+                </label>
+                <input type="file" id="pdfFileUnrestrict" accept="application/pdf"
+                       class="block w-full text-sm text-gray-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-lg file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-blue-50 file:text-blue-700
+                              hover:file:bg-blue-100
+                              border rounded-lg p-2.5">
+            </div>
+
+            <div>
+                <label for="ownerPasswordUnrestrict" class="block text-sm font-medium text-gray-700 mb-1">
+                    2. Enter Author/Owner Password
+                </label>
+                <input type="password" id="ownerPasswordUnrestrict"
+                       placeholder="Required to see permissions"
+                       class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            <div class="space-y-3">
+                <button id="checkPermsBtn"
+                        class="w-full bg-gray-700 text-white p-3 rounded-lg font-semibold
+                               hover:bg-gray-800 focus:outline-none focus:ring-2
+                               focus:ring-gray-500 focus:ring-opacity-50
+                               transition duration-200">
+                    Check Permissions
+                </button>
+                
+                <button id="forceBtn"
+                        class="w-full bg-orange-500 text-white p-3 rounded-lg font-semibold
+                               hover:bg-orange-600 focus:outline-none focus:ring-2
+                               focus:ring-orange-500 focus:ring-opacity-50
+                               transition duration-200">
+                    Attempt Forceful Removal (No Password)
+                </button>
+            </div>
+            
+            <div id="permissionEditor" class="hidden space-y-6 pt-4 border-t border-gray-200">
+                <fieldset class="border border-gray-300 rounded-lg p-4">
+                    <legend class="text-sm font-medium text-gray-700 px-2">
+                        3. Set New Permissions
+                    </legend>
+                    <p class="text-xs text-gray-500 pb-3 px-2">Check a box to **ALLOW** that action.</p>
+                    <div class="space-y-3 mt-2">
+                        <div class="flex items-center">
+                            <input id="allowPrinting" type="checkbox"
+                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="allowPrinting" class="ml-2 block text-sm text-gray-900">
+                                Allow Printing
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="allowCopying" type="checkbox"
+                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="allowCopying" class="ml-2 block text-sm text-gray-900">
+                                Allow Copying Content
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="allowModifying" type="checkbox"
+                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="allowModifying" class="ml-2 block text-sm text-gray-900">
+                                Allow Modifying Document
+                            </LabeL>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="allowAnnotations" type="checkbox"
+                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="allowAnnotations" class="ml-2 block text-sm text-gray-900">
+                                Allow Adding Annotations
+                            </label>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <button id="applyPermsBtn"
+                        class="w-full bg-red-600 text-white p-3 rounded-lg font-semibold
+                               hover:bg-red-700 focus:outline-none focus:ring-2
+                               focus:ring-red-500 focus:ring-opacity-50
+                               transition duration-200">
+                    Apply Changes & Download
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DEFINE THE RENDER SERVER URL ---
+        const SERVER_URL = 'https://permission-263r.onrender.com';
+
+        // --- Timer variable for auto-hiding toast ---
+        let globalToastTimer;
+
+        // --- Helper function to hide the toast ---
+        function hideToast() {
+            const toast = document.getElementById('globalToast');
+            toast.classList.add('hidden');
+            if (globalToastTimer) {
+                clearTimeout(globalToastTimer);
+            }
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.innerHTML = '';
+            while (toastMessage.nextSibling) {
+                toast.removeChild(toastMessage.nextSibling);
+            }
+        }
+
+        // --- Add listener for the "X" button ---
+        document.getElementById('toastCloseBtn').addEventListener('click', hideToast);
+
+        // --- View Switching Logic (unchanged) ---
+        const mainView = document.getElementById('mainView');
+        const restrictView = document.getElementById('restrictView');
+        const unrestrictView = document.getElementById('unrestrictView');
+        const btnGoToRestrict = document.getElementById('btnGoToRestrict');
+        const btnGoToUnrestrict = document.getElementById('btnGoToUnrestrict');
+        const backBtns = document.querySelectorAll('.backBtn');
+        
+        btnGoToRestrict.addEventListener('click', () => {
+            mainView.classList.add('hidden');
+            restrictView.classList.remove('hidden');
+            hideToast();
+        });
+        
+        btnGoToUnrestrict.addEventListener('click', () => {
+            mainView.classList.add('hidden');
+            unrestrictView.classList.remove('hidden');
+            hideToast();
+            document.getElementById('permissionEditor').classList.add('hidden');
+            document.getElementById('checkPermsBtn').disabled = false;
+        });
+        
+        backBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                mainView.classList.remove('hidden');
+                restrictView.classList.add('hidden');
+                unrestrictView.classList.add('hidden');
+                hideToast();
+            });
+        });
+        
+        // --- RESTRICT LOGIC (Password Checkbox, unchanged) ---
+        const passwordInput = document.getElementById('ownerPassword');
+        const generateCheck = document.getElementById('generateOwner');
+        generateCheck.addEventListener('change', () => {
+            if (generateCheck.checked) {
+                passwordInput.disabled = true;
+                passwordInput.value = '';
+                passwordInput.placeholder = 'Will be auto-generated by server';
+            } else {
+                passwordInput.disabled = false;
+                passwordInput.placeholder = 'Enter a new password';
+            }
+        });
+
+        // --- RESTRICT LOGIC (Button Click, UPDATED) ---
+        document.getElementById('processBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('pdfFile');
+            const toast = document.getElementById('globalToast');
+            
+            if (fileInput.files.length === 0) {
+                showMessage('Please select a PDF file first.', 'error');
+                return;
+            }
+            if (!generateCheck.checked && !passwordInput.value) {
+                showMessage('Please enter a new owner password or check the "generate" box.', 'error');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const ownerPassword = passwordInput.value;
+            const generateOwner = generateCheck.checked;
+
+            showMessage('Processing... This may take a moment.', 'loading');
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('ownerPassword', ownerPassword);
+            formData.append('generateOwner', generateOwner.toString());
+            formData.append('restrictCopy', document.getElementById('restrictCopy').checked.toString());
+            formData.append('restrictPrinting', document.getElementById('restrictPrinting').checked.toString());
+            formData.append('restrictModifying', document.getElementById('restrictModifying').checked.toString());
+            formData.append('restrictAnnotations', document.getElementById('restrictAnnotations').checked.toString());
+            
+            try {
+                // This correctly calls the /restrict endpoint
+                const response = await fetch(`${SERVER_URL}/restrict`, { // <-- UPDATED URL
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || `Server error: ${response.statusText}`);
+                }
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const safeFilename = file.name.replace(/[^a-z0-9._-]/gi, '_');
+                a.download = `restricted_${safeFilename}`;
+                a.textContent = 'Download Restricted PDF';
+                a.className = 'inline-block w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700 transition duration-200 mt-4';
+                
+                showMessage('Success! Your file is ready.', 'success');
+
+                const generatedPassword = response.headers.get('X-Generated-Password');
+                if (generatedPassword) {
+                    const passwordMsg = document.createElement('div');
+                    passwordMsg.className = 'font-semibold text-red-600 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-left';
+                    passwordMsg.innerHTML = `<strong class="block">Generated Owner Password:</strong><span class="block text-lg font-mono my-2 text-center">${generatedPassword}</span><small class="text-gray-700 font-normal">(Save this! You need it to remove restrictions.)</small>`;
+                    toast.appendChild(passwordMsg);
+                }
+                toast.appendChild(a);
+
+            } catch (err) {
+                handleFetchError(err);
+            }
+        });
+
+        // --- UNRESTRICT LOGIC (STEP 1: Check Perms, UPDATED) ---
+        document.getElementById('checkPermsBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('pdfFileUnrestrict');
+            const passwordInput = document.getElementById('ownerPasswordUnrestrict');
+            const editor = document.getElementById('permissionEditor');
+
+            hideToast(); // Clear any previous messages
+
+            if (fileInput.files.length === 0) {
+                showMessage('Please select a PDF file first.', 'error');
+                return;
+            }
+            if (!passwordInput.value) {
+                showMessage('Owner password is required to check permissions.', 'error');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const ownerPassword = passwordInput.value;
+
+            showMessage('Checking permissions...', 'loading');
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('ownerPassword', ownerPassword);
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/check_permissions`, { // <-- UPDATED URL
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `Server error: ${response.statusText}`);
+                }
+
+                showMessage('Password correct. Current permissions shown below.', 'success');
+                
+                const perms = data.permissions;
+                document.getElementById('allowPrinting').checked = perms.can_print;
+                document.getElementById('allowCopying').checked = perms.can_copy;
+                document.getElementById('allowModifying').checked = perms.can_modify;
+                document.getElementById('allowAnnotations').checked = perms.can_annotate;
+
+                editor.classList.remove('hidden');
+                document.getElementById('checkPermsBtn').disabled = true;
+
+            } catch (err) {
+                handleFetchError(err);
+            }
+        });
+
+        // --- UPDATED: Event Listener for the "Force" Button ---
+        document.getElementById('forceBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('pdfFileUnrestrict');
+            if (fileInput.files.length === 0) {
+                showMessage('Please select a PDF file first.', 'error');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            showMessage('Attempting forceful removal...', 'loading');
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+
+            try {
+                // This now calls the /force_remove endpoint
+                const response = await fetch(`${SERVER_URL}/force_remove`, { // <-- UPDATED URL
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || `Server error: ${response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const safeFilename = file.name.replace(/[^a-z0-9._-]/gi, '_');
+                a.download = `unrestricted_${safeFilename}`; // Success file
+                a.textContent = 'Download Unrestricted PDF';
+                a.className = 'inline-block w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700 transition duration-200 mt-4';
+                
+                showMessage('Success! All restrictions have been stripped.', 'success');
+                document.getElementById('globalToast').appendChild(a);
+
+            } catch (err) {
+                // handleFetchError will show the error from the server,
+                // e.g., "Forceful removal failed. The file is protected by a User Password..."
+                handleFetchError(err);
+            }
+        });
+
+        // --- UNRESTRICT LOGIC (STEP 2: Apply Perms, UPDATED) ---
+        document.getElementById('applyPermsBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('pdfFileUnrestrict');
+            const passwordInput = document.getElementById('ownerPasswordUnrestrict');
+            const toast = document.getElementById('globalToast');
+
+            const file = fileInput.files[0];
+            const ownerPassword = passwordInput.value;
+
+            showMessage('Applying changes...', 'loading');
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+            formData.append('ownerPassword', ownerPassword);
+            
+            formData.append('allowPrinting', document.getElementById('allowPrinting').checked.toString());
+            formData.append('allowCopying', document.getElementById('allowCopying').checked.toString());
+            formData.append('allowModifying', document.getElementById('allowModifying').checked.toString());
+            formData.append('allowAnnotations', document.getElementById('allowAnnotations').checked.toString());
+
+            try {
+                const response = await fetch(`${SERVER_URL}/update_permissions`, { // <-- UPDATED URL
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || `Server error: ${response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const safeFilename = file.name.replace(/[^a-z0-9._-]/gi, '_');
+                a.download = `updated_${safeFilename}`;
+                a.textContent = 'Download Updated PDF';
+                a.className = 'inline-block w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700 transition duration-200 mt-4';
+                
+                showMessage('Success! File updated.', 'success');
+                toast.appendChild(a);
+
+            } catch (err) {
+                handleFetchError(err);
+            }
+        });
+
+
+        // --- HELPER FUNCTION (showMessage, MODIFIED) ---
+        
+        function showMessage(message, type) {
+            const toast = document.getElementById('globalToast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            // Clear any old timer
+            if (globalToastTimer) {
+                clearTimeout(globalToastTimer);
+            }
+
+            // Clear old content (like download links)
+            while (toastMessage.nextSibling) {
+                toast.removeChild(toastMessage.nextSibling);
+            }
+            
+            // Set new message
+            toastMessage.innerHTML = `<p class="font-medium text-center">${message}</p>`;
+            
+            // Reset colors
+            toast.classList.remove('bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-blue-100', 'text-blue-700');
+
+            // Apply new colors
+            if (type === 'error') {
+                toast.classList.add('bg-red-100', 'text-red-700');
+            } else if (type === 'success') {
+                toast.classList.add('bg-green-100', 'text-green-700');
+            } else if (type === 'loading') {
+                toast.classList.add('bg-blue-100', 'text-blue-700');
+            }
+            
+            // Show the toast
+            toast.classList.remove('hidden');
+            
+            // Auto-hide for error or loading messages after 5 seconds
+            if (type === 'error' || type === 'loading') {
+                globalToastTimer = setTimeout(() => {
+                    // Only hide if it's still showing the same message
+                    if(toastMessage.innerHTML.includes(message)) {
+                       hideToast();
+                    }
+                }, 5000); // 5-second timeout
+            }
+            // Success messages stay visible until "X" is clicked.
+        }
+        
+        // --- HELPER FUNCTION (handleFetchError, unchanged) ---
+        function handleFetchError(err) {
+            console.error(err);
+            const msg = err.message;
+            if (msg.includes('Failed to fetch')) {
+                // This is the most common error - server is down or CORS issue
+                showMessage('Error: Could not connect to the server. Please check the URL and server status.', 'error');
+            } else if (msg.includes('This file is already restricted') || 
+                       msg.includes('Incorrect owner password') ||
+                       msg.includes('Forceful removal failed')) { // Catch new error
+                showMessage(`Error: ${msg}`, 'error');
+            } else {
+                showMessage(`An error occurred: ${msg}`, 'error');
+            }
+        }
+    </script>
+
+</body>
+</html>

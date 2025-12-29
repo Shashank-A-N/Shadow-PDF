@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Drop</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- QRCode.js (with fallback) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {
+            background-color: #0f172a; /* slate-900 */
+            color: #e2e8f0; /* slate-200 */
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .burn-container { position: relative; display: inline-block; }
+        .ash {
+            position: absolute; background: #475569; width: 4px; height: 4px;
+            border-radius: 50%; animation: ash-float 1.5s ease-out forwards;
+        }
+        @keyframes ash-float {
+            0% { transform: translateY(0) scale(1); opacity: 0.8; }
+            100% { transform: translateY(-40px) translateX(var(--move-x)) scale(0); opacity: 0; }
+        }
+
+        .progress-bar { transition: width 0.3s ease; }
+        #qrcode img { margin: 0 auto; border: 4px solid white; border-radius: 8px; }
+        
+        /* Disabled state for drop zone */
+        input:disabled ~ #drop-zone {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #1e293b; 
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md bg-slate-800 rounded-xl shadow-2xl border border-slate-700 p-8 text-center relative overflow-hidden">
+        
+        <!-- View: System Check (Diagnostic) -->
+        <div id="view-system-check" class="hidden">
+            <i data-lucide="alert-triangle" class="w-12 h-12 text-yellow-500 mx-auto mb-4"></i>
+            <h1 class="text-xl font-bold text-white mb-2">System Error</h1>
+            <p id="system-error-msg" class="text-red-400 text-sm bg-red-900/20 p-4 rounded text-left font-mono"></p>
+        </div>
+
+        <!-- View: Loading -->
+        <div id="view-loading" class="fade-in hidden">
+            <i data-lucide="loader-2" class="w-12 h-12 text-blue-500 animate-spin mx-auto"></i>
+            <p id="loading-text" class="mt-4 text-slate-400">Establishing secure connection...</p>
+        </div>
+
+        <!-- View: Upload -->
+        <div id="view-upload" class="hidden fade-in">
+            <div class="mb-6">
+                <div class="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="shield-check" class="w-6 h-6 text-blue-400"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white">Secure Drop</h1>
+                <p class="text-slate-400 text-sm mt-2">
+                    End-to-End Encrypted. <br/>File vanishes after one download or 24 hours.
+                </p>
+            </div>
+
+            <div id="upload-input-section" class="space-y-4">
+                <div class="relative group">
+                    <input type="file" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-600 rounded-xl p-8 transition-all duration-300 hover:border-blue-400 hover:bg-slate-700/50">
+                        <div id="file-placeholder">
+                            <p class="text-slate-300 font-medium">Click to select file</p>
+                            <p class="text-xs text-slate-500 mt-1">Max 600KB (Browser Limit)</p>
+                        </div>
+                        <div id="file-selected" class="hidden">
+                            <i data-lucide="file" class="w-8 h-8 text-blue-400 mx-auto mb-2"></i>
+                            <div class="text-green-400 font-medium truncate max-w-[200px] mx-auto" id="filename-display"></div>
+                            <div class="text-xs text-slate-500 mt-1" id="filesize-display"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-left">
+                    <label class="text-xs text-slate-400 font-semibold uppercase ml-1">Password Protection (Optional)</label>
+                    <div class="relative mt-1">
+                        <input type="password" id="upload-password" placeholder="Enter a password for 2FA" 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-10 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                        
+                        <i data-lucide="lock" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+                        
+                        <button id="toggle-password-btn" type="button" class="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 focus:outline-none">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="progress-container" class="hidden w-full bg-slate-700 rounded-full h-2.5 mb-4">
+                    <div id="progress-fill" class="bg-blue-600 h-2.5 rounded-full progress-bar" style="width: 0%"></div>
+                </div>
+
+                <div id="error-message" class="hidden flex items-start justify-center gap-2 text-red-400 text-sm bg-red-400/10 p-2 rounded text-left">
+                    <i data-lucide="alert-circle" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                    <span id="error-text"></span>
+                </div>
+
+                <button id="upload-btn" disabled class="w-full py-3 px-4 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-200 bg-slate-700 text-slate-500 cursor-not-allowed">
+                    Select a File
+                </button>
+                
+                <!-- Cancel Button (Hidden by default) -->
+                <button id="cancel-upload-btn" class="hidden w-full py-2 px-4 rounded-lg font-semibold text-sm text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors border border-transparent hover:border-red-900/30">
+                    Cancel Upload
+                </button>
+            </div>
+
+            <div id="upload-result-section" class="hidden animate-in fade-in slide-in-from-bottom-4 duration-500 text-left">
+                <div id="sender-status" class="flex items-center justify-center gap-2 mb-4 py-2 bg-yellow-500/10 text-yellow-500 rounded text-sm animate-pulse">
+                    <i data-lucide="radar" class="w-4 h-4"></i>
+                    <span>Waiting for pickup...</span>
+                </div>
+
+                <div class="bg-slate-900 p-4 rounded-lg border border-green-500/30 mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-xs text-green-400 font-bold uppercase tracking-wider">Ready to Share</p>
+                        <span id="security-badge" class="text-[10px] bg-blue-900 text-blue-200 px-2 py-0.5 rounded border border-blue-800">AES-256</span>
+                    </div>
+                    <div id="share-link" class="break-all text-sm text-slate-300 font-mono select-all cursor-text bg-slate-950 p-2 rounded border border-slate-800 hidden"></div>
+                    
+                    <div id="qrcode" class="flex justify-center my-4"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <button id="copy-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm">
+                        <i data-lucide="copy" class="w-4 h-4"></i> Copy Link
+                    </button>
+                    <button onclick="window.location.reload()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm">
+                        <i data-lucide="plus" class="w-4 h-4"></i> New Drop
+                    </button>
+                </div>
+                
+                <button id="revoke-btn" class="w-full bg-red-900/50 hover:bg-red-900/80 border border-red-900 text-red-200 font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Revoke Link (Delete Immediately)
+                </button>
+
+                <p class="text-xs text-slate-500 mt-4 text-center">Keep tab open for notifications.</p>
+            </div>
+        </div>
+
+        <!-- View: Password Prompt -->
+        <div id="view-password" class="hidden fade-in">
+            <i data-lucide="lock" class="w-12 h-12 text-yellow-500 mx-auto mb-4"></i>
+            <h1 class="text-xl font-bold text-white mb-2">Password Protected</h1>
+            <p class="text-slate-400 text-sm mb-4">The sender secured this file with a password.</p>
+            <input type="password" id="download-password-input" placeholder="Enter Password" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-slate-200 text-sm mb-4 focus:outline-none focus:border-blue-500">
+            <button id="unlock-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                Unlock & Download
+            </button>
+        </div>
+
+        <!-- View: Download Progress -->
+        <div id="view-download" class="hidden fade-in">
+            <i data-lucide="download-cloud" class="w-12 h-12 text-green-500 animate-bounce mx-auto mb-4"></i>
+            <h1 class="text-xl font-bold text-white mb-2">Secure Drop Found</h1>
+            <p id="download-status" class="text-slate-400 text-sm">Authenticating...</p>
+            <div class="w-full bg-slate-700 rounded-full h-1.5 mt-4 max-w-[200px] mx-auto">
+                <div id="download-progress" class="bg-green-500 h-1.5 rounded-full progress-bar w-0"></div>
+            </div>
+        </div>
+
+        <!-- View: Success -->
+        <div id="view-success" class="hidden fade-in">
+            <div class="mb-6 relative inline-block burn-container" id="burn-icon">
+                <div class="absolute inset-0 bg-orange-500 blur-xl opacity-20 rounded-full"></div>
+                <i data-lucide="flame" class="w-16 h-16 text-orange-500 relative z-10"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white mb-2">File Destroyed</h1>
+            <p class="text-slate-400 mb-6">The content has been downloaded and deleted.</p>
+            <div class="p-4 bg-slate-900/50 rounded-lg text-sm text-slate-500 border border-slate-700/50">Link is now invalid.</div>
+        </div>
+
+        <!-- View: 404 -->
+        <div id="view-404" class="hidden fade-in">
+            <i data-lucide="file-x" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
+            <h1 class="text-2xl font-bold text-white mb-2">Drop Not Found</h1>
+            <p id="error-404-text" class="text-slate-400 mb-6">File self-destructed or never existed.</p>
+            <a href="?" class="inline-block bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded-lg transition-colors">Create New Drop</a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, doc, getDoc, deleteDoc, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        // --- System Check ---
+        function runSystemCheck() {
+            if (!window.crypto || !window.crypto.subtle) {
+                showSystemError("SECURITY ERROR: Encryption API missing.\n\nBrowser requires HTTPS or Localhost.");
+                return false;
+            }
+            return true;
+        }
+
+        function showSystemError(msg) {
+            ['view-loading', 'view-upload'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById('view-system-check').classList.remove('hidden');
+            document.getElementById('system-error-msg').innerText = msg;
+            lucide.createIcons();
+        }
+
+        // --- Configuration ---
+        let firebaseConfig;
+        let appId = 'default-app-id';
+        let isEnvConfig = false;
+        const DROPS_COLLECTION = 'drops';
+
+        const userProvidedConfig = {
+            apiKey: "AIzaSyDOFNeEl8rHsfTz-4TGBpYBAq2ukY1awJ0",
+            authDomain: "manga-reader-30320.firebaseapp.com",
+            projectId: "manga-reader-30320",
+            storageBucket: "manga-reader-30320.firebasestorage.app",
+            messagingSenderId: "2604892274",
+            appId: "1:2604892274:web:ccbb92a3e638f23a8442eb",
+            measurementId: "G-PMJPMS181B"
+        };
+
+        if (typeof __firebase_config !== 'undefined') {
+            firebaseConfig = JSON.parse(__firebase_config);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            isEnvConfig = true;
+        } else {
+            firebaseConfig = userProvidedConfig;
+        }
+
+        // Initialize
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let selectedFile = null;
+        let isAuthReady = false;
+        let currentDropRef = null; 
+        let isUploadCancelled = false; // Flag for cancellation
+
+        // --- Encryption Logic ---
+        const CryptoUtils = {
+            generateKey: async () => window.crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]),
+            exportKey: async (key) => JSON.stringify(await window.crypto.subtle.exportKey("jwk", key)),
+            importKey: async (jwkString) => window.crypto.subtle.importKey("jwk", JSON.parse(jwkString), { name: "AES-GCM" }, true, ["encrypt", "decrypt"]),
+            encrypt: async (data, key) => {
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                const encrypted = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, data);
+                return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
+            },
+            decrypt: async (encryptedObj, key) => {
+                return await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(encryptedObj.iv) }, key, new Uint8Array(encryptedObj.data));
+            },
+            deriveKeyFromPassword: async (password, salt) => {
+                const enc = new TextEncoder();
+                const keyMaterial = await window.crypto.subtle.importKey("raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]);
+                return await window.crypto.subtle.deriveKey(
+                    { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+                    keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+                );
+            }
+        };
+
+        // --- UI Helpers ---
+        function showView(viewId) {
+            ['view-loading', 'view-upload', 'view-password', 'view-download', 'view-success', 'view-404', 'view-system-check'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-message');
+            const text = document.getElementById('error-text');
+            if (msg) {
+                el.classList.remove('hidden');
+                text.textContent = msg;
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function setUploadProgress(width) {
+            document.getElementById('progress-fill').style.width = `${width}%`;
+        }
+        
+        function setStatus(text, progress = 0) {
+            const statusEl = document.getElementById('download-status');
+            const bar = document.getElementById('download-progress');
+            if (statusEl) statusEl.textContent = text;
+            if (bar) bar.style.width = `${progress}%`;
+        }
+
+        function generateQR(url) {
+            try {
+                const container = document.getElementById('qrcode');
+                container.innerHTML = '';
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(container, { text: url, width: 128, height: 128 });
+                } else {
+                    console.warn("QR Library not loaded.");
+                }
+            } catch (e) { console.error("QR Error", e); }
+        }
+
+        function triggerBurnEffect() {
+            const container = document.getElementById('burn-icon');
+            if(!container) return;
+            container.innerHTML = '';
+            const flameIcon = document.createElement('i');
+            flameIcon.setAttribute('data-lucide', 'flame');
+            flameIcon.className = "w-16 h-16 text-orange-500 relative z-10";
+            container.appendChild(flameIcon);
+            if(window.lucide) lucide.createIcons();
+            const glow = document.createElement('div');
+            glow.className = "absolute inset-0 bg-orange-500 blur-xl opacity-20 rounded-full";
+            container.appendChild(glow);
+            for(let i=0; i<20; i++) {
+                const ash = document.createElement('div');
+                ash.classList.add('ash');
+                ash.style.setProperty('--move-x', `${(Math.random() - 0.5) * 100}px`);
+                ash.style.left = '50%';
+                ash.style.top = '50%';
+                container.appendChild(ash);
+            }
+        }
+
+        // --- Main Logic ---
+        async function init() {
+            if (!runSystemCheck()) return;
+
+            const params = new URLSearchParams(window.location.search);
+            const dropId = params.get('id');
+
+            if (!dropId) showView('view-upload');
+            else showView('view-loading');
+
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                isAuthReady = !!user;
+                if (user) {
+                    if (dropId) checkDrop(dropId);
+                    else updateFileUI();
+                }
+            });
+
+            // Auth Start
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    if (!auth.currentUser) await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth Failed", err);
+                if (dropId) showError("Auth Failed: " + err.message);
+            }
+        }
+
+        // Upload Logic
+        const fileInput = document.getElementById('file-input');
+        const uploadBtn = document.getElementById('upload-btn');
+        const cancelBtn = document.getElementById('cancel-upload-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const revokeBtn = document.getElementById('revoke-btn');
+        
+        // Password Toggle Logic
+        const togglePwdBtn = document.getElementById('toggle-password-btn');
+        const pwdInput = document.getElementById('upload-password');
+        
+        togglePwdBtn.addEventListener('click', () => {
+            const type = pwdInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            pwdInput.setAttribute('type', type);
+            // Toggle icon
+            togglePwdBtn.innerHTML = type === 'password' ? 
+                '<i data-lucide="eye" class="w-4 h-4"></i>' : 
+                '<i data-lucide="eye-off" class="w-4 h-4"></i>';
+            if(window.lucide) lucide.createIcons();
+        });
+
+        fileInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
+
+        function handleFileSelect(file) {
+            if (!file) return;
+            if (file.size > 600 * 1024) {
+                showError("File too large. Limit is 600KB.");
+                selectedFile = null;
+            } else {
+                showError('');
+                selectedFile = file;
+            }
+            updateFileUI();
+        }
+
+        function updateFileUI() {
+            const placeholder = document.getElementById('file-placeholder');
+            const selected = document.getElementById('file-selected');
+            const nameDisplay = document.getElementById('filename-display');
+            const sizeDisplay = document.getElementById('filesize-display');
+            const dropZone = document.getElementById('drop-zone');
+
+            if (selectedFile) {
+                placeholder.classList.add('hidden');
+                selected.classList.remove('hidden');
+                dropZone.classList.add('border-green-500/50', 'bg-green-500/5');
+                nameDisplay.textContent = selectedFile.name;
+                sizeDisplay.textContent = (selectedFile.size / 1024).toFixed(1) + ' KB';
+                
+                if (!isAuthReady) {
+                    uploadBtn.disabled = true;
+                    uploadBtn.innerHTML = `Connecting...`;
+                    uploadBtn.classList.add('cursor-not-allowed');
+                } else {
+                    uploadBtn.disabled = false;
+                    uploadBtn.innerHTML = `Create Secure Drop`;
+                    uploadBtn.classList.add('bg-blue-600', 'text-white');
+                    uploadBtn.classList.remove('bg-slate-700', 'text-slate-500', 'cursor-not-allowed'); // FIX: remove cursor-not-allowed
+                    uploadBtn.classList.add('cursor-pointer'); // Explicitly add pointer
+                }
+            } else {
+                placeholder.classList.remove('hidden');
+                selected.classList.add('hidden');
+                dropZone.classList.remove('border-green-500/50', 'bg-green-500/5');
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = `Select a File`;
+                uploadBtn.classList.remove('bg-blue-600', 'text-white', 'cursor-pointer');
+                uploadBtn.classList.add('bg-slate-700', 'text-slate-500', 'cursor-not-allowed');
+                fileInput.value = ''; 
+            }
+        }
+
+        function getDropsCollection() {
+            return isEnvConfig ? collection(db, 'artifacts', appId, 'public', 'data', DROPS_COLLECTION) : collection(db, DROPS_COLLECTION);
+        }
+
+        // Timeout wrapper for promises
+        function timeoutPromise(ms, promise) {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    reject(new Error("Timeout: Database is not responding. Check Firewall/Network."));
+                }, ms);
+                promise
+                    .then(value => { clearTimeout(timer); resolve(value); })
+                    .catch(reason => { clearTimeout(timer); reject(reason); });
+            });
+        }
+
+        // Cancel Handler
+        cancelBtn.addEventListener('click', () => {
+            isUploadCancelled = true;
+            // UI Reset is handled in the catch block of uploadBtn or here directly
+            cancelBtn.textContent = "Cancelling...";
+            cancelBtn.disabled = true;
+        });
+
+        uploadBtn.addEventListener('click', async () => {
+            if (!selectedFile || !currentUser) return;
+            const password = pwdInput.value;
+
+            // Reset cancel state
+            isUploadCancelled = false;
+            cancelBtn.classList.remove('hidden');
+            cancelBtn.textContent = "Cancel Upload";
+            cancelBtn.disabled = false;
+
+            fileInput.disabled = true;
+            pwdInput.disabled = true;
+
+            uploadBtn.disabled = true;
+            document.getElementById('progress-container').classList.remove('hidden');
+            
+            try {
+                if(isUploadCancelled) throw new Error("Cancelled by user");
+
+                uploadBtn.textContent = "Generating Keys...";
+                setUploadProgress(10);
+                const masterKey = await CryptoUtils.generateKey();
+                const masterKeyString = await CryptoUtils.exportKey(masterKey);
+
+                if(isUploadCancelled) throw new Error("Cancelled by user");
+
+                uploadBtn.textContent = "Reading File...";
+                setUploadProgress(30);
+                const fileBuffer = await selectedFile.arrayBuffer();
+
+                if(isUploadCancelled) throw new Error("Cancelled by user");
+
+                uploadBtn.textContent = "Encrypting...";
+                setUploadProgress(50);
+                const encryptedFile = await CryptoUtils.encrypt(fileBuffer, masterKey);
+
+                if(isUploadCancelled) throw new Error("Cancelled by user");
+
+                let storedKeyData = null;
+                let urlHash = "";
+                
+                if (password) {
+                    uploadBtn.textContent = "Securing Key...";
+                    setUploadProgress(70);
+                    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+                    const passKey = await CryptoUtils.deriveKeyFromPassword(password, salt);
+                    const enc = new TextEncoder();
+                    const wrappedKey = await CryptoUtils.encrypt(enc.encode(masterKeyString), passKey);
+                    storedKeyData = { iv: wrappedKey.iv, data: wrappedKey.data, salt: Array.from(salt) };
+                } else {
+                    urlHash = encodeURIComponent(masterKeyString);
+                }
+
+                if(isUploadCancelled) throw new Error("Cancelled by user");
+
+                uploadBtn.textContent = "Uploading...";
+                setUploadProgress(85);
+
+                // FIX: Add Timeout to Firestore Call - 30 seconds
+                // If Cancel is clicked during this await, we handle it after resolution
+                const docRef = await timeoutPromise(30000, addDoc(getDropsCollection(), {
+                    name: selectedFile.name,
+                    iv: encryptedFile.iv,
+                    data: encryptedFile.data,
+                    is_protected: !!password,
+                    key_envelope: storedKeyData,
+                    created_by: currentUser.uid,
+                    created_at: serverTimestamp()
+                }));
+                
+                // RACE CONDITION: User cancelled while upload was sending
+                if(isUploadCancelled) {
+                    await deleteDoc(docRef);
+                    throw new Error("Cancelled by user");
+                }
+
+                currentDropRef = docRef;
+
+                setUploadProgress(100);
+                const link = `${window.location.origin}${window.location.pathname}?id=${docRef.id}${urlHash ? '#' + urlHash : ''}`;
+                document.getElementById('share-link').textContent = link;
+                
+                generateQR(link);
+
+                const badge = document.getElementById('security-badge');
+                if (password) {
+                    badge.textContent = "Password Protected";
+                    badge.className = "text-[10px] bg-yellow-900 text-yellow-200 px-2 py-0.5 rounded border border-yellow-800";
+                } else {
+                    badge.textContent = "AES-256";
+                    badge.className = "text-[10px] bg-blue-900 text-blue-200 px-2 py-0.5 rounded border border-blue-800";
+                }
+
+                document.getElementById('upload-input-section').classList.add('hidden');
+                document.getElementById('upload-result-section').classList.remove('hidden');
+
+                const unsubscribe = onSnapshot(docRef, (doc) => {
+                    if (!doc.exists()) {
+                        const status = document.getElementById('sender-status');
+                        status.className = "flex items-center justify-center gap-2 mb-4 py-2 bg-green-500/10 text-green-500 rounded text-sm";
+                        status.innerHTML = `<span>File Destroyed / Revoked!</span>`;
+                        document.getElementById('copy-btn').disabled = true;
+                        document.getElementById('copy-btn').classList.add('opacity-50');
+                        revokeBtn.classList.add('hidden'); 
+                    }
+                });
+                
+                revokeBtn.onclick = async () => {
+                    if (confirm("Are you sure? This will permanently delete the file and the link will stop working.")) {
+                        revokeBtn.textContent = "Deleting...";
+                        revokeBtn.disabled = true;
+                        try {
+                            await deleteDoc(currentDropRef);
+                        } catch (e) {
+                            alert("Failed to revoke: " + e.message);
+                            revokeBtn.textContent = "Revoke Link";
+                            revokeBtn.disabled = false;
+                        }
+                    }
+                };
+
+            } catch (err) {
+                console.error(err);
+                if (err.message !== "Cancelled by user") {
+                    if (err.code === 'permission-denied') showError("Permission Denied: Check Firebase Rules.");
+                    else showError("Error: " + err.message);
+                }
+                
+                // RESET STATE
+                updateFileUI(); // Re-enables main button
+                fileInput.disabled = false;
+                pwdInput.disabled = false;
+                document.getElementById('progress-container').classList.add('hidden');
+                cancelBtn.classList.add('hidden');
+            }
+        });
+
+        // Copy Button
+        copyBtn.addEventListener('click', () => {
+            const text = document.getElementById('share-link').textContent;
+            navigator.clipboard.writeText(text);
+            const original = copyBtn.innerHTML;
+            copyBtn.textContent = "Copied!";
+            copyBtn.classList.add('bg-green-600');
+            setTimeout(() => {
+                copyBtn.innerHTML = original;
+                copyBtn.classList.remove('bg-green-600');
+                if(window.lucide) lucide.createIcons();
+            }, 2000);
+        });
+
+        // Download Logic
+        async function checkDrop(dropId) {
+            const hash = window.location.hash.substring(1); 
+            
+            try {
+                const docRef = isEnvConfig ? doc(db, 'artifacts', appId, 'public', 'data', DROPS_COLLECTION, dropId) : doc(db, DROPS_COLLECTION, dropId);
+                const docSnap = await getDoc(docRef);
+
+                if (!docSnap.exists()) {
+                    showView('view-404');
+                    return;
+                }
+
+                const data = docSnap.data();
+                const now = Date.now();
+                const createdTime = data.created_at ? data.created_at.toMillis() : now;
+                
+                if (now - createdTime > 24 * 60 * 60 * 1000) {
+                    await deleteDoc(docRef);
+                    document.getElementById('error-404-text').textContent = "This drop has expired (24h limit).";
+                    showView('view-404');
+                    return;
+                }
+
+                if (data.is_protected) {
+                    showView('view-password');
+                    document.getElementById('unlock-btn').onclick = async () => {
+                        const pw = document.getElementById('download-password-input').value;
+                        if(!pw) return;
+                        document.getElementById('unlock-btn').textContent = "Unlocking...";
+                        await handleDecryption(docRef, data, null, pw);
+                    };
+                } else {
+                    if (!hash) { showError("Missing Key in URL"); showView('view-404'); return; }
+                    showView('view-download');
+                    await handleDecryption(docRef, data, decodeURIComponent(hash), null);
+                }
+
+            } catch (err) {
+                console.error(err);
+                showView('view-404');
+            }
+        }
+
+        async function handleDecryption(docRef, data, keyString, password) {
+            try {
+                let masterKey;
+                if (password) {
+                    setStatus('Deriving key...', 20);
+                    const salt = new Uint8Array(data.key_envelope.salt);
+                    const passKey = await CryptoUtils.deriveKeyFromPassword(password, salt);
+                    try {
+                        const decryptedKeyBuffer = await CryptoUtils.decrypt({ iv: data.key_envelope.iv, data: data.key_envelope.data }, passKey);
+                        masterKey = await CryptoUtils.importKey(new TextDecoder().decode(decryptedKeyBuffer));
+                    } catch(e) {
+                        alert("Incorrect Password");
+                        document.getElementById('unlock-btn').textContent = "Unlock & Download";
+                        return;
+                    }
+                } else {
+                    masterKey = await CryptoUtils.importKey(keyString);
+                }
+
+                setStatus('Decrypting file...', 50);
+                const decryptedBuffer = await CryptoUtils.decrypt({ iv: data.iv, data: data.data }, masterKey);
+
+                setStatus('Downloading...', 80);
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(new Blob([decryptedBuffer]));
+                link.download = data.name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                setStatus('Deleting...', 100);
+                await deleteDoc(docRef);
+                showView('view-success');
+                triggerBurnEffect();
+
+            } catch (err) {
+                console.error(err);
+                alert("Decryption Failed.");
+                showView('view-404');
+            }
+        }
+
+        init();
+        if(window.lucide) lucide.createIcons();
+    </script>
+</body>
+</html>

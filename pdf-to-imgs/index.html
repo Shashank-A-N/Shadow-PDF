@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Image Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF.js library from Mozilla -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <!-- JSZip library for creating ZIP files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <!-- FileSaver.js for saving the ZIP file -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for better UI feedback */
+        .file-input-label {
+            transition: all 0.2s ease-in-out;
+        }
+        .file-input-label:hover {
+            background-color: #4f46e5;
+            color: white;
+        }
+        #image-output img {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.5rem;
+            transition: transform 0.2s ease-in-out;
+        }
+        #image-output img:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">PDF to Image Converter</h1>
+            <p class="mt-2 text-md sm:text-lg text-gray-600">Extract every page from your PDF into high-quality images.</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="bg-white p-6 sm:p-8 rounded-xl shadow-lg">
+            
+            <!-- Step 1: Upload PDF -->
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-3 text-gray-700">Step 1: Choose a PDF File</h2>
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <input type="file" id="pdf-input" class="hidden" accept="application/pdf">
+                    <label for="pdf-input" class="file-input-label cursor-pointer bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md inline-block">
+                        Select PDF
+                    </label>
+                    <p id="file-name" class="mt-3 text-gray-500">No file selected.</p>
+                </div>
+            </div>
+
+            <!-- Step 2: Configure and Convert -->
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-3 text-gray-700">Step 2: Set Options & Convert</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                    <div>
+                        <label for="image-format" class="block text-sm font-medium text-gray-700 mb-1">Image Format</label>
+                        <select id="image-format" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="image/jpeg">JPG</option>
+                            <option value="image/png" selected>PNG</option>
+                            <option value="image/webp">WEBP</option>
+                        </select>
+                    </div>
+                    <button id="convert-btn" class="w-full bg-green-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                        Convert to Images
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status & Progress -->
+            <div id="status-container" class="hidden my-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <p id="status-text" class="text-blue-800 text-center"></p>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Step 3: View and Download -->
+            <div id="output-section" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-700">Step 3: Your Images</h2>
+                    <button id="download-zip-btn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Download All (.zip)
+                    </button>
+                </div>
+                <div id="image-output" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-lg">
+                    <!-- Images will be inserted here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Set the workerSrc for PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+        // DOM Elements
+        const pdfInput = document.getElementById('pdf-input');
+        const fileNameDisplay = document.getElementById('file-name');
+        const convertBtn = document.getElementById('convert-btn');
+        const imageFormatSelect = document.getElementById('image-format');
+        const statusContainer = document.getElementById('status-container');
+        const statusText = document.getElementById('status-text');
+        const progressBar = document.getElementById('progress-bar');
+        const outputSection = document.getElementById('output-section');
+        const imageOutput = document.getElementById('image-output');
+        const downloadZipBtn = document.getElementById('download-zip-btn');
+
+        let pdfFile = null;
+        let convertedImages = [];
+
+        // Event Listeners
+        pdfInput.addEventListener('change', handlePdfUpload);
+        convertBtn.addEventListener('click', convertPdfToImages);
+        downloadZipBtn.addEventListener('click', downloadImagesAsZip);
+
+        /**
+         * Handles the PDF file upload event.
+         */
+        function handlePdfUpload(event) {
+            pdfFile = event.target.files[0];
+            if (pdfFile && pdfFile.type === 'application/pdf') {
+                fileNameDisplay.textContent = `Selected: ${pdfFile.name}`;
+                convertBtn.disabled = false;
+                resetOutput();
+            } else {
+                pdfFile = null;
+                fileNameDisplay.textContent = 'Invalid file. Please select a PDF.';
+                convertBtn.disabled = true;
+            }
+        }
+
+        /**
+         * Resets the output and status areas.
+         */
+        function resetOutput() {
+            outputSection.classList.add('hidden');
+            imageOutput.innerHTML = '';
+            statusContainer.classList.add('hidden');
+            progressBar.style.width = '0%';
+            convertedImages = [];
+        }
+
+        /**
+         * Main function to convert the selected PDF to images.
+         */
+        async function convertPdfToImages() {
+            if (!pdfFile) return;
+
+            resetOutput();
+            statusContainer.classList.remove('hidden');
+            convertBtn.disabled = true;
+
+            const fileReader = new FileReader();
+
+            fileReader.onload = async function() {
+                const typedarray = new Uint8Array(this.result);
+                try {
+                    const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                    const numPages = pdf.numPages;
+                    statusText.textContent = `Converting ${numPages} page(s)...`;
+
+                    for (let i = 1; i <= numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 }); // Increase scale for better quality
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        const renderContext = {
+                            canvasContext: context,
+                            viewport: viewport
+                        };
+                        await page.render(renderContext).promise;
+
+                        const format = imageFormatSelect.value;
+                        const quality = format === 'image/jpeg' ? 0.92 : undefined;
+                        const imageDataUrl = canvas.toDataURL(format, quality);
+                        
+                        convertedImages.push({
+                            name: `page_${i}.${format.split('/')[1]}`,
+                            dataUrl: imageDataUrl
+                        });
+
+                        displayImage(imageDataUrl, i);
+                        
+                        // Update progress
+                        const progress = (i / numPages) * 100;
+                        progressBar.style.width = `${progress}%`;
+                    }
+
+                    statusText.textContent = 'Conversion complete!';
+                    outputSection.classList.remove('hidden');
+                } catch (error) {
+                    console.error('Error converting PDF:', error);
+                    statusText.textContent = 'Failed to convert PDF. Please check the file and try again.';
+                    progressBar.style.backgroundColor = 'red';
+                } finally {
+                    convertBtn.disabled = false;
+                }
+            };
+
+            fileReader.readAsArrayBuffer(pdfFile);
+        }
+
+        /**
+         * Displays a single converted image in the output grid.
+         * @param {string} dataUrl - The base64 data URL of the image.
+         * @param {number} pageNum - The page number of the image.
+         */
+        function displayImage(dataUrl, pageNum) {
+            const format = imageFormatSelect.value.split('/')[1];
+            const div = document.createElement('div');
+            div.className = 'relative group';
+            
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            img.alt = `Page ${pageNum}`;
+            img.className = 'w-full h-auto object-cover rounded-lg border border-gray-200';
+
+            const downloadLink = document.createElement('a');
+            downloadLink.href = dataUrl;
+            downloadLink.download = `page_${pageNum}.${format}`;
+            downloadLink.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>`;
+            downloadLink.className = 'absolute top-2 right-2 bg-white/70 p-1.5 rounded-full text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-sm';
+            downloadLink.title = 'Download this image';
+
+            div.appendChild(img);
+            div.appendChild(downloadLink);
+            imageOutput.appendChild(div);
+        }
+
+        /**
+         * Creates a ZIP file of all converted images and initiates download.
+         */
+        async function downloadImagesAsZip() {
+            if (convertedImages.length === 0) return;
+
+            statusText.textContent = 'Zipping files... Please wait.';
+            statusContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+
+            const zip = new JSZip();
+            
+            for (let i = 0; i < convertedImages.length; i++) {
+                const image = convertedImages[i];
+                // Remove the data URL prefix to get the pure base64 string
+                const base64Data = image.dataUrl.split(',')[1];
+                zip.file(image.name, base64Data, { base64: true });
+                
+                const progress = ((i + 1) / convertedImages.length) * 100;
+                progressBar.style.width = `${progress}%`;
+            }
+
+            try {
+                const content = await zip.generateAsync({ type: 'blob' });
+                const zipFileName = `${pdfFile.name.replace('.pdf', '')}.zip`;
+                saveAs(content, zipFileName);
+                statusText.textContent = 'ZIP file created and download started.';
+            } catch (error) {
+                console.error('Error creating ZIP file:', error);
+                statusText.textContent = 'Failed to create ZIP file.';
+            }
+        }
+    </script>
+
+</body>
+</html>

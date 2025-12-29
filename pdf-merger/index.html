@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Merger</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- pdf-lib for PDF manipulation -->
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <!-- SortableJS for drag-and-drop reordering -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the file list items during drag operation */
+        .sortable-ghost {
+            background: #c0e3ff;
+            opacity: 0.7;
+        }
+        .sortable-drag {
+            opacity: 1 !important;
+        }
+        /* Custom transition for smooth UI updates */
+        .transition-all {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">PDF Merger</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-2">Combine up to 10 PDFs into one file. Drag to reorder.</p>
+        </div>
+
+        <!-- File Upload Area -->
+        <div id="upload-area" class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all">
+            <input type="file" id="file-input" multiple accept="application/pdf" class="hidden">
+            <div class="flex flex-col items-center">
+                <i class="fas fa-cloud-upload-alt text-5xl text-gray-400 dark:text-gray-500 mb-4"></i>
+                <p class="font-semibold text-gray-700 dark:text-gray-300">Drag & drop files here or <span class="text-blue-500 dark:text-blue-400 font-bold">click to browse</span></p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Maximum 10 files</p>
+            </div>
+        </div>
+
+        <!-- File List -->
+        <div id="file-list-container" class="mt-6 hidden">
+            <h2 class="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Your Files:</h2>
+            <ul id="file-list" class="space-y-2">
+                <!-- File items will be injected here by JavaScript -->
+            </ul>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="mt-8 flex flex-col sm:flex-row gap-4">
+            <button id="merge-btn" disabled class="w-full flex-1 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none transition-all flex items-center justify-center gap-2">
+                <i class="fas fa-compress-arrows-alt"></i>
+                <span>Merge PDFs</span>
+            </button>
+            <button id="reset-btn" class="w-full sm:w-auto bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-3 px-6 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all flex items-center justify-center gap-2">
+                <i class="fas fa-trash-alt"></i>
+                <span>Reset</span>
+            </button>
+        </div>
+
+        <!-- Status/Message Area -->
+        <div id="status-area" class="mt-6 text-center"></div>
+
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const fileListContainer = document.getElementById('file-list-container');
+        const fileList = document.getElementById('file-list');
+        const mergeBtn = document.getElementById('merge-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const statusArea = document.getElementById('status-area');
+
+        // --- State Management ---
+        let uploadedFiles = [];
+        let sortableInstance = null;
+        const MAX_FILES = 10;
+
+        // --- PDF-LIB Initialization ---
+        const { PDFDocument } = PDFLib;
+
+        // --- Event Listeners ---
+        uploadArea.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        resetBtn.addEventListener('click', resetApp);
+        mergeBtn.addEventListener('click', mergePdfs);
+
+        // Drag and Drop Listeners
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('border-blue-500', 'bg-gray-50', 'dark:bg-gray-700');
+        });
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('border-blue-500', 'bg-gray-50', 'dark:bg-gray-700');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('border-blue-500', 'bg-gray-50', 'dark:bg-gray-700');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        /**
+         * Handles file selection from the input element.
+         * @param {Event} e - The change event.
+         */
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        /**
+         * Processes the selected or dropped files.
+         * @param {FileList} files - The list of files to process.
+         */
+        function handleFiles(files) {
+            const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+            
+            if (pdfFiles.length === 0) {
+                showStatus('Please select PDF files only.', 'error');
+                return;
+            }
+
+            if (uploadedFiles.length + pdfFiles.length > MAX_FILES) {
+                showStatus(`You can only upload a maximum of ${MAX_FILES} files.`, 'error');
+                return;
+            }
+
+            uploadedFiles.push(...pdfFiles);
+            renderFileList();
+            updateMergeButtonState();
+        }
+
+        /**
+         * Renders the list of uploaded files in the UI.
+         */
+        function renderFileList() {
+            if (uploadedFiles.length > 0) {
+                fileListContainer.classList.remove('hidden');
+            } else {
+                fileListContainer.classList.add('hidden');
+            }
+            
+            fileList.innerHTML = ''; // Clear existing list
+            uploadedFiles.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-3 rounded-lg shadow-sm';
+                li.dataset.id = index; // Use index as a temporary ID
+                
+                li.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <i class="fas fa-grip-vertical text-gray-400 cursor-grab"></i>
+                        <i class="fas fa-file-pdf text-red-500 text-xl"></i>
+                        <span class="font-medium text-sm truncate" title="${file.name}">${file.name}</span>
+                    </div>
+                    <button class="text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors" onclick="removeFile(${index})">
+                        <i class="fas fa-times-circle"></i>
+                    </button>
+                `;
+                fileList.appendChild(li);
+            });
+
+            // Initialize or update SortableJS
+            if (sortableInstance) {
+                sortableInstance.destroy();
+            }
+            sortableInstance = new Sortable(fileList, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                handle: '.fa-grip-vertical',
+                onEnd: (evt) => {
+                    // Reorder the uploadedFiles array based on the drag-and-drop action
+                    const [movedItem] = uploadedFiles.splice(evt.oldIndex, 1);
+                    uploadedFiles.splice(evt.newIndex, 0, movedItem);
+                    // Re-render to update indices and remove buttons
+                    renderFileList(); 
+                }
+            });
+        }
+
+        /**
+         * Removes a specific file from the uploaded list.
+         * @param {number} index - The index of the file to remove.
+         */
+        window.removeFile = (index) => {
+            uploadedFiles.splice(index, 1);
+            renderFileList();
+            updateMergeButtonState();
+        };
+
+        /**
+         * Updates the state (enabled/disabled) of the merge button.
+         */
+        function updateMergeButtonState() {
+            mergeBtn.disabled = uploadedFiles.length < 2;
+        }
+
+        /**
+         * The core function to merge the PDFs.
+         */
+        async function mergePdfs() {
+            if (uploadedFiles.length < 2) {
+                showStatus('Please upload at least two PDF files to merge.', 'error');
+                return;
+            }
+
+            showStatus('Merging PDFs... Please wait.', 'loading');
+            mergeBtn.disabled = true;
+
+            try {
+                const mergedPdf = await PDFDocument.create();
+
+                for (const file of uploadedFiles) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    // Load the PDF, ignoring potential errors with non-standard PDFs
+                    const pdf = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+
+                const mergedPdfBytes = await mergedPdf.save();
+                downloadPdf(mergedPdfBytes);
+                showStatus('Merge successful! Your download has started.', 'success');
+
+            } catch (error) {
+                console.error('Error merging PDFs:', error);
+                showStatus('An error occurred while merging the PDFs. Some files might be corrupted or password-protected.', 'error');
+            } finally {
+                updateMergeButtonState(); // Re-enable if more than 1 file is left
+            }
+        }
+
+        /**
+         * Triggers the download of the merged PDF.
+         * @param {Uint8Array} pdfBytes - The byte array of the merged PDF.
+         */
+        function downloadPdf(pdfBytes) {
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `merged-${Date.now()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        /**
+         * Displays a status message to the user.
+         * @param {string} message - The message to display.
+         * @param {'info'|'success'|'error'|'loading'} type - The type of message.
+         */
+        function showStatus(message, type = 'info') {
+            statusArea.innerHTML = '';
+            let iconHtml = '';
+            let colorClass = '';
+
+            switch (type) {
+                case 'success':
+                    iconHtml = '<i class="fas fa-check-circle text-green-500 mr-2"></i>';
+                    colorClass = 'text-green-600 dark:text-green-400';
+                    break;
+                case 'error':
+                    iconHtml = '<i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>';
+                    colorClass = 'text-red-600 dark:text-red-400';
+                    break;
+                case 'loading':
+                    iconHtml = '<i class="fas fa-spinner fa-spin text-blue-500 mr-2"></i>';
+                    colorClass = 'text-blue-600 dark:text-blue-400';
+                    break;
+                default:
+                    colorClass = 'text-gray-600 dark:text-gray-400';
+            }
+            
+            statusArea.innerHTML = `<p class="font-medium ${colorClass}">${iconHtml}${message}</p>`;
+        }
+
+        /**
+         * Resets the application to its initial state.
+         */
+        function resetApp() {
+            uploadedFiles = [];
+            fileInput.value = ''; // Clear the file input
+            renderFileList();
+            updateMergeButtonState();
+            statusArea.innerHTML = '';
+        }
+
+    </script>
+</body>
+</html>

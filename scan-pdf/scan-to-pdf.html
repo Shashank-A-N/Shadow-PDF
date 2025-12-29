@@ -1,0 +1,317 @@
+<!--
+  IMPORTANT: How to fix authentication errors.
+  If you see connection errors, you need to enable Anonymous Sign-in in your Firebase project.
+
+  Follow these steps:
+  1. Go to the Firebase Console (https://console.firebase.google.com/).
+  2. Select your project: 'scan-pdf-6f8af'.
+  3. In the left menu, go to Build > Authentication.
+  4. Click the "Get started" button.
+  5. Select the "Sign-in method" tab.
+  6. Click on "Anonymous" from the list of providers.
+  7. Enable the toggle switch and click "Save".
+
+  After you complete these steps, the app will be able to connect.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan to PDF</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .dragging {
+            opacity: 0.5;
+            border: 2px dashed #4f46e5;
+        }
+        .drag-over {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(79, 70, 229, 0.5);
+        }
+        #notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex items-center justify-center min-h-screen">
+    <div id="app" class="w-full max-w-6xl mx-auto p-4 md:p-8">
+        
+        <!-- Desktop View -->
+        <div id="desktop-view">
+            <header class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-slate-900">Scan to PDF</h1>
+                <p class="text-lg text-slate-600 mt-2">Capture document scans from your mobile and instantly create a PDF.</p>
+            </header>
+
+            <div class="grid md:grid-cols-2 gap-8 items-start">
+                <!-- QR Code and Instructions -->
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                    <h2 class="text-2xl font-semibold text-slate-900 mb-4">Get Started</h2>
+                    <div class="flex flex-col md:flex-row items-center gap-6 mb-4">
+                        <div id="qrcode-container" class="p-4 bg-white rounded-lg border border-slate-200">
+                            <div id="qrcode" class="flex items-center justify-center"></div>
+                             <div id="qr-loader" class="w-48 h-48 flex items-center justify-center">
+                                <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600"></div>
+                            </div>
+                        </div>
+                        <ol class="list-decimal list-inside space-y-3 text-slate-600 flex-1">
+                            <li>The QR code is now ready.</li>
+                            <li>Scan it with your phone's camera.</li>
+                            <li>Start scanning your documents.</li>
+                            <li>The pages will appear on the right.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Scanned Pages -->
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 min-h-[300px]">
+                    <h2 class="text-2xl font-semibold text-slate-900 mb-4">Scanned Pages</h2>
+                    <div id="scanned-pages-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4 min-h-[150px]">
+                        <div id="placeholder" class="text-center col-span-full py-10">
+                            <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <h3 class="mt-2 text-sm font-medium text-slate-900">Waiting for scans...</h3>
+                            <p class="mt-1 text-sm text-slate-500">Your scanned pages will appear here.</p>
+                        </div>
+                    </div>
+                    <div class="mt-6 text-center">
+                         <button id="generate-pdf-btn" disabled class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all duration-300 shadow-md disabled:shadow-none flex items-center justify-center gap-2">
+                            <svg id="pdf-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
+                            <span id="pdf-btn-text">Generate PDF</span>
+                            <div id="pdf-loader" class="hidden animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Element -->
+    <div id="notification" class="fixed bottom-5 right-5 bg-red-500 text-white py-2.5 px-5 rounded-lg shadow-xl transition-all duration-300 transform translate-y-20 opacity-0">
+        <span id="notification-message"></span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- CONFIG & ELEMENTS ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyCqHvYY7AOtOOFLuqQzRXo9dOK14Vo3tHo",
+          authDomain: "scan-pdf-6f8af.firebaseapp.com",
+          projectId: "scan-pdf-6f8af",
+          storageBucket: "scan-pdf-6f8af.appspot.com",
+          messagingSenderId: "90910752973",
+          appId: "1:90910752973:web:9beaf7b68e442894512984",
+          measurementId: "G-YCZV2D7CEK"
+        };
+        const appId = 'default-scan-app';
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        const scannedPagesContainer = document.getElementById('scanned-pages-container');
+        const generatePdfBtn = document.getElementById('generate-pdf-btn');
+        const qrcodeContainer = document.getElementById('qrcode');
+        const qrLoader = document.getElementById('qr-loader');
+        const pdfLoader = document.getElementById('pdf-loader');
+        const pdfBtnText = document.getElementById('pdf-btn-text');
+        const pdfIcon = document.getElementById('pdf-icon');
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.getElementById('notification-message');
+
+        let sessionId = null;
+        let docRef = null;
+        let pagesCache = [];
+        let notificationTimeout;
+        let qrCodeInstance = null;
+
+        // --- NOTIFICATION ---
+        function showNotification(message, type = 'error', duration = 3000) {
+            clearTimeout(notificationTimeout);
+            notificationMessage.textContent = message;
+            notification.className = `fixed bottom-5 right-5 text-white py-2.5 px-5 rounded-lg shadow-xl transition-all duration-300 transform translate-y-20 opacity-0 ${type === 'error' ? 'bg-red-600' : 'bg-green-600'}`;
+            requestAnimationFrame(() => { notification.classList.add('show'); });
+            notificationTimeout = setTimeout(() => { notification.classList.remove('show'); }, duration);
+        }
+        
+        // --- INITIALIZATION ---
+        async function init() {
+            try {
+                await signInAnonymously(auth);
+                setupDesktopView();
+            } catch (error) {
+                console.error("Authentication or initialization failed:", error);
+                document.body.innerHTML = `<div class="text-red-500 font-semibold p-8">Error: Could not connect to services. Please follow the instructions at the top of this file and refresh.</div>`;
+                showNotification('Connection failed. See instructions.', 'error');
+            }
+        }
+
+        // --- QR CODE LOGIC ---
+        function generateQrCode() {
+            // This now works automatically on a live server, no IP needed.
+            const url = `${window.location.origin}/scanner.html?session=${sessionId}`;
+            
+            qrcodeContainer.innerHTML = '';
+            qrCodeInstance = new QRCode(qrcodeContainer, {
+                text: url,
+                width: 192,
+                height: 192,
+                colorDark: "#1e293b",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        // --- DESKTOP VIEW LOGIC ---
+        async function setupDesktopView() {
+            sessionId = crypto.randomUUID();
+            docRef = doc(db, `/artifacts/${appId}/public/data/scans`, sessionId);
+
+            try {
+                await setDoc(docRef, { pages: [], createdAt: new Date() });
+                
+                qrLoader.style.display = 'none';
+                generateQrCode();
+
+                onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        pagesCache = data.pages || [];
+                        renderPages(pagesCache);
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error setting up desktop view:", error);
+                qrcodeContainer.innerHTML = `<div class="text-red-500 text-sm p-4">Could not create a session. Check Firestore rules.</div>`;
+                showNotification('Could not create session.', 'error');
+            }
+        }
+
+        function renderPages(pages) {
+            const placeholder = document.getElementById('placeholder');
+            scannedPagesContainer.innerHTML = '';
+            if (pages.length === 0) {
+                scannedPagesContainer.appendChild(placeholder);
+                generatePdfBtn.disabled = true;
+            } else {
+                generatePdfBtn.disabled = false;
+                pages.forEach((page) => {
+                    const pageEl = document.createElement('div');
+                    pageEl.className = 'relative group aspect-[3/4] border-2 border-slate-200 rounded-lg overflow-hidden shadow-sm transition-transform duration-300';
+                    pageEl.draggable = true;
+                    pageEl.dataset.id = page.id;
+
+                    const img = new Image();
+                    img.src = page.data;
+                    img.className = 'w-full h-full object-cover';
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.className = 'absolute top-1.5 right-1.5 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10';
+                    deleteBtn.onclick = () => deletePage(page);
+
+                    pageEl.appendChild(img);
+                    pageEl.appendChild(deleteBtn);
+                    scannedPagesContainer.appendChild(pageEl);
+                });
+                setupDragAndDrop();
+            }
+        }
+
+        async function deletePage(pageToDelete) {
+            if (!docRef) return;
+            try {
+                await updateDoc(docRef, { pages: arrayRemove(pageToDelete) });
+            } catch (error) {
+                console.error("Error deleting page: ", error);
+                showNotification('Failed to delete page.', 'error');
+            }
+        }
+        
+        function setupDragAndDrop() {
+            const draggables = scannedPagesContainer.querySelectorAll('[draggable="true"]');
+            let dragSrcEl = null;
+
+            draggables.forEach(item => {
+                item.addEventListener('dragstart', (e) => { dragSrcEl = item; item.classList.add('dragging'); });
+                item.addEventListener('dragend', (e) => item.classList.remove('dragging'));
+                item.addEventListener('dragover', (e) => e.preventDefault());
+                item.addEventListener('dragenter', (e) => item.classList.add('drag-over'));
+                item.addEventListener('dragleave', (e) => item.classList.remove('drag-over'));
+                item.addEventListener('drop', (e) => {
+                    e.stopPropagation();
+                    if (dragSrcEl !== item) {
+                        const fromId = dragSrcEl.dataset.id;
+                        const toId = item.dataset.id;
+                        const fromIndex = pagesCache.findIndex(p => p.id === fromId);
+                        const toIndex = pagesCache.findIndex(p => p.id === toId);
+                        const reorderedPages = [...pagesCache];
+                        const [removed] = reorderedPages.splice(fromIndex, 1);
+                        reorderedPages.splice(toIndex, 0, removed);
+                        if(docRef) updateDoc(docRef, { pages: reorderedPages });
+                    }
+                    item.classList.remove('drag-over');
+                });
+            });
+        }
+
+        async function generatePdf() {
+            if (pagesCache.length === 0) return;
+            generatePdfBtn.disabled = true;
+            pdfLoader.style.display = 'block';
+            pdfIcon.style.display = 'none';
+            pdfBtnText.textContent = 'Generating...';
+            try {
+                const { jsPDF } = window.jspdf;
+                const firstImg = await loadImage(pagesCache[0].data);
+                const orientation = firstImg.width > firstImg.height ? 'l' : 'p';
+                const doc = new jsPDF({ orientation, unit: 'px', format: [firstImg.width, firstImg.height] });
+                for (let i = 0; i < pagesCache.length; i++) {
+                    const imgData = pagesCache[i].data;
+                    const img = await loadImage(imgData);
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const pdfHeight = doc.internal.pageSize.getHeight();
+                    if (i > 0) doc.addPage([pdfWidth, pdfHeight]);
+                    doc.addImage(img, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                }
+                doc.save('scanned-document.pdf');
+                showNotification('PDF generated successfully!', 'success');
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                showNotification('An error occurred generating the PDF.', 'error');
+            } finally {
+                generatePdfBtn.disabled = false;
+                pdfLoader.style.display = 'none';
+                pdfIcon.style.display = 'block';
+                pdfBtnText.textContent = 'Generate PDF';
+            }
+        }
+
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = (err) => reject(err);
+                img.src = src;
+            });
+        }
+        
+        generatePdfBtn.addEventListener('click', generatePdf);
+        init();
+    </script>
+</body>
+</html>
+
