@@ -1,0 +1,66 @@
+{
+  "templates": [
+    {
+      "id": "blank-a4",
+      "name": "Blank A4",
+      "category": "basic",
+      "file": "blank-a4.json",
+      "thumbnail": "thumbnails/blank-a4.png",
+      "description": "Standard blank A4 page"
+    },
+    {
+      "id": "letter",
+      "name": "Letter",
+      "category": "business",
+      "file": "letter.json",
+      "thumbnail": "thumbnails/letter.png",
+      "description": "Professional business letter"
+    },
+    {
+      "id": "invoice",
+      "name": "Invoice",
+      "category": "business",
+      "file": "invoice.json",
+      "thumbnail": "thumbnails/invoice.png",
+      "description": "Professional invoice template"
+    },
+    {
+      "id": "resume",
+      "name": "Resume",
+      "category": "personal",
+      "file": "resume.json",
+      "thumbnail": "thumbnails/resume.png",
+      "description": "Professional resume template"
+    },
+    {
+      "id": "certificate",
+      "name": "Certificate",
+      "category": "awards",
+      "file": "certificate.json",
+      "thumbnail": "thumbnails/certificate.png",
+      "description": "Certificate of achievement"
+    }
+  ],
+  "categories": [
+    {
+      "id": "basic",
+      "name": "Basic",
+      "icon": "📄"
+    },
+    {
+      "id": "business",
+      "name": "Business",
+      "icon": "💼"
+    },
+    {
+      "id": "personal",
+      "name": "Personal",
+      "icon": "👤"
+    },
+    {
+      "id": "awards",
+      "name": "Awards",
+      "icon": "🏆"
+    }
+  ]
+}

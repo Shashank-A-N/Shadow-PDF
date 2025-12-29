@@ -1,0 +1,22 @@
+{
+  "name": "Blank A4",
+  "description": "Standard blank A4 page",
+  "pageSize": {
+    "width": 595.28,
+    "height": 841.89,
+    "unit": "pt"
+  },
+  "orientation": "portrait",
+  "margins": {
+    "top": 72,
+    "right": 72,
+    "bottom": 72,
+    "left": 72
+  },
+  "background": "#FFFFFF",
+  "grid": {
+    "enabled": false,
+    "size": 20,
+    "color": "#E5E7EB"
+  }
+}

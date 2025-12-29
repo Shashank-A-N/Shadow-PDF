@@ -1,0 +1,57 @@
+{
+  "name": "pdf-editor-ultra",
+  "version": "1.0.0",
+  "description": "Professional, feature-rich PDF editor built entirely in the browser using modern web technologies.",
+  "type": "module",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve -l 8000",
+    "start": "npx serve -l 8000",
+    "build": "echo 'Build script not configured. For now, this is a placeholder.' && exit 0",
+    "preview": "npx serve dist -l 8080",
+    "lint": "eslint \"src/**/*.js\"",
+    "lint:fix": "eslint \"src/**/*.js\" --fix",
+    "format": "prettier --write \"src/**/*.js\" \"*.html\" \"*.json\" \"*.md\""
+  },
+  "keywords": [
+    "pdf",
+    "editor",
+    "annotation",
+    "signature",
+    "ocr",
+    "web-app",
+    "pdf.js",
+    "pdf-lib",
+    "tesseract.js",
+    "vanilla-js"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/pdf-editor-ultra.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/pdf-editor-ultra/issues"
+  },
+  "homepage": "https://github.com/yourusername/pdf-editor-ultra#readme",
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.17",
+    "tailwindcss": "^4.1.17"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.5",
+    "serve": "^14.2.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Firefox versions",
+    "last 2 Safari versions",
+    "last 2 Edge versions"
+  ]
+}

@@ -1,0 +1,3484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Studio Pro - Advanced PDF Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <script>
+        tailwind.config = {
+          darkMode: 'class',
+          theme: {
+            extend: {
+              keyframes: {
+                spin: { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } },
+                pulse: { '0%, 100%': { opacity: 1 }, '50%': { opacity: .5 } },
+                slideIn: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(0)' } },
+                fadeIn: { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+              },
+              animation: {
+                spin: 'spin 1s linear infinite',
+                pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                slideIn: 'slideIn 0.3s ease-out',
+                fadeIn: 'fadeIn 0.3s ease-out',
+              },
+            }
+          }
+        }
+        if (localStorage.getItem('color-theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        #canvas-container {
+            position: relative;
+            overflow: auto;
+            background: #f1f5f9; /* slate-100 */
+        }
+        .dark #canvas-container {
+            background: #0f172a; /* slate-950 */
+            background-image: linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+                              linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+                              linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        #canvas-wrapper {
+            position: relative;
+            transform-origin: top left;
+            transition: transform 0.1s ease;
+            margin: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            image-rendering: pixelated;
+        }
+        #pdf-canvas {
+            background: #fff; /* PDF background */
+        }
+        #grid-canvas { pointer-events: none; opacity: 0.3; }
+        #guides-canvas { pointer-events: none; }
+        #selection-canvas { pointer-events: none; }
+        #interaction-canvas {
+            cursor: default;
+        }
+        
+        .cursor-crosshair { cursor: crosshair !important; }
+        .cursor-text { cursor: text !important; }
+        .cursor-move { cursor: move !important; }
+        .cursor-grab { cursor: grab !important; }
+        .cursor-grabbing { cursor: grabbing !important; }
+        .cursor-resize-nwse { cursor: nwse-resize !important; }
+        .cursor-resize-nesw { cursor: nesw-resize !important; }
+        .cursor-resize-ns { cursor: ns-resize !important; }
+        .cursor-resize-ew { cursor: ew-resize !important; }
+        .cursor-rotate { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>') 12 12, auto !important; }
+        
+        #ruler-h, #ruler-v {
+            position: absolute;
+            background: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            font-size: 9px;
+            color: #64748b;
+            z-index: 100;
+            pointer-events: none; /* Let canvas container handle scroll */
+        }
+        .dark #ruler-h, .dark #ruler-v {
+            background: #1e293b;
+            border-color: #334155;
+            color: #94a3b8;
+        }
+        #ruler-h { height: 20px; left: 20px; right: 0; top: 0; }
+        #ruler-v { width: 20px; top: 20px; bottom: 0; left: 0; }
+        #ruler-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 0;
+            left: 0;
+            background: #e2e8f0;
+            border: 1px solid #cbd5e1;
+            z-index: 101;
+        }
+        .dark #ruler-corner {
+            background: #334155;
+            border-color: #475569;
+        }
+        
+        .layer-item {
+            padding: 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .layer-item:hover {
+            background: #f1f5f9;
+        }
+        .dark .layer-item:hover {
+            background: #334155;
+        }
+        .layer-item.selected {
+            background: #e0f2fe;
+            border-color: #3b82f6;
+        }
+        .dark .layer-item.selected {
+            background: #1e3a8a;
+            border-color: #3b82f6;
+        }
+        
+        .tool-group {
+            border-right: 1px solid #e2e8f0;
+            padding-right: 0.5rem;
+            margin-right: 0.5rem;
+        }
+        .dark .tool-group {
+            border-color: #475569;
+        }
+        .tool-group:last-child {
+            border-right: none;
+            padding-right: 0;
+            margin-right: 0;
+        }
+        .tool-btn.tool-active {
+            background: #3b82f6 !important;
+            color: white !important;
+        }
+
+        .floating-panel {
+            position: fixed;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            z-index: 1000;
+            min-width: 200px;
+        }
+        .dark .floating-panel {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        
+        #context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            z-index: 10000;
+            min-width: 180px;
+            display: none;
+            padding: 0.25rem;
+        }
+        .dark #context-menu {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        .context-menu-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .context-menu-item:hover {
+            background: #f1f5f9;
+        }
+        .dark .context-menu-item:hover {
+            background: #334155;
+        }
+        .context-menu-separator {
+            height: 1px;
+            background: #e2e8f0;
+            margin: 0.25rem 0;
+        }
+        .dark .context-menu-separator {
+            background: #334155;
+        }
+        
+        #status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 28px;
+            background: #f8f9fa;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            font-size: 0.75rem;
+            color: #64748b;
+            z-index: 100;
+        }
+        .dark #status-bar {
+            background: #1e293b;
+            border-color: #334155;
+            color: #94a3b8;
+        }
+        
+        .color-preset {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .color-preset:hover {
+            transform: scale(1.1);
+            border-color: #3b82f6;
+        }
+        .color-preset.selected {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+        
+        .thumbnail-item {
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            border: 2px solid transparent;
+            border-radius: 0.375rem;
+            padding: 8px;
+        }
+        .thumbnail-item:hover .thumbnail-controls {
+            opacity: 1;
+        }
+        .thumbnail-controls {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            display: flex;
+            gap: 2px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .thumbnail-controls button {
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 20px;
+            height: 20px;
+            font-size: 10px;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .thumbnail-controls button:hover {
+            background: rgba(0,0,0,0.8);
+        }
+        .thumbnail-item.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+        .thumbnail-item.selected {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: #1e293b;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .tooltip.show {
+            opacity: 1;
+        }
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: #1e293b;
+        }
+        
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        .dark .skeleton {
+             background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+             background-size: 200% 100%;
+             animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .kbd {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            padding: 0.125rem 0.375rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+        .dark .kbd {
+            background: #374151;
+            border-color: #4b5563;
+        }
+
+        #toast-container {
+            position: fixed;
+            top: 6rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .toast {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            color: white;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards;
+        }
+        .toast-success { background: #22c55e; }
+        .toast-error { background: #ef4444; }
+        .toast-info { background: #3b82f6; }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; transform: translateY(-10px); }
+        }
+
+        #signature-pad {
+            border: 1px dashed #94a3b8;
+            border-radius: 0.375rem;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 transition-colors duration-300 overflow-hidden">
+
+    <div id="toast-container"></div>
+
+    <div id="upload-screen" class="min-h-screen flex items-center justify-center p-4 animate-fadeIn">
+        <div class="bg-white dark:bg-slate-800 p-8 md:p-12 rounded-xl shadow-2xl text-center max-w-2xl w-full">
+            <div class="mb-6">
+                <i class="fas fa-file-pdf text-6xl text-blue-500"></i>
+            </div>
+            <h1 class="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-3 bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+                PDF Studio Pro
+            </h1>
+            <p class="text-lg text-slate-600 dark:text-slate-400 mb-8">Professional PDF Editor with Advanced Features</p>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <label for="initial-pdf-upload" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg transition duration-300 cursor-pointer flex items-center justify-center gap-2">
+                    <i class="fas fa-upload"></i> Open PDF
+                </label>
+                <button id="create-new-pdf" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-4 px-6 rounded-lg transition duration-300 flex items-center justify-center gap-2">
+                    <i class="fas fa-plus-circle"></i> Create New
+                </button>
+            </div>
+            
+            <input type="file" id="initial-pdf-upload" accept=".pdf" class="hidden">
+            
+            <div id="recent-files" class="hidden">
+                <h3 class="text-left text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Recent Files</h3>
+                <div id="recent-files-list" class="space-y-2"></div>
+            </div>
+            
+            <div class="grid grid-cols-4 gap-4 mt-12 pt-8 border-t border-slate-200 dark:border-slate-700">
+                <div class="text-center">
+                    <i class="fas fa-layers text-2xl text-slate-400 mb-2"></i>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">Layers</p>
+                </div>
+                <div class="text-center">
+                    <i class="fas fa-ruler-combined text-2xl text-slate-400 mb-2"></i>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">Guides</p>
+                </div>
+                <div class="text-center">
+                    <i class="fas fa-shapes text-2xl text-slate-400 mb-2"></i>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">Shapes</p>
+                </div>
+                <div class="text-center">
+                    <i class="fas fa-magic text-2xl text-slate-400 mb-2"></i>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">Effects</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-editor" class="h-screen flex flex-col hidden">
+        
+        <div id="menu-bar" class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center justify-between h-12">
+            <div class="flex items-center gap-4">
+                <h1 class="font-bold text-lg">PDF Studio Pro</h1>
+                <div class="flex items-center gap-2">
+                    <button class="px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded">File</button>
+                    <button class="px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded">Edit</button>
+                    <button class="px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded">View</button>
+                    <button class="px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded">Insert</button>
+                    <button class="px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded">Tools</button>
+                    <button id="help-menu-btn" class="px-3 py-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 rounded">Help</button>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button id="share-btn" class="px-4 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
+                    <i class="fas fa-share"></i> Share
+                </button>
+                <button id="theme-toggle-btn" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded">
+                    <i class="fas fa-moon dark:hidden"></i>
+                    <i class="fas fa-sun hidden dark:inline"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="toolbar" class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-2 flex items-center gap-2 overflow-x-auto h-12">
+            
+            <div class="tool-group flex items-center gap-1">
+                <button id="new-file-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="New">
+                    <i class="fas fa-file-plus"></i>
+                </button>
+                <button id="open-file-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Open">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+                <button id="save-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Save">
+                    <i class="fas fa-save"></i>
+                </button>
+                <button id="export-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Export">
+                    <i class="fas fa-file-export"></i>
+                </button>
+            </div>
+
+            <div class="tool-group flex items-center gap-1">
+                <button id="undo-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded disabled:opacity-50" title="Undo (Ctrl+Z)">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button id="redo-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded disabled:opacity-50" title="Redo (Ctrl+Y)">
+                    <i class="fas fa-redo"></i>
+                </button>
+                <button id="cut-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Cut (Ctrl+X)">
+                    <i class="fas fa-cut"></i>
+                </button>
+                <button id="copy-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Copy (Ctrl+C)">
+                    <i class="fas fa-copy"></i>
+                </button>
+                <button id="paste-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Paste (Ctrl+V)">
+                    <i class="fas fa-paste"></i>
+                </button>
+                <button id="duplicate-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Duplicate (Ctrl+D)">
+                    <i class="fas fa-clone"></i>
+                </button>
+            </div>
+
+            <div class="tool-group flex items-center gap-1">
+                <button id="select-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Select (V)">
+                    <i class="fas fa-mouse-pointer"></i>
+                </button>
+                <button id="lasso-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Lasso Select">
+                    <i class="fas fa-draw-polygon"></i>
+                </button>
+                <button id="hand-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Pan (H)">
+                    <i class="fas fa-hand-paper"></i>
+                </button>
+                <button id="zoom-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Zoom (Z)">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+            </div>
+
+            <div class="tool-group flex items-center gap-1">
+                <button id="rect-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Rectangle (R)">
+                    <i class="far fa-square"></i>
+                </button>
+                <button id="circle-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Circle (O)">
+                    <i class="far fa-circle"></i>
+                </button>
+                <button id="triangle-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Triangle">
+                    <i class="fas fa-play" style="transform: rotate(270deg)"></i>
+                </button>
+                <button id="star-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Star">
+                    <i class="far fa-star"></i>
+                </button>
+                <button id="arrow-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Arrow">
+                    <i class="fas fa-long-arrow-alt-right"></i>
+                </button>
+                <button id="line-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Line (L)">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button id="pen-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Pen (P)">
+                    <i class="fas fa-pen"></i>
+                </button>
+                <button id="brush-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Brush (B)">
+                    <i class="fas fa-paint-brush"></i>
+                </button>
+            </div>
+
+            <div class="tool-group flex items-center gap-1">
+                <button id="text-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Text (T)">
+                    <i class="fas fa-font"></i>
+                </button>
+                <button id="textbox-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Text Box">
+                    <i class="fas fa-i-cursor"></i>
+                </button>
+                <button id="note-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Sticky Note">
+                    <i class="fas fa-sticky-note"></i>
+                </button>
+                <button id="highlight-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Highlight">
+                    <i class="fas fa-highlighter"></i>
+                </button>
+                <button id="strikeout-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Strikeout">
+                    <i class="fas fa-strikethrough"></i>
+                </button>
+                <button id="underline-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Underline">
+                    <i class="fas fa-underline"></i>
+                </button>
+            </div>
+
+            <div class="tool-group flex items-center gap-1">
+                <button id="image-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Insert Image">
+                    <i class="fas fa-image"></i>
+                </button>
+                <button id="signature-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Signature">
+                    <i class="fas fa-signature"></i>
+                </button>
+                <button id="stamp-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Stamp">
+                    <i class="fas fa-stamp"></i>
+                </button>
+                <button id="watermark-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Watermark">
+                    <i class="fas fa-tint"></i>
+                </button>
+                <button id="qrcode-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="QR Code">
+                    <i class="fas fa-qrcode"></i>
+                </button>
+                <button id="barcode-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Barcode">
+                    <i class="fas fa-barcode"></i>
+                </button>
+            </div>
+
+            <div class="tool-group flex items-center gap-1">
+                <button id="ruler-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Ruler">
+                    <i class="fas fa-ruler"></i>
+                </button>
+                <button id="protractor-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Protractor">
+                    <i class="fas fa-drafting-compass"></i>
+                </button>
+                <button id="area-tool" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Measure Area">
+                    <i class="fas fa-vector-square"></i>
+                </button>
+            </div>
+
+            <div class="tool-group flex items-center gap-2">
+                <button id="zoom-out-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Zoom Out (Ctrl+-)">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <select id="zoom-select" class="tool-btn px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800">
+                    <option value="0.5">50%</option>
+                    <option value="0.75">75%</option>
+                    <option value="1" selected>100%</option>
+                    <option value="1.25">125%</option>
+                    <option value="1.5">150%</option>
+                    <option value="2">200%</option>
+                    <option value="3">300%</option>
+                    <option value="fit">Fit Page</option>
+                    <option value="fitwidth">Fit Width</option>
+                </select>
+                <button id="zoom-in-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Zoom In (Ctrl+=)">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button id="fullscreen-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Fullscreen (F11)">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="format-bar" class="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 p-2 flex items-center gap-3 hidden h-12">
+            <div id="text-format" class="flex items-center gap-2 hidden">
+                <select id="font-family" class="px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800">
+                    <option value="Arial">Arial</option>
+                    <option value="Helvetica">Helvetica</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier">Courier</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Comic Sans MS">Comic Sans MS</option>
+                </select>
+                <select id="font-size" class="px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800">
+                    <option value="8">8</option>
+                    <option value="10">10</option>
+                    <option value="12">12</option>
+                    <option value="14">14</option>
+                    <option value="16">16</option>
+                    <option value="18">18</option>
+                    <option value="24" selected>24</option>
+                    <option value="36">36</option>
+                    <option value="48">48</option>
+                    <option value="72">72</option>
+                </select>
+                <button id="bold-btn" class="tool-btn p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded font-bold" title="Bold">B</button>
+                <button id="italic-btn" class="tool-btn p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded italic" title="Italic">I</button>
+                <button id="underline-btn" class="tool-btn p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded underline" title="Underline">U</button>
+                <button id="align-left-btn" class="tool-btn p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded" title="Align Left">
+                    <i class="fas fa-align-left"></i>
+                </button>
+                <button id="align-center-btn" class="tool-btn p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded" title="Align Center">
+                    <i class="fas fa-align-center"></i>
+                </button>
+                <button id="align-right-btn" class="tool-btn p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded" title="Align Right">
+                    <i class="fas fa-align-right"></i>
+                </button>
+            </div>
+
+            <div id="shape-format" class="flex items-center gap-2 hidden">
+                <div class="flex items-center gap-1">
+                    <label class="text-sm">Fill:</label>
+                    <input type="color" id="fill-color" class="w-8 h-8 border-0 rounded cursor-pointer" title="Fill Color">
+                    <input type="range" id="fill-opacity" min="0" max="100" value="100" class="w-20" title="Fill Opacity">
+                </div>
+                <div class="flex items-center gap-1">
+                    <label class="text-sm">Stroke:</label>
+                    <input type="color" id="stroke-color" class="w-8 h-8 border-0 rounded cursor-pointer" title="Stroke Color">
+                    <input type="number" id="stroke-width" min="0" max="50" value="2" class="w-16 px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" title="Stroke Width">
+                </div>
+                <select id="stroke-style" class="px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" title="Stroke Style">
+                    <option value="solid">Solid</option>
+                    <option value="dashed">Dashed</option>
+                    <option value="dotted">Dotted</option>
+                </select>
+            </div>
+
+            <div id="highlight-format" class="flex items-center gap-2 hidden">
+                <div class="flex items-center gap-1">
+                    <label class="text-sm">Color:</label>
+                    <input type="color" id="highlight-color" class="w-8 h-8 border-0 rounded cursor-pointer" value="#FFFF00" title="Highlight Color">
+                    <input type="range" id="highlight-opacity" min="0" max="100" value="40" class="w-20" title="Highlight Opacity">
+                </div>
+            </div>
+            
+            <div id="strikeout-format" class="flex items-center gap-2 hidden">
+                <div class="flex items-center gap-1">
+                    <label class="text-sm">Color:</label>
+                    <input type="color" id="strikeout-color" class="w-8 h-8 border-0 rounded cursor-pointer" value="#FF0000" title="Strikeout Color">
+                    <label class="text-sm">Thickness:</label>
+                    <input type="number" id="strikeout-width" min="1" max="10" value="2" class="w-16 px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" title="Strikeout Thickness">
+                </div>
+            </div>
+
+            <div id="underline-format" class="flex items-center gap-2 hidden">
+                <div class="flex items-center gap-1">
+                    <label class="text-sm">Color:</label>
+                    <input type="color" id="underline-color" class="w-8 h-8 border-0 rounded cursor-pointer" value="#000000" title="Underline Color">
+                    <label class="text-sm">Thickness:</label>
+                    <input type="number" id="underline-width" min="1" max="10" value="2" class="w-16 px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" title="Underline Thickness">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 flex overflow-hidden">
+            
+            <div id="left-sidebar" class="w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col">
+                
+                <div class="flex border-b border-slate-200 dark:border-slate-700">
+                    <button class="flex-1 px-2 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 sidebar-tab tool-active" data-tab="pages">
+                        Pages
+                    </button>
+                    <button class="flex-1 px-2 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 sidebar-tab" data-tab="layers">
+                        Layers
+                    </button>
+                    <button class="flex-1 px-2 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-700 sidebar-tab" data-tab="bookmarks">
+                        Bookmarks
+                    </button>
+                </div>
+
+                <div id="pages-panel" class="flex-1 overflow-y-auto p-2 sidebar-panel">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium">Pages</span>
+                        <button id="add-page-btn" class="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600" title="Add Blank Page">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                    <div id="page-thumbnails" class="space-y-2">
+                    </div>
+                </div>
+
+                <div id="layers-panel" class="flex-1 overflow-y-auto p-2 sidebar-panel hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium">Layers</span>
+                        <div class="flex gap-1">
+                            <button id="add-layer-btn" class="p-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Add Layer">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button id="delete-layer-btn" class="p-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Delete Layer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="layers-list" class="space-y-1">
+                    </div>
+                </div>
+
+                <div id="bookmarks-panel" class="flex-1 overflow-y-auto p-2 sidebar-panel hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium">Bookmarks</span>
+                        <button id="add-bookmark-btn" class="p-1 text-xs hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Add Bookmark">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div id="bookmarks-list" class="space-y-1">
+                    </div>
+                </div>
+            </div>
+
+            <div id="canvas-area" class="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950">
+                
+                <div class="flex items-center justify-between p-2 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 h-12">
+                    <div class="flex items-center gap-2">
+                        <button id="prev-page-btn" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded disabled:opacity-50" title="Previous Page (PageUp)">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span class="text-sm">
+                            Page <input type="number" id="current-page-input" class="w-12 px-1 border border-slate-200 dark:border-slate-700 rounded text-center bg-white dark:bg-slate-800" value="1" min="1"> 
+                            of <span id="total-pages">0</span>
+                        </span>
+                        <button id="next-page-btn" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded disabled:opacity-50" title="Next Page (PageDown)">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="toggle-grid-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Toggle Grid">
+                            <i class="fas fa-th"></i>
+                        </button>
+                        <button id="toggle-guides-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded tool-active" title="Toggle Guides">
+                            <i class="fas fa-ruler-combined"></i>
+                        </button>
+                        <button id="toggle-rulers-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Toggle Rulers">
+                            <i class="fas fa-ruler-horizontal"></i>
+                        </button>
+                        <button id="snap-to-grid-btn" class="tool-btn p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Snap to Grid">
+                            <i class="fas fa-magnet"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="canvas-container" class="flex-1 relative overflow-auto">
+                    <div id="ruler-corner" class="hidden"></div>
+                    <canvas id="ruler-h" class="hidden" height="20"></canvas>
+                    <canvas id="ruler-v" class="hidden" width="20"></canvas>
+                    
+                    <div id="canvas-wrapper">
+                        <canvas id="pdf-canvas"></canvas>
+                        <canvas id="grid-canvas"></canvas>
+                        <canvas id="objects-canvas"></canvas>
+                        <canvas id="guides-canvas"></canvas>
+                        <canvas id="selection-canvas"></canvas>
+                        <canvas id="interaction-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="right-sidebar" class="w-72 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 overflow-y-auto">
+                
+                <div class="p-3 border-b border-slate-200 dark:border-slate-700">
+                    <h3 class="font-medium">Properties</h3>
+                </div>
+
+                <div id="properties-panel" class="p-3 space-y-4">
+                    
+                    <div id="prop-default-msg" class="text-sm text-slate-500">
+                        Select an object to see its properties.
+                    </div>
+
+                    <div id="prop-object" class="space-y-4 hidden">
+                        <div class="space-y-2">
+                            <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400">Transform</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-xs text-slate-500">X</label>
+                                    <input type="number" id="prop-x" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="x">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500">Y</label>
+                                    <input type="number" id="prop-y" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="y">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500">Width</label>
+                                    <input type="number" id="prop-width" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="width">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500">Height</label>
+                                    <input type="number" id="prop-height" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="height">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500">Rotation</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="prop-rotation" min="0" max="360" value="0" class="flex-1" data-prop="rotation">
+                                    <span id="rotation-value" class="text-sm w-12 text-right">0°</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400">Appearance</h4>
+                            <div>
+                                <label class="text-xs text-slate-500">Opacity</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="prop-opacity" min="0" max="100" value="100" class="flex-1" data-prop="opacity">
+                                    <span id="opacity-value" class="text-sm w-12 text-right">100%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500">Blend Mode</label>
+                                <select id="prop-blend-mode" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="blendMode">
+                                    <option value="normal">Normal</option>
+                                    <option value="multiply">Multiply</option>
+                                    <option value="screen">Screen</option>
+                                    <option value="overlay">Overlay</option>
+                                    <option value="darken">Darken</option>
+                                    <option value="lighten">Lighten</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400">Effects</h4>
+                            <div class="flex items-center justify-between">
+                                <label class="text-xs text-slate-500">Shadow</label>
+                                <input type="checkbox" id="prop-shadow" class="rounded" data-prop="shadow">
+                            </div>
+                            <div id="shadow-controls" class="space-y-2 hidden">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-xs text-slate-500">Offset X</label>
+                                        <input type="number" id="shadow-x" value="2" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="shadowX">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-slate-500">Offset Y</label>
+                                        <input type="number" id="shadow-y" value="2" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="shadowY">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500">Blur</label>
+                                    <input type="number" id="shadow-blur" value="4" class="w-full px-2 py-1 border border-slate-200 dark:border-slate-700 rounded text-sm bg-white dark:bg-slate-800" data-prop="shadowBlur">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500">Color</label>
+                                    <input type="color" id="shadow-color" value="#000000" class="w-full h-8 border-0 rounded" data-prop="shadowColor">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400">Alignment</h4>
+                        <div class="grid grid-cols-3 gap-1">
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Align Left">
+                                <i class="fas fa-align-left"></i>
+                            </button>
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Align Center">
+                                <i class="fas fa-align-center"></i>
+                            </button>
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Align Right">
+                                <i class="fas fa-align-right"></i>
+                            </button>
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Align Top">
+                                <i class="fas fa-align-left" style="transform: rotate(90deg)"></i>
+                            </button>
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Align Middle">
+                                <i class="fas fa-align-center" style="transform: rotate(90deg)"></i>
+                            </button>
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Align Bottom">
+                                <i class="fas fa-align-right" style="transform: rotate(90deg)"></i>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1">
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Distribute Horizontally">
+                                <i class="fas fa-arrows-alt-h"></i> Distribute H
+                            </button>
+                            <button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-sm" title="Distribute Vertically">
+                                <i class="fas fa-arrows-alt-v"></i> Distribute V
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400">Actions</h4>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="bring-to-front-btn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded text-sm">
+                                Bring Front
+                            </button>
+                            <button id="send-to-back-btn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded text-sm">
+                                Send Back
+                            </button>
+                            <button id="group-btn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded text-sm">
+                                <i class="fas fa-object-group"></i> Group
+                            </button>
+                            <button id="ungroup-btn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded text-sm">
+                                <i class="fas fa-object-ungroup"></i> Ungroup
+                            </button>
+                        </div>
+                        <button id="delete-object-btn" class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400">Color Presets</h4>
+                        <div class="grid grid-cols-8 gap-1">
+                            <div class="color-preset" style="background: #000000" data-color="#000000"></div>
+                            <div class="color-preset" style="background: #FFFFFF" data-color="#FFFFFF"></div>
+                            <div class="color-preset" style="background: #FF0000" data-color="#FF0000"></div>
+                            <div class="color-preset" style="background: #00FF00" data-color="#00FF00"></div>
+                            <div class="color-preset" style="background: #0000FF" data-color="#0000FF"></div>
+                            <div class="color-preset" style="background: #FFFF00" data-color="#FFFF00"></div>
+                            <div class="color-preset" style="background: #FF00FF" data-color="#FF00FF"></div>
+                            <div class="color-preset" style="background: #00FFFF" data-color="#00FFFF"></div>
+                            <div class="color-preset" style="background: #FF6B6B" data-color="#FF6B6B"></div>
+                            <div class="color-preset" style="background: #4ECDC4" data-color="#4ECDC4"></div>
+                            <div class="color-preset" style="background: #45B7D1" data-color="#45B7D1"></div>
+                            <div class="color-preset" style="background: #96CEB4" data-color="#96CEB4"></div>
+                            <div class="color-preset" style="background: #FFEAA7" data-color="#FFEAA7"></div>
+                            <div class="color-preset" style="background: #DDA0DD" data-color="#DDA0DD"></div>
+                            <div class="color-preset" style="background: #98D8C8" data-color="#98D8C8"></div>
+                            <div class="color-preset" style="background: #F7DC6F" data-color="#F7DC6F"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="status-bar" class="h-7">
+            <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-4">
+                    <span id="cursor-position">X: 0, Y: 0</span>
+                    <span id="selection-info">No selection</span>
+                    <span id="zoom-level">100%</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="object-count">0 objects</span>
+                    <span id="page-info">Page 1 of 1</span>
+                    <span id="file-size">0 KB</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="context-menu">
+        <div class="context-menu-item" data-action="cut">
+            <i class="fas fa-cut w-4"></i> Cut
+            <span class="ml-auto text-xs opacity-50">Ctrl+X</span>
+        </div>
+        <div class="context-menu-item" data-action="copy">
+            <i class="fas fa-copy w-4"></i> Copy
+            <span class="ml-auto text-xs opacity-50">Ctrl+C</span>
+        </div>
+        <div class="context-menu-item" data-action="paste">
+            <i class="fas fa-paste w-4"></i> Paste
+            <span class="ml-auto text-xs opacity-50">Ctrl+V</span>
+        </div>
+        <div class="context-menu-item" data-action="duplicate">
+            <i class="fas fa-clone w-4"></i> Duplicate
+            <span class="ml-auto text-xs opacity-50">Ctrl+D</span>
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="bring-front">
+            <i class="fas fa-angle-double-up w-4"></i> Bring to Front
+        </div>
+        <div class="context-menu-item" data-action="bring-forward">
+            <i class="fas fa-angle-up w-4"></i> Bring Forward
+        </div>
+        <div class="context-menu-item" data-action="send-backward">
+            <i class="fas fa-angle-down w-4"></i> Send Backward
+        </div>
+        <div class="context-menu-item" data-action="send-back">
+            <i class="fas fa-angle-double-down w-4"></i> Send to Back
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="group">
+            <i class="fas fa-object-group w-4"></i> Group
+            <span class="ml-auto text-xs opacity-50">Ctrl+G</span>
+        </div>
+        <div class="context-menu-item" data-action="ungroup">
+            <i class="fas fa-object-ungroup w-4"></i> Ungroup
+            <span class="ml-auto text-xs opacity-50">Ctrl+Shift+G</span>
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="delete">
+            <i class="fas fa-trash w-4"></i> Delete
+            <span class="ml-auto text-xs opacity-50">Del</span>
+        </div>
+    </div>
+
+    <input type="file" id="pdf-upload" accept=".pdf" class="hidden">
+    <input type="file" id="image-upload" accept="image/*" class="hidden">
+    <input type="file" id="multi-pdf-upload" accept=".pdf" multiple class="hidden">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10000] hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-8 flex flex-col items-center">
+            <div class="w-16 h-16 border-4 border-t-blue-500 border-gray-200 rounded-full animate-spin"></div>
+            <div id="loading-text" class="text-xl mt-4">Processing...</div>
+            <div id="loading-progress" class="w-64 h-2 bg-gray-200 dark:bg-slate-700 rounded-full mt-4 hidden">
+                <div id="loading-progress-bar" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-container" class="fixed inset-0 z-[5000] hidden"></div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        const { PDFDocument, rgb, degrees, StandardFonts, PageSizes, PDFName, PDFDict, PDFArray, PDFString, cmyk, grayscale } = PDFLib;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+
+        const app = {
+            pdfDoc: null,
+            currentPdfBytes: null,
+            fileName: 'untitled.pdf',
+            pages: [], 
+            currentPage: 1,
+            totalPages: 0,
+            
+            canvases: {},
+            contexts: {},
+            scale: 1,
+            viewport: null, 
+            pageWidth: 0,
+            pageHeight: 0,
+            devicePixelRatio: window.devicePixelRatio || 1,
+            panOffset: { x: 20, y: 20 }, 
+            
+            objects: [], 
+            selectedObjects: [],
+            layers: [
+                { id: 'default', name: 'Layer 1', visible: true, locked: false }
+            ],
+            activeLayer: 'default',
+            
+            currentTool: 'select',
+            isDrawing: false,
+            isDragging: false,
+            isResizing: false,
+            isPanning: false,
+            isRotating: false,
+            
+            showGrid: false,
+            showGuides: true,
+            showRulers: true,
+            snapToGrid: false,
+            gridSize: 20,
+            
+            history: [],
+            historyIndex: -1,
+            maxHistorySize: 100,
+            isUndoingRedoing: false,
+            
+            clipboard: [],
+            
+            guides: {
+                horizontal: [],
+                vertical: []
+            },
+            
+            selectionBox: null,
+            multiSelectMode: false,
+            
+            dragStart: { x: 0, y: 0 },
+            dragOffset: { x: 0, y: 0 },
+            currentPath: null,
+            resizeHandle: null,
+            rotationCenter: { x: 0, y: 0 },
+            
+            settings: {
+                autoSave: false,
+                autoSaveInterval: 60000, 
+                theme: localStorage.getItem('color-theme') || 'light',
+                defaultFont: 'Helvetica',
+                defaultFontSize: 24,
+                defaultFillColor: '#000000',
+                defaultStrokeColor: '#000000',
+                defaultStrokeWidth: 2,
+            }
+        };
+
+        const dom = {
+            formatBar: document.getElementById('format-bar'),
+            textFormat: document.getElementById('text-format'),
+            shapeFormat: document.getElementById('shape-format'),
+            highlightFormat: document.getElementById('highlight-format'),
+            strikeoutFormat: document.getElementById('strikeout-format'),
+            underlineFormat: document.getElementById('underline-format'),
+            fontFamily: document.getElementById('font-family'),
+            fontSize: document.getElementById('font-size'),
+            fillColor: document.getElementById('fill-color'),
+            fillOpacity: document.getElementById('fill-opacity'),
+            strokeColor: document.getElementById('stroke-color'),
+            strokeWidth: document.getElementById('stroke-width'),
+            strokeStyle: document.getElementById('stroke-style'),
+            propDefaultMsg: document.getElementById('prop-default-msg'),
+            propObject: document.getElementById('prop-object'),
+            propX: document.getElementById('prop-x'),
+            propY: document.getElementById('prop-y'),
+            propWidth: document.getElementById('prop-width'),
+            propHeight: document.getElementById('prop-height'),
+            propRotation: document.getElementById('prop-rotation'),
+            rotationValue: document.getElementById('rotation-value'),
+            propOpacity: document.getElementById('prop-opacity'),
+            opacityValue: document.getElementById('opacity-value'),
+            propShadow: document.getElementById('prop-shadow'),
+            shadowControls: document.getElementById('shadow-controls'),
+            toastContainer: document.getElementById('toast-container'),
+            tooltip: document.getElementById('tooltip'),
+            contextMenu: document.getElementById('context-menu'),
+            canvasContainer: document.getElementById('canvas-container'),
+            canvasWrapper: document.getElementById('canvas-wrapper'),
+            rulerH: document.getElementById('ruler-h'),
+            rulerV: document.getElementById('ruler-v'),
+            rulerCorner: document.getElementById('ruler-corner'),
+            loadingOverlay: document.getElementById('loading-overlay'),
+            loadingText: document.getElementById('loading-text'),
+            loadingProgress: document.getElementById('loading-progress'),
+            loadingProgressBar: document.getElementById('loading-progress-bar'),
+            zoomSelect: document.getElementById('zoom-select'),
+            undoBtn: document.getElementById('undo-btn'),
+            redoBtn: document.getElementById('redo-btn'),
+            cursorPosition: document.getElementById('cursor-position'),
+            selectionInfo: document.getElementById('selection-info'),
+            zoomLevel: document.getElementById('zoom-level'),
+            objectCount: document.getElementById('object-count'),
+            pageInfo: document.getElementById('page-info'),
+            fileSize: document.getElementById('file-size'),
+            pageThumbnails: document.getElementById('page-thumbnails'),
+            modalContainer: document.getElementById('modal-container')
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            setupCanvases();
+            setupEventListeners();
+            setupKeyboardShortcuts();
+            
+            if (app.settings.autoSave) {
+                setInterval(autoSave, app.settings.autoSaveInterval);
+            }
+            
+            initializeTooltips();
+            setupDragAndDrop();
+            selectTool('select');
+            updateHistoryButtons();
+            toggleRulers(app.showRulers);
+            
+            console.log('PDF Studio Pro initialized successfully');
+        }
+
+        function setupCanvases() {
+            const canvasIds = ['pdf-canvas', 'grid-canvas', 'objects-canvas', 'guides-canvas', 'selection-canvas', 'interaction-canvas'];
+            
+            canvasIds.forEach(id => {
+                const canvas = document.getElementById(id);
+                if (canvas) {
+                    app.canvases[id] = canvas;
+                    app.contexts[id] = canvas.getContext('2d');
+                }
+            });
+            app.canvases.rulerH = dom.rulerH;
+            app.contexts.rulerH = dom.rulerH.getContext('2d');
+            app.canvases.rulerV = dom.rulerV;
+            app.contexts.rulerV = dom.rulerV.getContext('2d');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('initial-pdf-upload').addEventListener('change', handleFileUpload);
+            document.getElementById('create-new-pdf').addEventListener('click', createNewPDF);
+            document.getElementById('open-file-btn').addEventListener('click', () => document.getElementById('pdf-upload').click());
+            document.getElementById('pdf-upload').addEventListener('change', handleFileUpload);
+            document.getElementById('image-upload').addEventListener('change', handleImageUpload);
+            document.getElementById('new-file-btn').addEventListener('click', createNewPDF);
+
+            const interactionCanvas = app.canvases['interaction-canvas'];
+            interactionCanvas.addEventListener('mousedown', handleCanvasMouseDown);
+            interactionCanvas.addEventListener('mousemove', handleCanvasMouseMove);
+            interactionCanvas.addEventListener('mouseup', handleCanvasMouseUp);
+            interactionCanvas.addEventListener('mouseleave', handleCanvasMouseLeave);
+            dom.canvasContainer.addEventListener('wheel', handleCanvasWheel, { passive: false });
+            interactionCanvas.addEventListener('contextmenu', handleContextMenu);
+            interactionCanvas.addEventListener('dblclick', handleDoubleClick);
+            
+            interactionCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            interactionCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            interactionCanvas.addEventListener('touchend', handleTouchEnd);
+            
+            document.querySelectorAll('#toolbar .tool-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const toolName = btn.id.replace('-tool', '');
+                    if (toolName === 'image') {
+                        document.getElementById('image-upload').click();
+                        return;
+                    }
+                    if (toolName === 'signature') {
+                        showSignatureModal();
+                        return;
+                    }
+                    if (['lasso', 'triangle', 'star', 'arrow', 'textbox', 'note', 'stamp', 'watermark', 'qrcode', 'barcode', 'ruler', 'protractor', 'area'].includes(toolName)) {
+                        showNotification('This tool is not yet implemented.', 'info');
+                        return;
+                    }
+                    selectTool(toolName);
+                });
+            });
+            
+            document.getElementById('zoom-in-btn').addEventListener('click', () => zoomIn());
+            document.getElementById('zoom-out-btn').addEventListener('click', () => zoomOut());
+            dom.zoomSelect.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val === 'fit') fitToPage();
+                else if (val === 'fitwidth') fitToWidth();
+                else setZoom(parseFloat(val));
+            });
+            
+            document.getElementById('prev-page-btn').addEventListener('click', () => navigatePage(app.currentPage - 1));
+            document.getElementById('next-page-btn').addEventListener('click', () => navigatePage(app.currentPage + 1));
+            document.getElementById('current-page-input').addEventListener('change', (e) => {
+                goToPage(parseInt(e.target.value));
+            });
+            document.getElementById('add-page-btn').addEventListener('click', addBlankPage);
+            
+            document.querySelectorAll('.sidebar-tab').forEach(tab => {
+                tab.addEventListener('click', () => switchSidebarTab(tab.dataset.tab));
+            });
+            dom.pageThumbnails.addEventListener('click', (e) => {
+                const thumb = e.target.closest('.thumbnail-item');
+                const deleteBtn = e.target.closest('.thumb-delete-btn');
+                const rotateBtn = e.target.closest('.thumb-rotate-btn');
+                
+                if (deleteBtn && thumb) {
+                    const pageNum = parseInt(thumb.dataset.page);
+                    if (confirm(`Are you sure you want to delete page ${pageNum}?`)) {
+                        deletePage(pageNum);
+                    }
+                    return;
+                }
+
+                if (rotateBtn && thumb) {
+                    const pageNum = parseInt(thumb.dataset.page);
+                    rotatePage(pageNum);
+                    return;
+                }
+
+                if (thumb) {
+                    goToPage(parseInt(thumb.dataset.page));
+                }
+            });
+
+            document.getElementById('toggle-grid-btn').addEventListener('click', toggleGrid);
+            document.getElementById('toggle-guides-btn').addEventListener('click', toggleGuides);
+            document.getElementById('toggle-rulers-btn').addEventListener('click', () => toggleRulers());
+            document.getElementById('toggle-snap-to-grid-btn').addEventListener('click', toggleSnapToGrid);
+            
+            setupFormatBarListeners();
+            setupPropertiesPanelListeners();
+
+            dom.undoBtn.addEventListener('click', undo);
+            dom.redoBtn.addEventListener('click', redo);
+            
+            document.getElementById('cut-btn').addEventListener('click', cut);
+            document.getElementById('copy-btn').addEventListener('click', copy);
+            document.getElementById('paste-btn').addEventListener('click', paste);
+            document.getElementById('duplicate-btn').addEventListener('click', duplicate);
+            
+            document.getElementById('save-btn').addEventListener('click', savePDF);
+            
+            document.getElementById('theme-toggle-btn').addEventListener('click', toggleTheme);
+            
+            document.addEventListener('click', hideContextMenu);
+            dom.contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    handleContextMenuAction(item.dataset.action);
+                    hideContextMenu();
+                });
+            });
+            
+            window.addEventListener('resize', handleWindowResize);
+
+            document.getElementById('bring-to-front-btn').addEventListener('click', bringToFront);
+            document.getElementById('send-to-back-btn').addEventListener('click', sendToBack);
+            document.getElementById('delete-object-btn').addEventListener('click', deleteSelected);
+            document.getElementById('group-btn').addEventListener('click', groupSelected);
+            document.getElementById('ungroup-btn').addEventListener('click', ungroupSelected);
+
+            document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
+        }
+
+        function setupFormatBarListeners() {
+            dom.fontFamily.addEventListener('change', (e) => updateSelectedObjects('fontFamily', e.target.value));
+            dom.fontSize.addEventListener('change', (e) => updateSelectedObjects('fontSize', parseInt(e.target.value)));
+            document.getElementById('bold-btn').addEventListener('click', () => updateSelectedObjects('bold', !app.selectedObjects[0]?.bold, true));
+            document.getElementById('italic-btn').addEventListener('click', () => updateSelectedObjects('italic', !app.selectedObjects[0]?.italic, true));
+            document.getElementById('underline-btn').addEventListener('click', () => updateSelectedObjects('underline', !app.selectedObjects[0]?.underline, true));
+            
+            dom.fillColor.addEventListener('input', (e) => updateSelectedObjects('fillColor', e.target.value));
+            dom.fillOpacity.addEventListener('input', (e) => updateSelectedObjects('fillOpacity', parseInt(e.target.value)));
+            dom.strokeColor.addEventListener('input', (e) => updateSelectedObjects('strokeColor', e.target.value));
+            dom.strokeWidth.addEventListener('input', (e) => updateSelectedObjects('strokeWidth', parseInt(e.target.value)));
+            dom.strokeStyle.addEventListener('change', (e) => updateSelectedObjects('strokeStyle', e.target.value));
+
+            document.getElementById('highlight-color').addEventListener('input', (e) => updateSelectedObjects('color', e.target.value));
+            document.getElementById('highlight-opacity').addEventListener('input', (e) => updateSelectedObjects('opacity', parseInt(e.target.value)));
+
+            document.getElementById('strikeout-color').addEventListener('input', (e) => updateSelectedObjects('color', e.target.value));
+            document.getElementById('strikeout-width').addEventListener('input', (e) => updateSelectedObjects('strokeWidth', parseInt(e.target.value)));
+
+            document.getElementById('underline-color').addEventListener('input', (e) => updateSelectedObjects('color', e.target.value));
+            document.getElementById('underline-width').addEventListener('input', (e) => updateSelectedObjects('strokeWidth', parseInt(e.target.value)));
+        }
+
+        function setupPropertiesPanelListeners() {
+            ['x', 'y', 'width', 'height'].forEach(prop => {
+                document.getElementById(`prop-${prop}`).addEventListener('change', (e) => {
+                    updateSelectedObjects(prop, parseFloat(e.target.value));
+                });
+            });
+            dom.propRotation.addEventListener('input', (e) => {
+                const rot = parseInt(e.target.value);
+                dom.rotationValue.textContent = `${rot}°`;
+                updateSelectedObjects('rotation', rot);
+            });
+            dom.propOpacity.addEventListener('input', (e) => {
+                const op = parseInt(e.target.value);
+                dom.opacityValue.textContent = `${op}%`;
+                updateSelectedObjects('opacity', op);
+            });
+            dom.propShadow.addEventListener('change', (e) => {
+                dom.shadowControls.classList.toggle('hidden', !e.target.checked);
+                updateSelectedObjects('shadow', e.target.checked);
+            });
+            ['shadowX', 'shadowY', 'shadowBlur', 'shadowColor'].forEach(prop => {
+                const el = document.getElementById(prop.replace('shadow', 'shadow-'));
+                const event = el.type === 'color' ? 'input' : 'change';
+                el.addEventListener(event, (e) => {
+                    updateSelectedObjects(prop, el.type === 'number' ? parseFloat(e.target.value) : e.target.value);
+                });
+            });
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                    return;
+                }
+                
+                const ctrl = e.ctrlKey || e.metaKey;
+                const shift = e.shiftKey;
+                const alt = e.altKey;
+                
+                let handled = true;
+                if (ctrl && e.key === 'n') createNewPDF();
+                else if (ctrl && e.key === 'o') document.getElementById('pdf-upload').click();
+                else if (ctrl && e.key === 's') savePDF();
+                else if (ctrl && shift && e.key === 's') savePDF(); 
+                else if (ctrl && e.key === 'z') undo();
+                else if (ctrl && e.key === 'y') redo();
+                else if (ctrl && e.key === 'x') cut();
+                else if (ctrl && e.key === 'c') copy();
+                else if (ctrl && e.key === 'v') paste();
+                else if (ctrl && e.key === 'd') duplicate();
+                else if (ctrl && e.key === 'a') selectAll();
+                else if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+                else if (ctrl && e.key === '=') zoomIn();
+                else if (ctrl && e.key === '-') zoomOut();
+                else if (ctrl && e.key === '0') setZoom(1);
+                else if (e.key === 'F11') toggleFullscreen();
+                else if (e.key === 'v') selectTool('select');
+                else if (e.key === 'h' || e.key === ' ') { handled = false; }
+                else if (e.key === 'z') selectTool('zoom');
+                else if (e.key === 't') selectTool('text');
+                else if (e.key === 'r') selectTool('rect');
+                else if (e.key === 'o') selectTool('circle');
+                else if (e.key === 'l') selectTool('line');
+                else if (e.key === 'p') selectTool('pen');
+                else if (e.key === 'b') selectTool('brush');
+                else if (ctrl && e.key === 'g') groupSelected();
+                else if (ctrl && shift && e.key === 'g') ungroupSelected();
+                else if (ctrl && e.key === ']') bringForward();
+                else if (ctrl && e.key === '[') sendBackward();
+                else if (ctrl && shift && e.key === ']') bringToFront();
+                else if (ctrl && shift && e.key === '[') sendToBack();
+                else if (e.key === 'PageUp') navigatePage(app.currentPage - 1);
+                else if (e.key === 'PageDown') navigatePage(app.currentPage + 1);
+                else if (e.key === 'Home') goToPage(1);
+                else if (e.key === 'End') goToPage(app.totalPages);
+                else if (e.key === 'Escape') {
+                    if (app.isDrawing) {
+                        app.isDrawing = false;
+                        app.objects.pop(); 
+                        selectTool('select');
+                        requestRedraw();
+                    } else {
+                        deselectAll();
+                    }
+                } else {
+                    handled = false;
+                }
+                
+                if (handled) e.preventDefault();
+
+                if (e.key === ' ' && !app.isPanning && app.currentTool !== 'hand') {
+                    app.prePanTool = app.currentTool;
+                    selectTool('hand');
+                    app.isPanning = true; 
+                    dom.canvasContainer.classList.add('cursor-grab');
+                    e.preventDefault();
+                }
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                if (e.key === ' ') {
+                    if (app.isPanning) {
+                        selectTool(app.prePanTool || 'select');
+                        app.isPanning = false;
+                        dom.canvasContainer.classList.remove('cursor-grab', 'cursor-grabbing');
+                    }
+                }
+            });
+        }
+
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('upload-screen');
+            const editorZone = document.getElementById('main-editor');
+
+            [dropZone, editorZone].forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (zone === dropZone) {
+                        zone.classList.add('bg-blue-100', 'dark:bg-blue-900');
+                    }
+                });
+                zone.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (zone === dropZone) {
+                        zone.classList.remove('bg-blue-100', 'dark:bg-blue-900');
+                    }
+                });
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (zone === dropZone) {
+                        zone.classList.remove('bg-blue-100', 'dark:bg-blue-900');
+                    }
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        document.getElementById('initial-pdf-upload').files = files;
+                        handleFileUpload({ target: document.getElementById('initial-pdf-upload') });
+                    }
+                });
+            });
+        }
+
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                showNotification('Please select a valid PDF file', 'error');
+                return;
+            }
+            
+            showLoading('Loading PDF...');
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                app.currentPdfBytes = arrayBuffer;
+                app.fileName = file.name;
+                
+                const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+                app.pdfDoc = await loadingTask.promise;
+                app.totalPages = app.pdfDoc.numPages;
+                
+                app.objects = [];
+                app.pages = [];
+                app.history = [];
+                app.historyIndex = -1;
+                app.selectedObjects = [];
+
+                for (let i = 1; i <= app.totalPages; i++) {
+                    app.pages.push({
+                        pageNumber: i,
+                        rotation: 0,
+                        backgroundColor: null
+                    });
+                }
+                
+                document.getElementById('upload-screen').classList.add('hidden');
+                document.getElementById('main-editor').classList.remove('hidden');
+                
+                await goToPage(1);
+                
+                showLoading('Generating thumbnails...');
+                await generateThumbnails();
+                
+                updatePageInfo();
+                updateStatusBar();
+                updateHistoryButtons();
+                saveHistory();
+                
+                hideLoading();
+                showNotification('PDF loaded successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                hideLoading();
+                showNotification('Failed to load PDF', 'error');
+            }
+        }
+
+        async function createNewPDF() {
+            showLoading('Creating new PDF...');
+            
+            try {
+                const pdfDoc = await PDFDocument.create();
+                const [width, height] = PageSizes.A4;
+                const page = pdfDoc.addPage([width, height]);
+                
+                app.currentPdfBytes = await pdfDoc.save();
+                app.fileName = 'untitled.pdf';
+                
+                const loadingTask = pdfjsLib.getDocument({ data: app.currentPdfBytes });
+                app.pdfDoc = await loadingTask.promise;
+                app.totalPages = 1;
+                
+                app.objects = [];
+                app.history = [];
+                app.historyIndex = -1;
+                app.selectedObjects = [];
+                app.pages = [{
+                    pageNumber: 1,
+                    rotation: 0,
+                    backgroundColor: null
+                }];
+                
+                document.getElementById('upload-screen').classList.add('hidden');
+                document.getElementById('main-editor').classList.remove('hidden');
+                
+                await goToPage(1);
+                await generateThumbnails();
+                
+                updatePageInfo();
+                updateStatusBar();
+                updateHistoryButtons();
+                saveHistory();
+                
+                hideLoading();
+                showNotification('New PDF created', 'success');
+                
+            } catch (error) {
+                console.error('Error creating PDF:', error);
+                hideLoading();
+                showNotification('Failed to create PDF', 'error');
+            }
+        }
+
+        async function savePDF() {
+            if (!app.pdfDoc) {
+                showNotification('No PDF loaded', 'error');
+                return;
+            }
+            showLoading('Saving PDF...');
+            
+            try {
+                const pdfDoc = await PDFDocument.load(app.currentPdfBytes);
+                const embeddedFonts = {};
+
+                async function getFont(fontName) {
+                    if (embeddedFonts[fontName]) {
+                        return embeddedFonts[fontName];
+                    }
+                    let font;
+                    if (fontName.includes('Times')) font = StandardFonts.TimesRoman;
+                    else if (fontName.includes('Courier')) font = StandardFonts.Courier;
+                    else font = StandardFonts.Helvetica; 
+                    
+                    embeddedFonts[fontName] = await pdfDoc.embedFont(font);
+                    return embeddedFonts[fontName];
+                }
+
+                const pages = pdfDoc.getPages();
+                
+                for (let i = 0; i < app.pages.length; i++) {
+                    const pageData = app.pages[i];
+                    let page;
+                    if (i < pages.length) {
+                        page = pages[i];
+                    } else {
+                        page = pdfDoc.addPage(PageSizes.A4);
+                        pages.push(page);
+                    }
+                    
+                    const { width, height } = page.getSize();
+                    page.setRotation(degrees(pageData.rotation || 0));
+
+                    const pageObjects = app.objects.filter(obj => obj.page === (i + 1));
+
+                    for (const obj of pageObjects) {
+                        await drawObjectToPDF(page, obj, pdfDoc, getFont, width, height);
+                    }
+                }
+
+                while (pages.length > app.pages.length) {
+                    pdfDoc.removePage(pages.length - 1);
+                    pages.pop();
+                }
+                
+                const pdfBytes = await pdfDoc.save();
+                
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = app.fileName;
+                link.click();
+                URL.revokeObjectURL(link.href);
+
+                app.currentPdfBytes = pdfBytes;
+                
+                hideLoading();
+                showNotification('PDF saved successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error saving PDF:', error);
+                hideLoading();
+                showNotification(`Failed to save PDF: ${error.message}`, 'error');
+            }
+        }
+
+        async function drawObjectToPDF(page, obj, pdfDoc, getFont, pageWidth, pageHeight) {
+            const y = pageHeight - obj.y - obj.height;
+            const x = obj.x;
+
+            const options = {
+                x: x,
+                y: y,
+                width: obj.width,
+                height: obj.height,
+                rotate: degrees(obj.rotation || 0),
+                opacity: (obj.opacity === undefined ? 100 : obj.opacity) / 100,
+            };
+
+            const parseColor = (hex) => {
+                if (!hex || hex === 'transparent') return undefined;
+                const r = parseInt(hex.slice(1, 3), 16) / 255;
+                const g = parseInt(hex.slice(3, 5), 16) / 255;
+                const b = parseInt(hex.slice(5, 7), 16) / 255;
+                return { r, g, b };
+            };
+
+            const colorToRgb = (hex) => {
+                const c = parseColor(hex);
+                return c ? rgb(c.r, c.g, c.b) : undefined;
+            }
+
+            const fillColor = colorToRgb(obj.fillColor);
+            const strokeColor = colorToRgb(obj.strokeColor);
+            const objColor = colorToRgb(obj.color);
+
+            try {
+                switch (obj.type) {
+                    case 'rect':
+                        page.drawRectangle({
+                            ...options,
+                            color: fillColor,
+                            borderColor: strokeColor,
+                            borderWidth: obj.strokeWidth,
+                            opacity: options.opacity,
+                            borderOpacity: options.opacity,
+                        });
+                        break;
+                    case 'circle':
+                        page.drawEllipse({
+                            x: x + obj.width / 2,
+                            y: y + obj.height / 2,
+                            xScale: obj.width / 2,
+                            yScale: obj.height / 2,
+                            color: fillColor,
+                            borderColor: strokeColor,
+                            borderWidth: obj.strokeWidth,
+                            opacity: options.opacity,
+                            borderOpacity: options.opacity,
+                            rotate: options.rotate,
+                        });
+                        break;
+                    case 'line':
+                        page.drawLine({
+                            start: { x: x, y: pageHeight - obj.y },
+                            end: { x: x + obj.width, y: pageHeight - (obj.y + obj.height) },
+                            thickness: obj.strokeWidth,
+                            color: strokeColor,
+                            opacity: options.opacity,
+                        });
+                        break;
+                    case 'path':
+                    case 'brush':
+                        const pathData = obj.points.map((p, i) => {
+                            const cmd = (i === 0) ? 'M' : 'L';
+                            const pX = x + p.x;
+                            const pY = pageHeight - (obj.y + p.y);
+                            return `${cmd} ${pX} ${pY}`;
+                        }).join(' ');
+                        
+                        page.drawSvgPath(pathData, {
+                            borderColor: strokeColor,
+                            borderWidth: obj.strokeWidth,
+                            opacity: options.opacity,
+                        });
+                        break;
+                    case 'text':
+                        const font = await getFont(obj.fontFamily);
+                        page.drawText(obj.text, {
+                            x: x,
+                            y: pageHeight - obj.y - obj.fontSize, 
+                            font: font,
+                            size: obj.fontSize,
+                            color: objColor,
+                            rotate: options.rotate,
+                            opacity: options.opacity,
+                        });
+                        break;
+                    case 'image':
+                        let imageBytes = obj.base64.split(',')[1];
+                        let pdfImage;
+                        if(obj.fileType === 'image/png') {
+                            pdfImage = await pdfDoc.embedPng(imageBytes);
+                        } else {
+                            pdfImage = await pdfDoc.embedJpg(imageBytes);
+                        }
+                        page.drawImage(pdfImage, options);
+                        break;
+                    case 'highlight':
+                        page.drawRectangle({
+                            ...options,
+                            color: objColor,
+                            opacity: options.opacity / 100,
+                        });
+                        break;
+                    case 'strikeout':
+                        page.drawLine({
+                            start: { x: x, y: pageHeight - obj.y - obj.height / 2 },
+                            end: { x: x + obj.width, y: pageHeight - obj.y - obj.height / 2 },
+                            thickness: obj.strokeWidth,
+                            color: objColor,
+                            opacity: options.opacity,
+                        });
+                        break;
+                    case 'underline':
+                        page.drawLine({
+                            start: { x: x, y: pageHeight - obj.y - obj.height + (obj.strokeWidth / 2) },
+                            end: { x: x + obj.width, y: pageHeight - obj.y - obj.height + (obj.strokeWidth / 2) },
+                            thickness: obj.strokeWidth,
+                            color: objColor,
+                            opacity: options.opacity,
+                        });
+                        break;
+                }
+            } catch (e) {
+                console.warn(`Skipping object, could not draw: ${obj.type}`, e.message);
+            }
+        }
+        
+        async function renderPage(pageNum) {
+            if (!app.pdfDoc || pageNum < 1 || pageNum > app.totalPages) return;
+            
+            showLoading('Rendering page...');
+            app.currentPage = pageNum;
+            const page = await app.pdfDoc.getPage(pageNum);
+            
+            const rotation = app.pages[pageNum - 1]?.rotation || 0;
+            app.viewport = page.getViewport({ scale: app.scale, rotation: rotation });
+            app.pageWidth = app.viewport.width;
+            app.pageHeight = app.viewport.height;
+            
+            const canvasWidth = Math.floor(app.pageWidth * app.devicePixelRatio);
+            const canvasHeight = Math.floor(app.pageHeight * app.devicePixelRatio);
+            
+            Object.values(app.canvases).forEach(canvas => {
+                if(canvas.id === 'ruler-h' || canvas.id === 'ruler-v') return;
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+                canvas.style.width = Math.floor(app.pageWidth) + 'px';
+                canvas.style.height = Math.floor(app.pageHeight) + 'px';
+            });
+            
+            dom.canvasWrapper.style.width = Math.floor(app.pageWidth) + 'px';
+            dom.canvasWrapper.style.height = Math.floor(app.pageHeight) + 'px';
+            
+            Object.values(app.contexts).forEach((ctx, i) => {
+                const id = Object.keys(app.contexts)[i];
+                if(id === 'ruler-h' || id === 'ruler-v') return;
+                ctx.setTransform(app.devicePixelRatio, 0, 0, app.devicePixelRatio, 0, 0);
+                ctx.clearRect(0, 0, app.pageWidth, app.pageHeight);
+            });
+            
+            const renderContext = {
+                canvasContext: app.contexts['pdf-canvas'],
+                viewport: app.viewport,
+                transform: [app.devicePixelRatio, 0, 0, app.devicePixelRatio, 0, 0]
+            };
+            await page.render(renderContext).promise;
+            
+            requestRedraw();
+            
+            updatePageInfo();
+            updateStatusBar();
+            updateZoomSelect();
+            centerCanvas();
+            hideLoading();
+        }
+
+        function requestRedraw() {
+            app.contexts['grid-canvas'].clearRect(0, 0, app.pageWidth, app.pageHeight);
+            app.contexts['objects-canvas'].clearRect(0, 0, app.pageWidth, app.pageHeight);
+            app.contexts['guides-canvas'].clearRect(0, 0, app.pageWidth, app.pageHeight);
+            app.contexts['selection-canvas'].clearRect(0, 0, app.pageWidth, app.pageHeight);
+            
+            if (app.showGrid) renderGrid();
+            if (app.showGuides) renderGuides();
+            if (app.showRulers) updateRulers();
+            
+            renderObjects();
+            renderSelection();
+        }
+
+        function renderGrid() {
+            const ctx = app.contexts['grid-canvas'];
+            const gridSize = app.gridSize;
+            
+            ctx.strokeStyle = app.settings.theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 0.5;
+            
+            for (let x = 0; x <= app.pageWidth; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, app.pageHeight);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= app.pageHeight; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(app.pageWidth, y);
+                ctx.stroke();
+            }
+        }
+
+        function renderGuides() {
+            const ctx = app.contexts['guides-canvas'];
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            
+            app.guides.horizontal.forEach(y => {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(app.pageWidth, y);
+                ctx.stroke();
+            });
+            app.guides.vertical.forEach(x => {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, app.pageHeight);
+                ctx.stroke();
+            });
+            
+            ctx.setLineDash([]);
+        }
+
+        function renderObjects() {
+            const ctx = app.contexts['objects-canvas'];
+            const pageObjects = app.objects.filter(obj => obj.page === app.currentPage);
+            
+            pageObjects.forEach(obj => {
+                renderObject(ctx, obj);
+            });
+        }
+
+        function renderObject(ctx, obj) {
+            ctx.save();
+            
+            const centerX = obj.x + obj.width / 2;
+            const centerY = obj.y + obj.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate((obj.rotation || 0) * Math.PI / 180);
+            ctx.translate(-centerX, -centerY);
+            
+            const opacity = (obj.opacity === undefined ? 100 : obj.opacity) / 100;
+            ctx.globalAlpha = opacity;
+            
+            if (obj.shadow) {
+                ctx.shadowColor = obj.shadowColor || 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = obj.shadowBlur || 4;
+                ctx.shadowOffsetX = obj.shadowX || 2;
+                ctx.shadowOffsetY = obj.shadowY || 2;
+            }
+            
+            const fill = obj.fillColor && obj.fillColor !== 'transparent';
+            const stroke = obj.strokeColor && obj.strokeColor !== 'transparent' && obj.strokeWidth > 0;
+            
+            ctx.fillStyle = obj.fillColor || 'transparent';
+            ctx.strokeStyle = obj.strokeColor || 'transparent';
+            ctx.lineWidth = obj.strokeWidth || 1;
+            
+            switch (obj.type) {
+                case 'rect':
+                    if (fill) ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                    if (stroke) ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+                    break;
+                    
+                case 'circle':
+                    ctx.beginPath();
+                    ctx.ellipse(obj.x + obj.width/2, obj.y + obj.height/2, obj.width/2, obj.height/2, 0, 0, 2 * Math.PI);
+                    if (fill) ctx.fill();
+                    if (stroke) ctx.stroke();
+                    break;
+                    
+                case 'text':
+                    ctx.fillStyle = obj.color || '#000000';
+                    ctx.font = `${obj.italic ? 'italic ' : ''}${obj.bold ? 'bold ' : ''}${obj.fontSize}px ${obj.fontFamily}`;
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(obj.text, obj.x, obj.y);
+                    break;
+                    
+                case 'image':
+                    if (obj.imageEl) {
+                        ctx.drawImage(obj.imageEl, obj.x, obj.y, obj.width, obj.height);
+                    }
+                    break;
+                
+                case 'line':
+                    ctx.beginPath();
+                    ctx.moveTo(obj.x, obj.y);
+                    ctx.lineTo(obj.x + obj.width, obj.y + obj.height);
+                    if(stroke) ctx.stroke();
+                    break;
+
+                case 'path':
+                case 'brush':
+                    ctx.strokeStyle = obj.strokeColor;
+                    ctx.lineWidth = obj.strokeWidth;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    obj.points.forEach((p, i) => {
+                        if (i === 0) ctx.moveTo(obj.x + p.x, obj.y + p.y);
+                        else ctx.lineTo(obj.x + p.x, obj.y + p.y);
+                    });
+                    ctx.stroke();
+                    break;
+
+                case 'highlight':
+                    ctx.fillStyle = obj.color || '#FFFF00';
+                    ctx.globalAlpha = opacity;
+                    ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                    break;
+
+                case 'strikeout':
+                    ctx.strokeStyle = obj.color || '#FF0000';
+                    ctx.lineWidth = obj.strokeWidth || 2;
+                    ctx.beginPath();
+                    ctx.moveTo(obj.x, obj.y + obj.height / 2);
+                    ctx.lineTo(obj.x + obj.width, obj.y + obj.height / 2);
+                    ctx.stroke();
+                    break;
+
+                case 'underline':
+                    ctx.strokeStyle = obj.color || '#000000';
+                    ctx.lineWidth = obj.strokeWidth || 2;
+                    ctx.beginPath();
+                    ctx.moveTo(obj.x, obj.y + obj.height - (ctx.lineWidth / 2));
+                    ctx.lineTo(obj.x + obj.width, obj.y + obj.height - (ctx.lineWidth / 2));
+                    ctx.stroke();
+                    break;
+            }
+            
+            ctx.restore();
+        }
+
+        function renderSelection() {
+            const ctx = app.contexts['selection-canvas'];
+            ctx.clearRect(0, 0, app.pageWidth, app.pageHeight);
+            
+            if (app.selectionBox) {
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(app.selectionBox.x, app.selectionBox.y, app.selectionBox.width, app.selectionBox.height);
+                ctx.setLineDash([]);
+            }
+
+            if (app.selectedObjects.length === 0) return;
+
+            const bounds = getCommonBoundingBox(app.selectedObjects);
+            if (!bounds) return;
+
+            ctx.save();
+            const centerX = bounds.x + bounds.width / 2;
+            const centerY = bounds.y + bounds.height / 2;
+            const rotation = (app.selectedObjects.length === 1 ? app.selectedObjects[0].rotation : 0) || 0;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotation * Math.PI / 180);
+            ctx.translate(-centerX, -centerY);
+
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+            
+            const handles = getResizeHandles(bounds);
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            Object.values(handles).forEach(handle => {
+                ctx.fillRect(handle.x - 4, handle.y - 4, 8, 8);
+                ctx.strokeRect(handle.x - 4, handle.y - 4, 8, 8);
+            });
+            
+            if (app.selectedObjects.length === 1) {
+                const rotHandle = getRotationHandle(bounds);
+                ctx.beginPath();
+                ctx.moveTo(bounds.x + bounds.width / 2, bounds.y);
+                ctx.lineTo(rotHandle.x, rotHandle.y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(rotHandle.x, rotHandle.y, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function selectTool(toolName) {
+            document.querySelectorAll('#toolbar .tool-btn').forEach(btn => {
+                btn.classList.remove('tool-active');
+            });
+            
+            const toolBtn = document.getElementById(`${toolName}-tool`);
+            if (toolBtn) toolBtn.classList.add('tool-active');
+            
+            app.currentTool = toolName;
+            updateCursor();
+            updateFormatBar();
+            
+            if (toolName !== 'select') {
+                deselectAll();
+            }
+        }
+
+        function updateCursor() {
+            const canvas = app.canvases['interaction-canvas'];
+            canvas.className = ''; 
+            
+            if (app.resizeHandle) {
+                canvas.classList.add(app.resizeHandle.cursor);
+                return;
+            }
+            if (app.isRotating) {
+                canvas.classList.add('cursor-rotate');
+                return;
+            }
+
+            switch (app.currentTool) {
+                case 'select':
+                    const obj = getObjectAtCoords(app.dragStart.x, app.dragStart.y, app.objects.filter(o => o.page === app.currentPage));
+                    canvas.classList.add(obj ? 'cursor-move' : 'cursor-default');
+                    break;
+                case 'hand':
+                    canvas.classList.add(app.isPanning ? 'cursor-grabbing' : 'cursor-grab');
+                    break;
+                case 'zoom':
+                    canvas.classList.add('cursor-zoom-in'); 
+                    break;
+                case 'text':
+                    canvas.classList.add('cursor-text');
+                    break;
+                default:
+                    canvas.classList.add('cursor-crosshair');
+            }
+        }
+
+        function updateFormatBar() {
+            const obj = app.selectedObjects.length === 1 ? app.selectedObjects[0] : null;
+            
+            dom.textFormat.classList.add('hidden');
+            dom.shapeFormat.classList.add('hidden');
+            dom.highlightFormat.classList.add('hidden');
+            dom.strikeoutFormat.classList.add('hidden');
+            dom.underlineFormat.classList.add('hidden');
+
+            let showBar = true;
+
+            if (obj?.type === 'text' || app.currentTool === 'text') {
+                dom.textFormat.classList.remove('hidden');
+                dom.fontFamily.value = obj?.fontFamily || app.settings.defaultFont;
+                dom.fontSize.value = obj?.fontSize || app.settings.defaultFontSize;
+                ['bold', 'italic', 'underline'].forEach(style => {
+                    document.getElementById(`${style}-btn`).classList.toggle('tool-active', obj?.[style] || false);
+                });
+            } else if (obj?.type.match(/rect|circle|line|path|brush/) || app.currentTool.match(/rect|circle|line|brush|pen/)) {
+                dom.shapeFormat.classList.remove('hidden');
+                dom.fillColor.value = obj?.fillColor || app.settings.defaultFillColor;
+                dom.fillOpacity.value = obj?.fillOpacity === undefined ? 100 : obj.fillOpacity;
+                dom.strokeColor.value = obj?.strokeColor || app.settings.defaultStrokeColor;
+                dom.strokeWidth.value = obj?.strokeWidth === undefined ? app.settings.defaultStrokeWidth : obj.strokeWidth;
+                dom.strokeStyle.value = obj?.strokeStyle || 'solid';
+            } else if (obj?.type === 'highlight' || app.currentTool === 'highlight') {
+                dom.highlightFormat.classList.remove('hidden');
+                document.getElementById('highlight-color').value = obj?.color || '#FFFF00';
+                document.getElementById('highlight-opacity').value = obj?.opacity || 40;
+            } else if (obj?.type === 'strikeout' || app.currentTool === 'strikeout') {
+                dom.strikeoutFormat.classList.remove('hidden');
+                document.getElementById('strikeout-color').value = obj?.color || '#FF0000';
+                document.getElementById('strikeout-width').value = obj?.strokeWidth || 2;
+            } else if (obj?.type === 'underline' || app.currentTool === 'underline') {
+                dom.underlineFormat.classList.remove('hidden');
+                document.getElementById('underline-color').value = obj?.color || '#000000';
+                document.getElementById('underline-width').value = obj?.strokeWidth || 2;
+            } else {
+                showBar = false;
+            }
+            
+            dom.formatBar.classList.toggle('hidden', !showBar);
+        }
+
+        function updatePropertiesPanel() {
+            if (app.selectedObjects.length !== 1) {
+                dom.propDefaultMsg.classList.remove('hidden');
+                dom.propObject.classList.add('hidden');
+                return;
+            }
+
+            dom.propDefaultMsg.classList.add('hidden');
+            dom.propObject.classList.remove('hidden');
+
+            const obj = app.selectedObjects[0];
+
+            dom.propX.value = Math.round(obj.x);
+            dom.propY.value = Math.round(obj.y);
+            dom.propWidth.value = Math.round(obj.width);
+            dom.propHeight.value = Math.round(obj.height);
+            dom.propRotation.value = obj.rotation || 0;
+            dom.rotationValue.textContent = `${obj.rotation || 0}°`;
+            
+            const op = obj.opacity === undefined ? 100 : obj.opacity;
+            dom.propOpacity.value = op;
+            dom.opacityValue.textContent = `${op}%`;
+
+            const hasShadow = obj.shadow || false;
+            dom.propShadow.checked = hasShadow;
+            dom.shadowControls.classList.toggle('hidden', !hasShadow);
+            if(hasShadow) {
+                document.getElementById('shadow-x').value = obj.shadowX || 2;
+                document.getElementById('shadow-y').value = obj.shadowY || 2;
+                document.getElementById('shadow-blur').value = obj.shadowBlur || 4;
+                document.getElementById('shadow-color').value = obj.shadowColor || '#000000';
+            }
+        }
+
+        function updatePageInfo() {
+            document.getElementById('current-page-input').value = app.currentPage;
+            document.getElementById('total-pages').textContent = app.totalPages;
+            
+            document.getElementById('prev-page-btn').disabled = app.currentPage <= 1;
+            document.getElementById('next-page-btn').disabled = app.currentPage >= app.totalPages;
+        }
+
+        function updateStatusBar() {
+            if (app.selectedObjects.length === 0) {
+                dom.selectionInfo.textContent = 'No selection';
+            } else if (app.selectedObjects.length === 1) {
+                const obj = app.selectedObjects[0];
+                dom.selectionInfo.textContent = `Selected: ${obj.type}`;
+            } else {
+                dom.selectionInfo.textContent = `${app.selectedObjects.length} objects selected`;
+            }
+            dom.zoomLevel.textContent = `${Math.round(app.scale * 100)}%`;
+            dom.pageInfo.textContent = `Page ${app.currentPage} of ${app.totalPages}`;
+            dom.objectCount.textContent = `${app.objects.filter(o => o.page === app.currentPage).length} objects`;
+            if (app.currentPdfBytes) {
+                dom.fileSize.textContent = `${(app.currentPdfBytes.byteLength / 1024).toFixed(1)} KB`;
+            }
+        }
+
+        function updateZoomSelect() {
+            const scalePercent = Math.round(app.scale * 100);
+            const matchingOption = Array.from(dom.zoomSelect.options).find(o => Math.round(parseFloat(o.value) * 100) === scalePercent);
+            if (matchingOption) {
+                dom.zoomSelect.value = matchingOption.value;
+            } else {
+                let customOption = dom.zoomSelect.querySelector('option[data-custom]');
+                if (!customOption) {
+                    customOption = document.createElement('option');
+                    customOption.dataset.custom = true;
+                }
+                customOption.value = app.scale;
+                customOption.textContent = `${scalePercent}%`;
+                dom.zoomSelect.appendChild(customOption);
+                dom.zoomSelect.value = app.scale;
+            }
+        }
+
+        function getCanvasCoords(e) {
+            const rect = app.canvases['interaction-canvas'].getBoundingClientRect();
+            const x = (e.clientX - rect.left) / app.scale;
+            const y = (e.clientY - rect.top) / app.scale;
+            return { x, y };
+        }
+
+        function getTouchCoords(e) {
+             const rect = app.canvases['interaction-canvas'].getBoundingClientRect();
+             const touches = e.touches || e.changedTouches;
+             return Array.from(touches).map(touch => ({
+                 x: (touch.clientX - rect.left) / app.scale,
+                 y: (touch.clientY - rect.top) / app.scale
+             }));
+        }
+
+        function handleCanvasMouseDown(e) {
+            e.preventDefault();
+            const { x, y } = getCanvasCoords(e);
+            app.dragStart = { x, y };
+            app.dragOffset = { x: 0, y: 0 };
+            
+            if (app.currentTool === 'hand' || app.isPanning) {
+                app.isPanning = true;
+                dom.canvasContainer.classList.add('cursor-grabbing');
+                return;
+            }
+            
+            app.resizeHandle = getHandleAtCoords(x, y);
+            if (app.resizeHandle) {
+                app.isResizing = true;
+                app.dragOffset = { x: app.resizeHandle.x, y: app.resizeHandle.y };
+                saveHistory();
+                return;
+            }
+
+            const clickedObject = getObjectAtCoords(x, y, app.objects.filter(o => o.page === app.currentPage));
+
+            if (app.currentTool === 'select') {
+                if (clickedObject) {
+                    app.isDragging = true;
+                    if (app.selectedObjects.includes(clickedObject)) {
+                        app.dragOffset = { x: x - clickedObject.x, y: y - clickedObject.y };
+                    } else {
+                        deselectAll();
+                        selectObject(clickedObject);
+                        app.dragOffset = { x: x - clickedObject.x, y: y - clickedObject.y };
+                    }
+                    saveHistory();
+                } else {
+                    deselectAll();
+                    app.isDrawing = true;
+                    app.selectionBox = { x, y, width: 0, height: 0 };
+                }
+            } else if (app.currentTool === 'text') {
+                deselectAll();
+                const newText = createObject({
+                    type: 'text',
+                    x: x,
+                    y: y,
+                    text: 'New Text',
+                    fontFamily: app.settings.defaultFont,
+                    fontSize: app.settings.defaultFontSize,
+                    color: app.settings.defaultFillColor,
+                    width: 100, 
+                    height: app.settings.defaultFontSize,
+                });
+                app.objects.push(newText);
+                selectObject(newText);
+                saveHistory();
+                requestRedraw();
+            } else {
+                deselectAll();
+                app.isDrawing = true;
+                let newObj = {
+                    type: app.currentTool,
+                    x: x,
+                    y: y,
+                    width: 0,
+                    height: 0,
+                    fillColor: app.settings.defaultFillColor,
+                    strokeColor: app.settings.defaultStrokeColor,
+                    strokeWidth: app.settings.defaultStrokeWidth,
+                    rotation: 0,
+                    opacity: 100
+                };
+                
+                if (app.currentTool === 'brush' || app.currentTool === 'pen') {
+                    newObj.points = [{x: 0, y: 0}]; 
+                    app.currentPath = newObj;
+                } else if (app.currentTool === 'highlight') {
+                    newObj.color = document.getElementById('highlight-color').value;
+                    newObj.opacity = document.getElementById('highlight-opacity').value;
+                } else if (app.currentTool === 'strikeout') {
+                    newObj.color = document.getElementById('strikeout-color').value;
+                    newObj.strokeWidth = document.getElementById('strikeout-width').value;
+                } else if (app.currentTool === 'underline') {
+                    newObj.color = document.getElementById('underline-color').value;
+                    newObj.strokeWidth = document.getElementById('underline-width').value;
+                }
+                
+                const newObject = createObject(newObj);
+                app.objects.push(newObject);
+                selectObject(newObject);
+            }
+        }
+
+        function handleCanvasMouseMove(e) {
+            e.preventDefault();
+            const { x, y } = getCanvasCoords(e);
+            dom.cursorPosition.textContent = `X: ${Math.round(x)}, Y: ${Math.round(y)}`;
+
+            if (app.isPanning) {
+                const dx = (e.clientX - app.dragStart.x * app.scale); 
+                const dy = (e.clientY - app.dragStart.y * app.scale);
+                dom.canvasContainer.scrollLeft -= dx;
+                dom.canvasContainer.scrollTop -= dy;
+                updateRulers();
+                return;
+            }
+
+            if (app.isResizing) {
+                resizeObject(app.resizeHandle, x, y);
+                requestRedraw();
+                updatePropertiesPanel();
+                return;
+            }
+            
+            if (app.isRotating) {
+                requestRedraw();
+                updatePropertiesPanel();
+                return;
+            }
+
+            if (app.isDragging) {
+                const dx = x - app.dragStart.x;
+                const dy = y - app.dragStart.y;
+
+                app.selectedObjects.forEach(obj => {
+                    const originalState = app.history[app.historyIndex].objects.find(o => o.id === obj.id);
+                    obj.x = originalState.x + dx;
+                    obj.y = originalState.y + dy;
+                });
+                requestRedraw();
+                updatePropertiesPanel();
+                return;
+            }
+            
+            if (app.isDrawing) {
+                const dx = x - app.dragStart.x;
+                const dy = y - app.dragStart.y;
+                
+                if (app.currentTool === 'select') {
+                    app.selectionBox.width = dx;
+                    app.selectionBox.height = dy;
+                } else if (app.currentTool === 'brush' || app.currentTool === 'pen') {
+                    app.currentPath.points.push({ x: x - app.dragStart.x, y: y - app.dragStart.y });
+                    const bounds = getBoundsFromPoints(app.currentPath.points);
+                    app.currentPath.width = bounds.width;
+                    app.currentPath.height = bounds.height;
+                } else {
+                    const obj = app.selectedObjects[0];
+                    obj.width = dx;
+                    obj.height = dy;
+                    if (app.currentTool === 'strikeout' || app.currentTool === 'underline') {
+                        obj.height = obj.strokeWidth;
+                    }
+                }
+                requestRedraw();
+                return;
+            }
+
+            if (app.currentTool === 'select') {
+                const handle = getHandleAtCoords(x, y);
+                if (handle) {
+                    app.canvases['interaction-canvas'].className = handle.cursor;
+                } else {
+                    const obj = getObjectAtCoords(x, y, app.objects.filter(o => o.page === app.currentPage));
+                    app.canvases['interaction-canvas'].className = obj ? 'cursor-move' : 'cursor-default';
+                }
+            }
+        }
+
+        function handleCanvasMouseUp(e) {
+            e.preventDefault();
+            
+            if (app.isDrawing) {
+                if (app.currentTool === 'select' && app.selectionBox) {
+                    const box = normalizeRect(app.selectionBox);
+                    const objectsInBox = getObjectsInRect(box, app.objects.filter(o => o.page === app.currentPage));
+                    selectObject(objectsInBox);
+                    app.selectionBox = null;
+                } else if (app.selectedObjects.length > 0) {
+                    const obj = app.selectedObjects[0];
+                    
+                    if (obj.type === 'brush' || obj.type === 'pen') {
+                        const bounds = getBoundsFromPoints(obj.points);
+                        obj.x = app.dragStart.x + bounds.x;
+                        obj.y = app.dragStart.y + bounds.y;
+                        obj.width = bounds.width;
+                        obj.height = bounds.height;
+                        obj.points = obj.points.map(p => ({ x: p.x - bounds.x, y: p.y - bounds.y }));
+                        app.currentPath = null;
+                    } else {
+                        const rect = normalizeRect(obj);
+                        obj.x = rect.x;
+                        obj.y = rect.y;
+                        obj.width = rect.width;
+                        obj.height = rect.height;
+
+                        if (obj.type === 'strikeout') {
+                            obj.y = rect.y + rect.height / 2 - obj.strokeWidth / 2;
+                            obj.height = obj.strokeWidth;
+                        } else if (obj.type === 'underline') {
+                             obj.y = rect.y + rect.height - obj.strokeWidth;
+                             obj.height = obj.strokeWidth;
+                        }
+                    }
+                    saveHistory();
+                }
+                updatePropertiesPanel();
+            }
+
+            if (app.isResizing || app.isDragging || app.isRotating) {
+                replaceHistoryState(getAppState());
+            }
+
+            app.isDrawing = false;
+            app.isDragging = false;
+            app.isResizing = false;
+            app.isRotating = false;
+            app.isPanning = (app.currentTool === 'hand'); 
+            app.resizeHandle = null;
+
+            updateCursor();
+            requestRedraw();
+        }
+        
+        function handleCanvasMouseLeave(e) {
+            dom.cursorPosition.textContent = "---";
+            if(app.isDrawing || app.isDragging || app.isResizing || app.isRotating) {
+                handleCanvasMouseUp(e); 
+            }
+        }
+
+        function handleDoubleClick(e) {
+             const { x, y } = getCanvasCoords(e);
+             const clickedObject = getObjectAtCoords(x, y, app.objects.filter(o => o.page === app.currentPage));
+             
+             if(clickedObject && clickedObject.type === 'text') {
+                 showNotification("In-place text editing not yet implemented.", "info");
+             }
+        }
+
+        function handleCanvasWheel(e) {
+            e.preventDefault();
+            
+            if (e.ctrlKey || e.metaKey) {
+                const { x, y } = getCanvasCoords(e);
+                const delta = -e.deltaY;
+                const zoomFactor = 1.1;
+                
+                if (delta > 0) zoomIn(zoomFactor, { x, y });
+                else zoomOut(zoomFactor, { x, y });
+            } else {
+                dom.canvasContainer.scrollLeft += e.deltaX;
+                dom.canvasContainer.scrollTop += e.deltaY;
+                updateRulers();
+            }
+        }
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                handleCanvasMouseDown({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, preventDefault: () => {} });
+            } else if (e.touches.length === 2) {
+                app.isDrawing = false;
+                app.isDragging = false;
+                app.isResizing = false;
+                const coords = getTouchCoords(e);
+                app.dragStart.pinchDist = Math.hypot(coords[0].x - coords[1].x, coords[0].y - coords[1].y);
+                app.dragStart.pinchCenter = {
+                    x: (coords[0].x + coords[1].x) / 2,
+                    y: (coords[0].y + coords[1].y) / 2
+                };
+            }
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                handleCanvasMouseMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, preventDefault: () => {} });
+            } else if (e.touches.length === 2) {
+                const coords = getTouchCoords(e);
+                const newDist = Math.hypot(coords[0].x - coords[1].x, coords[0].y - coords[1].y);
+                const scaleFactor = newDist / app.dragStart.pinchDist;
+                
+                setZoom(app.scale * scaleFactor, app.dragStart.pinchCenter);
+
+                app.dragStart.pinchDist = newDist;
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            if (e.changedTouches.length > 0) {
+                handleCanvasMouseUp({ clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY, preventDefault: () => {} });
+            }
+        }
+        
+        function zoom(factor, focalPoint = null) {
+            const container = dom.canvasContainer;
+            const scrollX = container.scrollLeft + (focalPoint ? (focalPoint.x * app.scale) - focalPoint.x * (app.scale * factor) : 0);
+            const scrollY = container.scrollTop + (focalPoint ? (focalPoint.y * app.scale) - focalPoint.y * (app.scale * factor) : 0);
+
+            const newScale = Math.max(0.1, Math.min(10, app.scale * factor));
+            if (newScale === app.scale) return;
+            
+            app.scale = newScale;
+            
+            renderPage(app.currentPage).then(() => {
+                if (focalPoint) {
+                    const newScrollLeft = focalPoint.x * app.scale - (focalPoint.x * app.scale - container.scrollLeft) * factor;
+                    const newScrollTop = focalPoint.y * app.scale - (focalPoint.y * app.scale - container.scrollTop) * factor;
+                    
+                    const rect = dom.canvasContainer.getBoundingClientRect();
+                    const pointOnScreenX = focalPoint.x * (app.scale / factor) - container.scrollLeft;
+                    const pointOnScreenY = focalPoint.y * (app.scale / factor) - container.scrollTop;
+
+                    container.scrollLeft = focalPoint.x * app.scale - pointOnScreenX;
+                    container.scrollTop = focalPoint.y * app.scale - pointOnScreenY;
+
+                } else {
+                     centerCanvas();
+                }
+                updateRulers();
+            });
+        }
+        
+        function setZoom(newScale, focalPoint = null) {
+            if (newScale === app.scale) return;
+            const factor = newScale / app.scale;
+            zoom(factor, focalPoint);
+        }
+
+        function zoomIn(factor = 1.2, focalPoint = null) { zoom(factor, focalPoint); }
+        function zoomOut(factor = 1.2, focalPoint = null) { zoom(1 / factor, focalPoint); }
+
+        function fitToPage() {
+            if (!app.viewport) return;
+            const container = dom.canvasContainer;
+            const scaleX = (container.clientWidth - 40) / app.pageWidth;
+            const scaleY = (container.clientHeight - 40) / app.pageHeight;
+            setZoom(Math.min(scaleX, scaleY));
+        }
+        function fitToWidth() {
+            if (!app.viewport) return;
+            const container = dom.canvasContainer;
+            const scaleX = (container.clientWidth - 40) / app.pageWidth;
+            setZoom(scaleX);
+        }
+
+        function centerCanvas() {
+            const container = dom.canvasContainer;
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            const canvasWidth = app.pageWidth;
+            const canvasHeight = app.pageHeight;
+
+            const scrollLeft = Math.max(0, (canvasWidth - containerWidth) / 2);
+            const scrollTop = Math.max(0, (canvasHeight - containerHeight) / 2);
+            
+            container.scrollLeft = scrollLeft;
+            container.scrollTop = scrollTop;
+            updateRulers();
+        }
+
+        function createObject(props) {
+            return {
+                id: crypto.randomUUID(),
+                page: app.currentPage,
+                layer: app.activeLayer,
+                ...props
+            };
+        }
+
+        function handleImageUpload(e, customData) {
+            let file, reader;
+
+            if (customData) {
+                const img = new Image();
+                img.onload = () => {
+                    const newImage = createObject({
+                        type: 'image',
+                        x: 50, y: 50,
+                        width: img.width,
+                        height: img.height,
+                        base64: customData.base64,
+                        fileType: customData.fileType,
+                        imageEl: img, 
+                    });
+                    app.objects.push(newImage);
+                    selectTool('select');
+                    deselectAll();
+                    selectObject(newImage);
+                    saveHistory();
+                    requestRedraw();
+                };
+                img.src = customData.base64;
+                return;
+            }
+            
+            file = e.target.files[0];
+            if (!file || !file.type.startsWith('image/')) return;
+            
+            reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const newImage = createObject({
+                        type: 'image',
+                        x: 50, y: 50,
+                        width: img.width,
+                        height: img.height,
+                        base64: event.target.result,
+                        fileType: file.type,
+                        imageEl: img, 
+                    });
+                    app.objects.push(newImage);
+                    selectTool('select');
+                    deselectAll();
+                    selectObject(newImage);
+                    saveHistory();
+                    requestRedraw();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+            e.target.value = ''; 
+        }
+
+        function updateSelectedObjects(prop, value, toggle = false) {
+            if (app.selectedObjects.length === 0) return;
+            
+            app.selectedObjects.forEach(obj => {
+                obj[prop] = toggle ? value : value;
+            });
+            
+            if (toggle) {
+                document.getElementById(`${prop}-btn`).classList.toggle('tool-active', value);
+            }
+
+            requestRedraw();
+            updatePropertiesPanel();
+        }
+
+        function deleteSelected() {
+            if (app.selectedObjects.length === 0) return;
+            saveHistory();
+            app.objects = app.objects.filter(obj => !app.selectedObjects.includes(obj));
+            deselectAll();
+            requestRedraw();
+        }
+        
+        function selectObject(objOrArray) {
+            if (!objOrArray) return;
+            const objects = Array.isArray(objOrArray) ? objOrArray : [objOrArray];
+            objects.forEach(obj => {
+                if (!app.selectedObjects.includes(obj)) {
+                    app.selectedObjects.push(obj);
+                }
+            });
+            updateFormatBar();
+            updatePropertiesPanel();
+            updateStatusBar();
+        }
+        
+        function deselectAll() {
+            app.selectedObjects = [];
+            requestRedraw();
+            updateFormatBar();
+            updatePropertiesPanel();
+            updateStatusBar();
+        }
+
+        function selectAll() {
+            deselectAll();
+            const pageObjects = app.objects.filter(obj => obj.page === app.currentPage);
+            selectObject(pageObjects);
+            requestRedraw();
+        }
+
+        function bringToFront() {
+            if (app.selectedObjects.length === 0) return;
+            saveHistory();
+            const pageObjects = app.objects.filter(o => o.page === app.currentPage);
+            const otherObjects = app.objects.filter(o => o.page !== app.currentPage);
+            const selected = app.selectedObjects;
+            const unselected = pageObjects.filter(o => !selected.includes(o));
+            app.objects = [...otherObjects, ...unselected, ...selected];
+            requestRedraw();
+        }
+        function sendToBack() {
+            if (app.selectedObjects.length === 0) return;
+            saveHistory();
+            const pageObjects = app.objects.filter(o => o.page === app.currentPage);
+            const otherObjects = app.objects.filter(o => o.page !== app.currentPage);
+            const selected = app.selectedObjects;
+            const unselected = pageObjects.filter(o => !selected.includes(o));
+            app.objects = [...otherObjects, ...selected, ...unselected];
+            requestRedraw();
+        }
+        function bringForward() {
+            if (app.selectedObjects.length !== 1) return;
+            saveHistory();
+            const obj = app.selectedObjects[0];
+            const index = app.objects.indexOf(obj);
+            if (index < app.objects.length - 1) {
+                if (app.objects[index+1].page === obj.page) {
+                    [app.objects[index], app.objects[index+1]] = [app.objects[index+1], app.objects[index]];
+                }
+            }
+            requestRedraw();
+        }
+        function sendBackward() {
+            if (app.selectedObjects.length !== 1) return;
+            saveHistory();
+            const obj = app.selectedObjects[0];
+            const index = app.objects.indexOf(obj);
+            if (index > 0) {
+                if (app.objects[index-1].page === obj.page) {
+                    [app.objects[index], app.objects[index-1]] = [app.objects[index-1], app.objects[index]];
+                }
+            }
+            requestRedraw();
+        }
+
+        function cut() {
+            copy();
+            deleteSelected();
+        }
+        function copy() {
+            app.clipboard = app.selectedObjects.map(obj => ({ ...obj, id: crypto.randomUUID() }));
+            showNotification('Copied to clipboard', 'info');
+        }
+        function paste() {
+            if (app.clipboard.length === 0) return;
+            saveHistory();
+            deselectAll();
+            const newObjects = app.clipboard.map(obj => {
+                const newObj = { ...obj, id: crypto.randomUUID(), page: app.currentPage };
+                newObj.x += 10;
+                newObj.y += 10;
+                if (newObj.type === 'image') {
+                    const img = new Image();
+                    img.src = newObj.base64;
+                    newObj.imageEl = img;
+                }
+                app.objects.push(newObj);
+                return newObj;
+            });
+            selectObject(newObjects);
+            requestRedraw();
+        }
+        function duplicate() {
+            copy();
+            paste();
+        }
+
+        function getAppState() {
+            const clonedObjects = app.objects.map(obj => {
+                const newObj = {...obj};
+                if (newObj.imageEl) delete newObj.imageEl; 
+                return newObj;
+            });
+            return {
+                objects: clonedObjects,
+                pages: JSON.parse(JSON.stringify(app.pages))
+            };
+        }
+
+        function restoreAppState(state) {
+            app.isUndoingRedoing = true;
+            app.objects = state.objects.map(obj => {
+                 if (obj.type === 'image') {
+                    const img = new Image();
+                    img.src = obj.base64;
+                    obj.imageEl = img;
+                }
+                return obj;
+            });
+            app.pages = state.pages;
+            app.totalPages = app.pages.length;
+            app.selectedObjects = [];
+            
+            goToPage(app.currentPage > app.totalPages ? app.totalPages : app.currentPage).then(() => {
+                generateThumbnails(); 
+                requestRedraw();
+                updatePropertiesPanel();
+                updateFormatBar();
+                updateStatusBar();
+                app.isUndoingRedoing = false;
+            });
+        }
+
+        function saveHistory() {
+            if (app.isUndoingRedoing) return;
+            
+            if (app.historyIndex < app.history.length - 1) {
+                app.history = app.history.slice(0, app.historyIndex + 1);
+            }
+            
+            app.history.push(getAppState());
+            
+            if (app.history.length > app.maxHistorySize) {
+                app.history.shift();
+            }
+            
+            app.historyIndex = app.history.length - 1;
+            updateHistoryButtons();
+        }
+        
+        function replaceHistoryState(state) {
+            if (app.historyIndex > -1) {
+                app.history[app.historyIndex] = state;
+            }
+        }
+
+        function undo() {
+            if (app.historyIndex <= 0) return;
+            app.isUndoingRedoing = true;
+            app.historyIndex--;
+            restoreAppState(app.history[app.historyIndex]);
+            updateHistoryButtons();
+        }
+
+        function redo() {
+            if (app.historyIndex >= app.history.length - 1) return;
+            app.isUndoingRedoing = true;
+            app.historyIndex++;
+            restoreAppState(app.history[app.historyIndex]);
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            dom.undoBtn.disabled = app.historyIndex <= 0;
+            dom.redoBtn.disabled = app.historyIndex >= app.history.length - 1;
+        }
+
+        async function navigatePage(page) {
+            if (page < 1 || page > app.totalPages) return;
+            await goToPage(page);
+        }
+
+        async function goToPage(pageNum) {
+            if (pageNum < 1 || pageNum > app.totalPages) {
+                dom.pageInfo.value = app.currentPage;
+                return;
+            }
+            deselectAll();
+            await renderPage(pageNum);
+            highlightThumbnail(pageNum);
+        }
+
+        async function addBlankPage() {
+            saveHistory();
+            const newPageNum = app.currentPage + 1;
+
+            app.pages.splice(newPageNum - 1, 0, {
+                pageNumber: newPageNum,
+                rotation: 0,
+                backgroundColor: null,
+            });
+
+            app.totalPages++;
+            
+            app.pages.forEach((page, i) => page.pageNumber = i + 1);
+            app.objects.forEach(obj => {
+                if (obj.page >= newPageNum) obj.page++;
+            });
+
+            const pdfDoc = await PDFDocument.load(app.currentPdfBytes);
+            pdfDoc.insertPage(newPageNum - 1, PageSizes.A4);
+            app.currentPdfBytes = await pdfDoc.save();
+            
+            const loadingTask = pdfjsLib.getDocument({ data: app.currentPdfBytes });
+            app.pdfDoc = await loadingTask.promise;
+
+            await goToPage(newPageNum);
+            await generateThumbnails(); 
+            saveHistory();
+        }
+
+        async function deletePage(pageNum) {
+            if (app.totalPages <= 1) {
+                showNotification("Cannot delete the last page", "error");
+                return;
+            }
+            saveHistory();
+            
+            app.pages.splice(pageNum - 1, 1);
+            app.totalPages--;
+            app.pages.forEach((page, i) => page.pageNumber = i + 1);
+
+            app.objects = app.objects.filter(obj => obj.page !== pageNum);
+            app.objects.forEach(obj => {
+                if (obj.page > pageNum) obj.page--;
+            });
+
+            const pdfDoc = await PDFDocument.load(app.currentPdfBytes);
+            pdfDoc.removePage(pageNum - 1);
+            app.currentPdfBytes = await pdfDoc.save();
+
+            const loadingTask = pdfjsLib.getDocument({ data: app.currentPdfBytes });
+            app.pdfDoc = await loadingTask.promise;
+
+            const newPage = Math.min(pageNum, app.totalPages);
+            app.currentPage = newPage;
+            
+            await goToPage(newPage);
+            await generateThumbnails();
+            saveHistory();
+        }
+
+        async function rotatePage(pageNum) {
+            saveHistory();
+            const page = app.pages[pageNum - 1];
+            page.rotation = (page.rotation + 90) % 360;
+            
+            await goToPage(pageNum);
+            await createThumbnail(pageNum); 
+            highlightThumbnail(pageNum);
+            saveHistory();
+        }
+
+        async function generateThumbnails() {
+            dom.pageThumbnails.innerHTML = '';
+            const promises = [];
+            for (let i = 1; i <= app.totalPages; i++) {
+                promises.push(createThumbnail(i));
+            }
+            await Promise.all(promises);
+            highlightThumbnail(app.currentPage);
+        }
+
+        async function createThumbnail(pageNum) {
+            try {
+                const existingThumb = document.querySelector(`.thumbnail-item[data-page="${pageNum}"]`);
+                if (existingThumb) existingThumb.remove();
+
+                const page = await app.pdfDoc.getPage(pageNum);
+                const rotation = app.pages[pageNum - 1]?.rotation || 0;
+                const viewport = page.getViewport({ scale: 1, rotation: rotation });
+                const scale = 100 / viewport.width; 
+                const thumbViewport = page.getViewport({ scale, rotation: rotation });
+
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.floor(thumbViewport.width * app.devicePixelRatio);
+                canvas.height = Math.floor(thumbViewport.height * app.devicePixelRatio);
+                canvas.style.width = Math.floor(thumbViewport.width) + 'px';
+                canvas.style.height = Math.floor(thumbViewport.height) + 'px';
+                const ctx = canvas.getContext('2d');
+
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: thumbViewport,
+                    transform: [app.devicePixelRatio, 0, 0, app.devicePixelRatio, 0, 0]
+                };
+                
+                await page.render(renderContext).promise;
+
+                const div = document.createElement('div');
+                div.className = 'thumbnail-item';
+                div.dataset.page = pageNum;
+                div.innerHTML = `
+                    <span class="absolute top-1 left-1 text-xs bg-black/50 text-white rounded-sm px-1">${pageNum}</span>
+                    <div class="thumbnail-controls">
+                        <button class="thumb-rotate-btn" title="Rotate Page"><i class="fas fa-rotate-right"></i></button>
+                        <button class="thumb-delete-btn" title="Delete Page"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                div.appendChild(canvas);
+
+                const existingNode = dom.pageThumbnails.querySelector(`.thumbnail-item[data-page="${pageNum + 1}"]`);
+                if (existingNode) {
+                    dom.pageThumbnails.insertBefore(div, existingNode);
+                } else {
+                    dom.pageThumbnails.appendChild(div);
+                }
+
+            } catch(e) {
+                console.error(`Failed to render thumbnail for page ${pageNum}`, e);
+            }
+        }
+        
+        function highlightThumbnail(pageNum) {
+            document.querySelectorAll('.thumbnail-item').forEach(thumb => {
+                thumb.classList.toggle('selected', parseInt(thumb.dataset.page) === pageNum);
+            });
+        }
+
+        function toggleRulers(forceState) {
+            app.showRulers = forceState !== undefined ? forceState : !app.showRulers;
+            [dom.rulerH, dom.rulerV, dom.rulerCorner].forEach(el => {
+                el.classList.toggle('hidden', !app.showRulers);
+            });
+            document.getElementById('toggle-rulers-btn').classList.toggle('tool-active', app.showRulers);
+            
+            if (app.showRulers) updateRulers();
+        }
+        
+        function updateRulers() {
+            if (!app.showRulers || !app.viewport) return;
+            
+            const hCtx = app.contexts.rulerH;
+            const vCtx = app.contexts.rulerV;
+            const hCanvas = app.canvases.rulerH;
+            const vCanvas = app.canvases.rulerV;
+            
+            hCanvas.width = dom.canvasContainer.clientWidth;
+            vCanvas.height = dom.canvasContainer.clientHeight;
+            
+            const scrollLeft = dom.canvasContainer.scrollLeft;
+            const scrollTop = dom.canvasContainer.scrollTop;
+            const scale = app.scale;
+            
+            hCtx.clearRect(0, 0, hCanvas.width, 20);
+            vCtx.clearRect(0, 0, 20, vCanvas.height);
+            
+            hCtx.fillStyle = '#64748b'; 
+            vCtx.fillStyle = '#64748b';
+            hCtx.font = '9px Inter';
+            vCtx.font = '9px Inter';
+
+            const majorTick = 100;
+            const minorTick = 10;
+            
+            const canvasOriginX = (hCanvas.width - app.pageWidth * scale) / 2 - scrollLeft;
+            const canvasOriginY = (vCanvas.height - app.pageHeight * scale) / 2 - scrollTop;
+            
+            for (let i = 0; i < app.pageWidth; i += minorTick) {
+                const x = (i * scale) + canvasOriginX;
+                if (x < 0 || x > hCanvas.width) continue;
+                
+                if (i % majorTick === 0) {
+                    hCtx.fillRect(x, 10, 1, 10);
+                    hCtx.fillText(Math.round(i), x + 2, 8);
+                } else {
+                    hCtx.fillRect(x, 15, 1, 5);
+                }
+            }
+
+            for (let i = 0; i < app.pageHeight; i += minorTick) {
+                const y = (i * scale) + canvasOriginY;
+                if (y < 0 || y > vCanvas.height) continue;
+                
+                if (i % majorTick === 0) {
+                    vCtx.fillRect(10, y, 10, 1);
+                    vCtx.save();
+                    vCtx.translate(8, y + 2);
+                    vCtx.rotate(-Math.PI / 2);
+                    vCtx.fillText(Math.round(i), 0, 0);
+                    vCtx.restore();
+                } else {
+                    vCtx.fillRect(15, y, 5, 1);
+                }
+            }
+        }
+        
+        function toggleGrid() {
+            app.showGrid = !app.showGrid;
+            document.getElementById('toggle-grid-btn').classList.toggle('tool-active', app.showGrid);
+            requestRedraw();
+        }
+        function toggleGuides() {
+            app.showGuides = !app.showGuides;
+            document.getElementById('toggle-guides-btn').classList.toggle('tool-active', app.showGuides);
+            requestRedraw();
+        }
+        function toggleSnapToGrid() {
+            app.snapToGrid = !app.snapToGrid;
+            document.getElementById('snap-to-grid-btn').classList.toggle('tool-active', app.snapToGrid);
+        }
+
+        function getObjectAtCoords(x, y, objects) {
+            for (let i = objects.length - 1; i >= 0; i--) {
+                const obj = objects[i];
+                if (isPointInRect(x, y, obj)) {
+                    return obj;
+                }
+            }
+            return null;
+        }
+
+        function getObjectsInRect(rect, objects) {
+            const { x, y, width, height } = normalizeRect(rect);
+            return objects.filter(obj => {
+                const objRect = { x: obj.x, y: obj.y, width: obj.width, height: obj.height };
+                return (
+                    x < objRect.x + objRect.width &&
+                    x + width > objRect.x &&
+                    y < objRect.y + objRect.height &&
+                    y + height > objRect.y
+                );
+            });
+        }
+        
+        function getHandleAtCoords(x, y) {
+            if (app.selectedObjects.length === 0) return null;
+            const bounds = getCommonBoundingBox(app.selectedObjects);
+            const handles = getResizeHandles(bounds);
+            const handleSize = 8 / app.scale; 
+
+            for (const [name, handle] of Object.entries(handles)) {
+                if (isPointInRect(x, y, { x: handle.x - handleSize/2, y: handle.y - handleSize/2, width: handleSize, height: handleSize })) {
+                    return { name, ...handle };
+                }
+            }
+            
+            if(app.selectedObjects.length === 1) {
+                const rotHandle = getRotationHandle(bounds);
+                if(isPointInRect(x, y, { x: rotHandle.x - handleSize/2, y: rotHandle.y - handleSize/2, width: handleSize, height: handleSize })) {
+                    return { name: 'rotate', x: rotHandle.x, y: rotHandle.y, cursor: 'cursor-rotate' };
+                }
+            }
+
+            return null;
+        }
+
+        function getCommonBoundingBox(objects) {
+            if (objects.length === 0) return null;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            objects.forEach(obj => {
+                minX = Math.min(minX, obj.x);
+                minY = Math.min(minY, obj.y);
+                maxX = Math.max(maxX, obj.x + obj.width);
+                maxY = Math.max(maxY, obj.y + obj.height);
+            });
+            return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        }
+
+        function getResizeHandles(rect) {
+            const { x, y, width, height } = rect;
+            return {
+                tl: { x: x, y: y, cursor: 'cursor-resize-nwse' },
+                tm: { x: x + width / 2, y: y, cursor: 'cursor-resize-ns' },
+                tr: { x: x + width, y: y, cursor: 'cursor-resize-nesw' },
+                ml: { x: x, y: y + height / 2, cursor: 'cursor-resize-ew' },
+                mr: { x: x + width, y: y + height / 2, cursor: 'cursor-resize-ew' },
+                bl: { x: x, y: y + height, cursor: 'cursor-resize-nesw' },
+                bm: { x: x + width / 2, y: y + height, cursor: 'cursor-resize-ns' },
+                br: { x: x + width, y: y + height, cursor: 'cursor-resize-nwse' },
+            };
+        }
+
+        function getRotationHandle(rect) {
+            return { x: rect.x + rect.width / 2, y: rect.y - 20 / app.scale };
+        }
+
+        function resizeObject(handle, x, y) {
+            const obj = app.selectedObjects[0]; 
+            const originalState = app.history[app.historyIndex].objects.find(o => o.id === obj.id);
+            
+            const oldX = originalState.x;
+            const oldY = originalState.y;
+            const oldW = originalState.width;
+            const oldH = originalState.height;
+
+            switch(handle.name) {
+                case 'tl':
+                    obj.width = oldW + (oldX - x);
+                    obj.height = oldH + (oldY - y);
+                    obj.x = x;
+                    obj.y = y;
+                    break;
+                case 'tm':
+                    obj.height = oldH + (oldY - y);
+                    obj.y = y;
+                    break;
+                case 'tr':
+                    obj.width = x - oldX;
+                    obj.height = oldH + (oldY - y);
+                    obj.y = y;
+                    break;
+                case 'ml':
+                    obj.width = oldW + (oldX - x);
+                    obj.x = x;
+                    break;
+                case 'mr':
+                    obj.width = x - oldX;
+                    break;
+                case 'bl':
+                    obj.width = oldW + (oldX - x);
+                    obj.height = y - oldY;
+                    obj.x = x;
+                    break;
+                case 'bm':
+                    obj.height = y - oldY;
+                    break;
+                case 'br':
+                    obj.width = x - oldX;
+                    obj.height = y - oldY;
+                    break;
+            }
+        }
+        
+        function isPointInRect(x, y, rect) {
+            return x >= rect.x && x <= rect.x + rect.width &&
+                   y >= rect.y && y <= rect.y + rect.height;
+        }
+
+        function normalizeRect(rect) {
+            let { x, y, width, height } = rect;
+            if (width < 0) {
+                width = -width;
+                x = x - width;
+            }
+            if (height < 0) {
+                height = -height;
+                y = y - height;
+            }
+            return { x, y, width, height };
+        }
+
+        function getBoundsFromPoints(points) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            points.forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+            return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        }
+
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            app.settings.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            localStorage.setItem('color-theme', app.settings.theme);
+            requestRedraw(); 
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+
+        function handleWindowResize() {
+            fitToPage(); 
+        }
+
+        function switchSidebarTab(tabName) {
+            if (tabName === 'layers' || tabName === 'bookmarks') {
+                showNotification(`${tabName} panel not implemented`, 'info');
+                return;
+            }
+            document.querySelectorAll('.sidebar-tab').forEach(tab => {
+                tab.classList.toggle('tool-active', tab.dataset.tab === tabName);
+            });
+            document.querySelectorAll('.sidebar-panel').forEach(panel => {
+                panel.classList.toggle('hidden', panel.id !== `${tabName}-panel`);
+            });
+        }
+
+        function showNotification(message, type = 'info') {
+            const iconMap = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle'
+            };
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `<i class="fas ${iconMap[type]}"></i> ${message}`;
+            dom.toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        function initializeTooltips() {
+            document.body.addEventListener('mouseover', (e) => {
+                const target = e.target.closest('[title]');
+                if (target) {
+                    const title = target.getAttribute('title');
+                    target.dataset.tooltip = title;
+                    target.removeAttribute('title'); 
+                    
+                    dom.tooltip.textContent = title;
+                    dom.tooltip.classList.add('show');
+                    
+                    const rect = target.getBoundingClientRect();
+                    dom.tooltip.style.left = `${rect.left + rect.width / 2}px`;
+                    dom.tooltip.style.top = `${rect.top}px`;
+                    dom.tooltip.style.transform = 'translateX(-50%) translateY(-100%) translateY(-4px)';
+                }
+            });
+            document.body.addEventListener('mouseout', (e) => {
+                const target = e.target.closest('[data-tooltip]');
+                if (target) {
+                    dom.tooltip.classList.remove('show');
+                }
+            });
+            document.body.appendChild(dom.tooltip);
+        }
+
+        function handleContextMenu(e) {
+            e.preventDefault();
+            dom.contextMenu.style.left = `${e.clientX}px`;
+            dom.contextMenu.style.top = `${e.clientY}px`;
+            dom.contextMenu.style.display = 'block';
+        }
+        
+        function hideContextMenu() {
+            dom.contextMenu.style.display = 'none';
+        }
+
+        function handleContextMenuAction(action) {
+            switch(action) {
+                case 'cut': cut(); break;
+                case 'copy': copy(); break;
+                case 'paste': paste(); break;
+                case 'duplicate': duplicate(); break;
+                case 'delete': deleteSelected(); break;
+                case 'bring-front': bringToFront(); break;
+                case 'send-back': sendToBack(); break;
+                case 'bring-forward': bringForward(); break;
+                case 'send-backward': sendBackward(); break;
+                case 'group': groupSelected(); break;
+                case 'ungroup': ungroupSelected(); break;
+            }
+        }
+
+        function showLoading(text = "Processing...") {
+            dom.loadingText.textContent = text;
+            dom.loadingOverlay.classList.remove('hidden');
+        }
+        function hideLoading() {
+            dom.loadingOverlay.classList.add('hidden');
+        }
+
+        function createModal(title, content, actions) {
+            dom.modalContainer.innerHTML = `
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center animate-fadeIn">
+                    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg">
+                        <div class="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 class="text-lg font-medium">${title}</h3>
+                            <button id="modal-close-btn" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-4">
+                            ${content}
+                        </div>
+                        <div class="flex justify-end gap-2 p-4 border-t border-slate-200 dark:border-slate-700">
+                            ${actions}
+                        </div>
+                    </div>
+                </div>
+            `;
+            dom.modalContainer.classList.remove('hidden');
+            
+            const close = () => dom.modalContainer.classList.add('hidden');
+            document.getElementById('modal-close-btn').addEventListener('click', close);
+            
+            return { close };
+        }
+
+        function showSignatureModal() {
+            const content = `
+                <canvas id="signature-pad" width="460" height="200" class="bg-white dark:bg-slate-100"></canvas>
+                <button id="sig-clear-btn" class="text-sm mt-2 hover:underline">Clear</button>
+            `;
+            const actions = `
+                <button id="sig-cancel-btn" class="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded hover:bg-slate-300 dark:hover:bg-slate-600">Cancel</button>
+                <button id="sig-save-btn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Save Signature</button>
+            `;
+            
+            const modal = createModal('Create Signature', content, actions);
+            
+            const canvas = document.getElementById('signature-pad');
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            
+            let isSigning = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            const startSign = (e) => {
+                isSigning = true;
+                [lastX, lastY] = [e.offsetX, e.offsetY];
+            };
+            
+            const drawSign = (e) => {
+                if (!isSigning) return;
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.stroke();
+                [lastX, lastY] = [e.offsetX, e.offsetY];
+            };
+            
+            const endSign = () => { isSigning = false; };
+            
+            canvas.addEventListener('mousedown', startSign);
+            canvas.addEventListener('mousemove', drawSign);
+            canvas.addEventListener('mouseup', endSign);
+            canvas.addEventListener('mouseleave', endSign);
+            
+            document.getElementById('sig-clear-btn').addEventListener('click', () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            });
+            
+            document.getElementById('sig-cancel-btn').addEventListener('click', modal.close);
+            
+            document.getElementById('sig-save-btn').addEventListener('click', () => {
+                const dataUrl = canvas.toDataURL('image/png');
+                handleImageUpload(null, {
+                    base64: dataUrl,
+                    fileType: 'image/png'
+                });
+                modal.close();
+            });
+        }
+
+        function autoSave() { console.log("Auto-save triggered (not implemented)"); }
+        function loadRecentFiles() { console.log("Load recent files (not implemented)"); }
+        function showExportDialog() { showNotification("Export not implemented", "info"); }
+        function groupSelected() { showNotification("Grouping not implemented", "info"); }
+        function ungroupSelected() { showNotification("Ungrouping not implemented", "info"); }
+
+    </script>
+</body>
+</html>

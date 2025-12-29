@@ -1,0 +1,94 @@
+{
+  "name": "Resume",
+  "description": "Professional resume template",
+  "pageSize": {
+    "width": 612,
+    "height": 792,
+    "unit": "pt"
+  },
+  "orientation": "portrait",
+  "margins": {
+    "top": 50,
+    "right": 50,
+    "bottom": 50,
+    "left": 50
+  },
+  "background": "#FFFFFF",
+  "elements": [
+    {
+      "type": "text",
+      "content": "[YOUR NAME]",
+      "x": 306,
+      "y": 80,
+      "fontSize": 24,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#1F2937",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "content": "[Your Title/Position]",
+      "x": 306,
+      "y": 105,
+      "fontSize": 12,
+      "fontFamily": "Helvetica",
+      "color": "#6B7280",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "content": "Email: [email] | Phone: [phone] | Location: [city]",
+      "x": 306,
+      "y": 125,
+      "fontSize": 9,
+      "fontFamily": "Helvetica",
+      "color": "#6B7280",
+      "align": "center"
+    },
+    {
+      "type": "line",
+      "x1": 50,
+      "y1": 145,
+      "x2": 562,
+      "y2": 145,
+      "stroke": "#E5E7EB",
+      "strokeWidth": 1
+    },
+    {
+      "type": "text",
+      "content": "SUMMARY",
+      "x": 50,
+      "y": 175,
+      "fontSize": 14,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#3B82F6"
+    },
+    {
+      "type": "text",
+      "content": "EXPERIENCE",
+      "x": 50,
+      "y": 280,
+      "fontSize": 14,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#3B82F6"
+    },
+    {
+      "type": "text",
+      "content": "EDUCATION",
+      "x": 50,
+      "y": 450,
+      "fontSize": 14,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#3B82F6"
+    },
+    {
+      "type": "text",
+      "content": "SKILLS",
+      "x": 50,
+      "y": 580,
+      "fontSize": 14,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#3B82F6"
+    }
+  ]
+}

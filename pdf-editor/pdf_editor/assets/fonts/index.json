@@ -1,0 +1,34 @@
+{
+  "fonts": [
+    {
+      "name": "Helvetica",
+      "family": "Helvetica",
+      "standard": true,
+      "variants": ["regular", "bold", "italic", "bold-italic"]
+    },
+    {
+      "name": "Times New Roman",
+      "family": "Times-Roman",
+      "standard": true,
+      "variants": ["regular", "bold", "italic", "bold-italic"]
+    },
+    {
+      "name": "Courier",
+      "family": "Courier",
+      "standard": true,
+      "variants": ["regular", "bold", "italic", "bold-italic"]
+    },
+    {
+      "name": "Symbol",
+      "family": "Symbol",
+      "standard": true,
+      "variants": ["regular"]
+    },
+    {
+      "name": "ZapfDingbats",
+      "family": "ZapfDingbats",
+      "standard": true,
+      "variants": ["regular"]
+    }
+  ]
+}

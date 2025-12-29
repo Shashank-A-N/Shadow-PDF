@@ -1,0 +1,108 @@
+{
+  "name": "Certificate",
+  "description": "Certificate of achievement template",
+  "pageSize": {
+    "width": 841.89,
+    "height": 595.28,
+    "unit": "pt"
+  },
+  "orientation": "landscape",
+  "margins": {
+    "top": 40,
+    "right": 40,
+    "bottom": 40,
+    "left": 40
+  },
+  "background": "#FFFEF7",
+  "elements": [
+    {
+      "type": "rect",
+      "x": 30,
+      "y": 30,
+      "width": 781.89,
+      "height": 535.28,
+      "stroke": "#D4AF37",
+      "strokeWidth": 8,
+      "fill": "transparent"
+    },
+    {
+      "type": "rect",
+      "x": 40,
+      "y": 40,
+      "width": 761.89,
+      "height": 515.28,
+      "stroke": "#D4AF37",
+      "strokeWidth": 2,
+      "fill": "transparent"
+    },
+    {
+      "type": "text",
+      "content": "CERTIFICATE",
+      "x": 420.945,
+      "y": 100,
+      "fontSize": 36,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#D4AF37",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "content": "OF ACHIEVEMENT",
+      "x": 420.945,
+      "y": 130,
+      "fontSize": 20,
+      "fontFamily": "Helvetica",
+      "color": "#8B7355",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "content": "This certificate is awarded to",
+      "x": 420.945,
+      "y": 200,
+      "fontSize": 14,
+      "fontFamily": "Helvetica",
+      "color": "#333333",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "content": "[RECIPIENT NAME]",
+      "x": 420.945,
+      "y": 250,
+      "fontSize": 32,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#1F2937",
+      "align": "center"
+    },
+    {
+      "type": "line",
+      "x1": 250,
+      "y1": 260,
+      "x2": 591.89,
+      "y2": 260,
+      "stroke": "#D4AF37",
+      "strokeWidth": 2
+    },
+    {
+      "type": "text",
+      "content": "for outstanding achievement in",
+      "x": 420.945,
+      "y": 300,
+      "fontSize": 12,
+      "fontFamily": "Helvetica",
+      "color": "#666666",
+      "align": "center"
+    },
+    {
+      "type": "text",
+      "content": "[ACHIEVEMENT]",
+      "x": 420.945,
+      "y": 340,
+      "fontSize": 18,
+      "fontFamily": "Helvetica-Bold",
+      "color": "#3B82F6",
+      "align": "center"
+    }
+  ]
+}

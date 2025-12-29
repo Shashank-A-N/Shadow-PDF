@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Professional PDF editor with advanced features">
+<meta name="theme-color" content="#3b82f6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>PDF Editor Ultra - Professional PDF Editing Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        brand: '#3b82f6',
+        success: '#10b981',
+        danger: '#ef4444',
+        warning: '#f59e0b',
+        info: '#06b6d4'
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.2s ease-in',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'slide-in-left': 'slideInLeft 0.3s ease-out',
+        'slide-in-right': 'slideInRight 0.3s ease-out'
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' }
+        },
+        slideInLeft: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(0)' }
+        },
+        slideInRight: {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(0)' }
+        }
+      }
+    }
+  }
+}
+if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark')
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js"</script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📄%3C/text%3E%3C/svg%3E">
+<style>
+/* Reset and Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Canvas Styles */
+#canvas-area {
+  overflow: auto;
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: flex-start;  /* Changed from 'center' */
+  justify-content: center;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.5rem; /* Added for nice spacing */
+}
+
+#canvas-wrapper {
+  position: relative;
+  display: inline-block;
+  background: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+}
+
+.dark #canvas-wrapper {
+  background: #1f2937;
+}
+
+#pdf-canvas, #objects-canvas, #annotation-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+#annotation-canvas {
+  pointer-events: auto;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4a5568;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #718096;
+}
+
+/* Tool Button Active State */
+.tool-active {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+/* Responsive Layout Container */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Main Content Grid */
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  transition: transform 0.3s ease, width 0.3s ease;
+}
+
+.dark .sidebar {
+  background: #111827;
+  border-color: #374151;
+}
+
+.sidebar-left {
+  width: 280px;
+}
+
+.sidebar-right {
+  width: 320px;
+  border-left: 1px solid #e5e7eb;
+  border-right: none;
+}
+
+.dark .sidebar-right {
+  border-color: #374151;
+}
+
+/* Mobile Sidebar Overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+}
+
+.sidebar-overlay.active {
+  display: block;
+}
+
+/* Mobile Sidebar Positioning */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+  }
+  
+  .sidebar-left {
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+  }
+  
+  .sidebar-right {
+    right: 0;
+    left: auto;
+    width: 320px;
+    max-width: 85vw;
+    transform: translateX(100%);
+  }
+  
+  .sidebar.active {
+    transform: translateX(0);
+  }
+}
+
+/* Tablet Sidebar */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar-left {
+    width: 240px;
+  }
+  
+  .sidebar-right {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    transform: translateX(100%);
+    z-index: 50;
+    width: 300px;
+  }
+  
+  .sidebar-right.active {
+    transform: translateX(0);
+  }
+}
+
+/* Toolbar Styles */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dark .toolbar {
+  background: #111827;
+  border-color: #374151;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.5rem;
+  border-right: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.dark .toolbar-group {
+  border-color: #374151;
+}
+
+.toolbar-group:last-child {
+  border-right: none;
+}
+
+/* Tool Button */
+.tool-btn {
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: #f3f4f6;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.dark .tool-btn {
+  background: #374151;
+  color: #d1d5db;
+}
+
+.tool-btn:hover {
+  background: #e5e7eb;
+  transform: translateY(-1px);
+}
+
+.dark .tool-btn:hover {
+  background: #4b5563;
+}
+
+.tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile Bottom Navigation #annotation-canvas */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  z-index: 30;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dark .bottom-nav {
+  background: #111827;
+  border-color: #374151;
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    padding: 0.5rem 0;
+  }
+  
+  .bottom-nav button {
+    flex: 1;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    background: none;
+    border: none;
+    color: #6b7280;
+    font-size: 0.75rem;
+  }
+  
+  .dark .bottom-nav button {
+    color: #9ca3af;
+  }
+  
+  .bottom-nav button.active {
+    color: #3b82f6;
+  }
+  
+  #canvas-area {
+    padding-bottom: 60px;
+  }
+}
+
+/* Floating Action Button */
+.fab {
+  display: none;
+  position: fixed;
+  bottom: 80px;
+  right: 1rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  background: #3b82f6;
+  color: white;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  z-index: 25;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.2s;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .fab {
+    display: flex;
+  }
+}
+
+/* Tool Palette */
+.tool-palette {
+  display: none;
+  position: fixed;
+  bottom: 150px;
+  right: 1rem;
+  background: white;
+  border-radius: 1rem;
+  padding: 0.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 24;
+  animation: slide-up 0.3s ease-out;
+}
+
+.dark .tool-palette {
+  background: #1f2937;
+}
+
+.tool-palette.active {
+  display: flex;
+}
+
+/* Thumbnail Styles */
+.thumbnail-item {
+  border: 2px solid transparent;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.thumbnail-item:hover {
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.thumbnail-item.active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Property Panel Styles */
+.property-section {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dark .property-section {
+  border-color: #374151;
+}
+
+.property-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.dark .property-label {
+  color: #9ca3af;
+}
+
+/* Notification Styles */
+.notification {
+  animation: slide-in-right 0.3s ease-out;
+  pointer-events: auto;
+}
+
+/* Modal Styles */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  animation: fade-in 0.2s ease-in;
+}
+
+.modal-content {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+  .toolbar {
+    padding: 0.25rem;
+  }
+  
+  .tool-btn {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0.375rem;
+  }
+  
+  .header-title {
+    font-size: 1rem;
+  }
+  
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 641px) {
+  .show-mobile {
+    display: none !important;
+  }
+}
+
+/* Touch Indicator */
+.touch-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 2rem;
+  font-size: 0.875rem;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.touch-indicator.active {
+  opacity: 1;
+}
+
+/* Responsive Grid */
+@media (min-width: 1280px) {
+  .sidebar-left {
+    width: 300px;
+  }
+  
+  .sidebar-right {
+    width: 340px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .sidebar, .toolbar, .bottom-nav, .fab, header {
+    display: none !important;
+  }
+  
+  #canvas-area {
+    padding: 0 !important;
+  }
+  
+  #canvas-wrapper {
+    box-shadow: none !important;
+  }
+}
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+
+<!-- Main Application Container -->
+<div class="app-container">
+
+<!-- Upload Screen -->
+<div id="upload-screen" class="h-full flex items-center justify-center p-4">
+  <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg p-6 md:p-8 space-y-6">
+    <!-- Logo and Title -->
+    <div class="text-center space-y-3">
+      <div class="text-6xl md:text-7xl animate-pulse">📄</div>
+      <h1 class="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        PDF Editor Ultra
+      </h1>
+      <p class="text-sm md:text-base text-gray-600 dark:text-gray-400">
+        Professional PDF manipulation tool
+      </p>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="space-y-3">
+      <label for="file-input" class="block w-full px-6 py-3 text-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl cursor-pointer hover:from-blue-700 hover:to-indigo-700 transition-all">
+        <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        Open PDF From Device
+      </label>
+      <input id="file-input" type="file" accept="application/pdf" class="hidden">
+      
+      <button id="new-file-btn" class="w-full px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all">
+        <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create New Blank PDF
+      </button>
+    </div>
+    
+    <!-- Features Grid -->
+    <div class="border-t dark:border-gray-800 pt-4">
+      <h3 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">Features</h3>
+      <div class="grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400">
+        <div class="flex items-center gap-2">✓ Text & Annotations</div>
+        <div class="flex items-center gap-2">✓ Digital Signatures</div>
+        <div class="flex items-center gap-2">✓ OCR Text Recognition</div>
+        <div class="flex items-center gap-2">✓ Form Fields</div>
+        <div class="flex items-center gap-2">✓ Page Management</div>
+        <div class="flex items-center gap-2">✓ Export Options</div>
+      </div>
+    </div>
+    
+    <!-- Footer Links -->
+    <div class="flex items-center justify-center gap-6 text-sm">
+      <button id="open-help" class="text-blue-600 dark:text-blue-400 hover:underline">
+        Help
+      </button>
+      <button id="open-about" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">
+        About
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Editor Screen -->
+<div id="editor" class="hidden h-full flex flex-col">
+
+<!-- Header -->
+<header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2 flex items-center justify-between">
+  <!-- Left Section -->
+  <div class="flex items-center gap-3">
+    <!-- Mobile Menu Button -->
+    <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 show-mobile">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+    
+    <!-- Title -->
+    <h1 class="header-title font-bold text-lg md:text-xl bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+      PDF Editor
+    </h1>
+    
+    <!-- File Name -->
+    <div id="file-label" class="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px] hide-mobile"></div>
+  </div>
+  
+  <!-- Right Section -->
+  <div class="flex items-center gap-2">
+    <!-- Mobile Properties Button -->
+    <button id="mobile-properties-btn" class="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/>
+      </svg>
+    </button>
+    
+    <!-- Theme Toggle -->
+    <button id="theme-toggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+      <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+      </svg>
+      <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+      </svg>
+    </button>
+    
+    <!-- Fullscreen -->
+    <button id="fullscreen-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 hide-mobile">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+      </svg>
+    </button>
+    
+    <!-- Settings -->
+    <button id="settings-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <!-- File Operations -->
+  <div class="toolbar-group">
+    <button id="open-btn" title="Open (Ctrl+O)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+      </svg>
+    </button>
+    <button id="save-btn" title="Save (Ctrl+S)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+      </svg>
+    </button>
+    <button id="export-btn" title="Export" class="tool-btn hide-mobile">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+      </svg>
+    </button>
+  </div>
+  
+  <!-- Edit Operations -->
+  <div class="toolbar-group">
+    <button id="undo-btn" title="Undo (Ctrl+Z)" class="tool-btn" disabled>
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+      </svg>
+    </button>
+    <button id="redo-btn" title="Redo (Ctrl+Y)" class="tool-btn" disabled>
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"/>
+      </svg>
+    </button>
+    <button id="cut-btn" title="Cut (Ctrl+X)" class="tool-btn hide-mobile">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"/>
+      </svg>
+    </button>
+    <button id="copy-btn" title="Copy (Ctrl+C)" class="tool-btn hide-mobile">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+      </svg>
+    </button>
+    <button id="paste-btn" title="Paste (Ctrl+V)" class="tool-btn hide-mobile">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+    </button>
+    <button id="delete-btn" title="Delete (Del)" class="tool-btn hide-mobile">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+    </button>
+  </div>
+  
+  <!-- Tools - Desktop -->
+  <div class="toolbar-group hide-mobile">
+    <button data-tool="select" title="Select (V)" class="tool-btn tool-active">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
+      </svg>
+    </button>
+    <button data-tool="hand" title="Hand (H)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"/>
+      </svg>
+    </button>
+    <button data-tool="text" title="Text (T)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+    </button>
+    <button data-tool="draw" title="Draw (P)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+      </svg>
+    </button>
+    <button data-tool="highlight" title="Highlight (M)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+      </svg>
+    </button>
+    <button data-tool="rect" title="Rectangle (R)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="16" stroke-width="2" rx="2"/>
+      </svg>
+    </button>
+    <button data-tool="oval" title="Oval (O)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" stroke-width="2"/>
+      </svg>
+    </button>
+    <button data-tool="line" title="Line (L)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19l14-14"/>
+      </svg>
+    </button>
+    <button data-tool="image" title="Image (I)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+      </svg>
+    </button>
+    <button data-tool="signature" title="Signature (S)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+      </svg>
+    </button>
+    <button data-tool="form" title="Form (F)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+      </svg>
+    </button>
+    <button data-tool="ocr" title="OCR (C)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+      </svg>
+    </button>
+    <button data-tool="eraser" title="Eraser (E)" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 12.5l-7 7-5-5 7-7m0 0l5 5m-5-5l-7 7"/>
+      </svg>
+    </button>
+  </div>
+  
+  <!-- Zoom Controls -->
+  <div class="toolbar-group ml-auto">
+    <button id="zoom-out" title="Zoom Out" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
+      </svg>
+    </button>
+    <select id="zoom-select" class="px-2 py-1 text-sm rounded-lg bg-gray-100 dark:bg-gray-800 border-0 focus:ring-2 focus:ring-blue-500">
+      <option value="0.5">50%</option>
+      <option value="0.75">75%</option>
+      <option value="1" selected>100%</option>
+      <option value="1.25">125%</option>
+      <option value="1.5">150%</option>
+      <option value="2">200%</option>
+      <option value="fit">Fit</option>
+    </select>
+    <button id="zoom-in" title="Zoom In" class="tool-btn">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- Main Content Area -->
+<div class="main-content">
+  <!-- Left Sidebar -->
+  <aside class="sidebar sidebar-left">
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 dark:border-gray-800">
+      <button data-panel="pages" class="sidebar-tab flex-1 px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+        Pages
+      </button>
+      <button data-panel="layers" class="sidebar-tab flex-1 px-4 py-2 text-sm font-medium text-gray-500 hover:text-blue-600">
+        Layers
+      </button>
+      <button data-panel="bookmarks" class="sidebar-tab flex-1 px-4 py-2 text-sm font-medium text-gray-500 hover:text-blue-600">
+        Marks
+      </button>
+    </div>
+    
+    <!-- Panels -->
+    <div class="flex-1 overflow-y-auto">
+      <!-- Pages Panel -->
+      <div id="panel-pages" class="p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold">Pages</h3>
+          <div class="flex gap-1">
+            <button id="add-page-btn" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+              </svg>
+            </button>
+            <button id="duplicate-page-btn" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+            </button>
+            <button id="delete-page-btn" class="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="thumbnails" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+      </div>
+      
+      <!-- Layers Panel -->
+      <div id="panel-layers" class="hidden p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold">Layers</h3>
+          <button id="add-layer-btn" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+          </button>
+        </div>
+        <div id="layers-list" class="space-y-2"></div>
+      </div>
+      
+      <!-- Bookmarks Panel -->
+      <div id="panel-bookmarks" class="hidden p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold">Bookmarks</h3>
+          <button id="add-bookmark-btn" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+            </svg>
+          </button>
+        </div>
+        <div id="bookmarks-list" class="space-y-2"></div>
+      </div>
+    </div>
+  </aside>
+  
+  <!-- Canvas Area -->
+  <div id="canvas-area" class="flex-1 bg-gray-100 dark:bg-gray-950">
+    <div id="canvas-wrapper">
+      <canvas id="pdf-canvas"></canvas>
+      <canvas id="objects-canvas"></canvas>
+      <canvas id="annotation-canvas"></canvas>
+      <div id="grid-overlay" class="hidden"></div>
+      <div id="ruler-h" class="hidden"></div>
+      <div id="ruler-v" class="hidden"></div>
+    </div>
+  </div>
+  
+  <!-- Right Sidebar (Properties) -->
+  <aside class="sidebar sidebar-right">
+    <div class="p-4 border-b border-gray-200 dark:border-gray-800">
+      <h2 class="text-sm font-semibold">Properties</h2>
+    </div>
+    <div id="properties-panel" class="flex-1 overflow-y-auto p-4">
+      <div class="text-center py-12 text-gray-400">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+        </svg>
+        <p class="text-sm">Select an object<br>to edit properties</p>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- Status Bar (Desktop Only) -->
+<footer class="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 px-4 py-1 text-xs flex items-center justify-between hide-mobile">
+  <div class="flex items-center gap-6">
+    <div>Page <span id="page-label" class="font-semibold text-blue-600">1</span> of <span id="page-count">1</span></div>
+    <div id="selection-label" class="text-gray-500 dark:text-gray-400"></div>
+  </div>
+  <div class="flex items-center gap-6">
+    <div id="cursor-label" class="font-mono text-gray-500 dark:text-gray-400">X: 0, Y: 0</div>
+    <div id="filesize-label" class="text-gray-500 dark:text-gray-400">0 KB</div>
+    <div id="zoom-label" class="font-mono text-gray-500 dark:text-gray-400">100%</div>
+  </div>
+</footer>
+
+<!-- Bottom Navigation (Mobile Only) -->
+<nav class="bottom-nav">
+  <button data-nav="pages" class="active">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    </svg>
+    <span>Pages</span>
+  </button>
+  <button data-nav="tools">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+    </svg>
+    <span>Tools</span>
+  </button>
+  <button data-nav="properties">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/>
+    </svg>
+    <span>Properties</span>
+  </button>
+  <button data-nav="more">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/>
+    </svg>
+    <span>More</span>
+  </button>
+</nav>
+
+<!-- Floating Action Button (Mobile) -->
+<button id="fab" class="fab">
+  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+  </svg>
+</button>
+
+<!-- Tool Palette (Mobile) -->
+<div id="tool-palette" class="tool-palette">
+  <button data-tool="select" class="tool-btn">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+    </svg>
+  </button>
+  <button data-tool="text" class="tool-btn">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    </svg>
+  </button>
+  <button data-tool="draw" class="tool-btn">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+    </svg>
+  </button>
+  <button data-tool="highlight" class="tool-btn">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+    </svg>
+  </button>
+  <button data-tool="rect" class="tool-btn">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="16" height="16" stroke-width="2" rx="2"/>
+    </svg>
+  </button>
+</div>
+
+</div><!-- End Editor -->
+
+</div><!-- End App Container -->
+
+<!-- Overlays and Modals -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- Context Menu -->
+<div id="context-menu" class="hidden fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl min-w-[160px]"></div>
+
+<!-- Notification Container -->
+<div id="notification-container" class="fixed top-4 right-4 z-50 space-y-3 pointer-events-none"></div>
+
+<!-- Modal Container -->
+<div id="modal-container" class="fixed inset-0 z-40 hidden"></div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="fixed inset-0 bg-black/60 backdrop-blur hidden items-center justify-center z-[100]">
+  <div class="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-xl flex flex-col items-center gap-4 min-w-[250px]">
+    <div class="relative w-12 h-12">
+      <div class="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-700"></div>
+      <div class="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+    </div>
+    <div id="loading-text" class="font-semibold">Processing...</div>
+    <div id="loading-subtext" class="text-sm text-gray-500 hidden"></div>
+  </div>
+</div>
+
+<!-- Touch Indicator -->
+<div id="touch-indicator" class="touch-indicator">
+  <span id="touch-text">Pinch to zoom</span>
+</div>
+
+<!-- Hidden Inputs -->
+<input id="hidden-image-input" type="file" accept="image/*" class="hidden">
+
+<!-- Scripts -->
+<script type="module" src="./src/app.js"></script>
+<script>
+// Mobile Navigation Handler
+document.addEventListener('DOMContentLoaded', function() {
+  // Mobile sidebar toggles
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  const mobilePropertiesBtn = document.getElementById('mobile-properties-btn');
+  const sidebarLeft = document.querySelector('.sidebar-left');
+  const sidebarRight = document.querySelector('.sidebar-right');
+  const overlay = document.getElementById('sidebar-overlay');
+  
+  function closeSidebars() {
+    sidebarLeft?.classList.remove('active');
+    sidebarRight?.classList.remove('active');
+    overlay?.classList.remove('active');
+  }
+  
+  mobileMenuBtn?.addEventListener('click', () => {
+    sidebarLeft?.classList.toggle('active');
+    overlay?.classList.toggle('active');
+  });
+  
+  mobilePropertiesBtn?.addEventListener('click', () => {
+    sidebarRight?.classList.toggle('active');
+    overlay?.classList.toggle('active');
+  });
+  
+  overlay?.addEventListener('click', closeSidebars);
+  
+  // Sidebar tabs
+  document.querySelectorAll('.sidebar-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const panel = tab.dataset.panel;
+      
+      // Update tabs
+      document.querySelectorAll('.sidebar-tab').forEach(t => {
+        t.classList.remove('border-blue-600', 'text-blue-600');
+        t.classList.add('text-gray-500');
+      });
+      tab.classList.add('border-blue-600', 'text-blue-600');
+      tab.classList.remove('text-gray-500');
+      
+      // Update panels
+      document.querySelectorAll('[id^="panel-"]').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`panel-${panel}`)?.classList.remove('hidden');
+    });
+  });
+  
+  // Bottom navigation
+  document.querySelectorAll('[data-nav]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const nav = btn.dataset.nav;
+      
+      // Update active state
+      document.querySelectorAll('[data-nav]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // Handle navigation
+      switch(nav) {
+        case 'pages':
+          sidebarLeft?.classList.add('active');
+          overlay?.classList.add('active');
+          break;
+        case 'tools':
+          document.getElementById('fab')?.click();
+          break;
+        case 'properties':
+          sidebarRight?.classList.add('active');
+          overlay?.classList.add('active');
+          break;
+        case 'more':
+          // Show more options
+          break;
+      }
+    });
+  });
+  
+  // FAB and tool palette
+  const fab = document.getElementById('fab');
+  const toolPalette = document.getElementById('tool-palette');
+  
+  fab?.addEventListener('click', () => {
+    toolPalette?.classList.toggle('active');
+  });
+  
+  // Tool palette buttons
+  document.querySelectorAll('#tool-palette [data-tool]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toolPalette?.classList.remove('active');
+    });
+  });
+  
+  // Handle window resize
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (window.innerWidth > 768) {
+        closeSidebars();
+      }
+    }, 250);
+  });
+  
+  // Prevent body scroll on iOS
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+  }
+});
+</script>
+</body>
+</html>

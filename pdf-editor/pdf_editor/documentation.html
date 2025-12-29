@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Editor Ultra - Project Page</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide-element@2.1.0/dist/lucide-element.min.js" type="module"></script>
+    
+    <!-- Configure Tailwind for Inter font -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-2xl font-bold text-blue-600">
+                PDF Editor Ultra
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="#features" class="text-gray-600 hover:text-blue-500">Features</a>
+                <a href="#tech" class="text-gray-600 hover:text-blue-500">Technology</a>
+                <a href="#start" class="text-gray-600 hover:text-blue-500">Get Started</a>
+                <a href="https://github.com/Shashank-A-N/PDF-Editor/archive/refs/heads/main.zip" class="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors" download>
+                    Download ZIP
+                </a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="bg-white pt-20 pb-16">
+        <div class="container mx-auto px-6 text-center">
+            <h1 class="text-5xl md:text-6xl font-extrabold text-gray-900 leading-tight">
+                PDF Editor Ultra
+            </h1>
+            <p class="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
+                A professional, feature-rich PDF editor built entirely in the browser using
+                modern web technologies. Open, create, edit, and sign PDFs with ease.
+            </p>
+            <div class="mt-8 flex justify-center space-x-4">
+                <a href="https://shashank-a-n.github.io/PDF-Editor/" class="px-8 py-3 bg-blue-600 text-white rounded-md font-medium text-lg hover:bg-blue-700 transition-colors">
+                    Start Using Now
+                </a>
+                <a href="https://github.com/Shashank-A-N/PDF-Editor" class="px-8 py-3 bg-gray-200 text-gray-800 rounded-md font-medium text-lg hover:bg-gray-300 transition-colors">
+                    View on GitHub
+                </a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Feature Video Section -->
+    <section class="container mx-auto px-6 -mt-10 relative z-10">
+        <div class="bg-white rounded-lg shadow-2xl border border-gray-200 p-4 lg:p-8">
+            <div class="flex flex-col lg:flex-row items-center">
+                
+                <!-- Video Player -->
+                <div class="w-full lg:w-2/3">
+                    <div class="rounded-lg overflow-hidden border border-gray-200 bg-gray-900" style="position: relative; padding-bottom: 56.25%;"> <!-- 16:9 Aspect Ratio -->
+                        <!-- 
+                            NOTE: This is a placeholder video. 
+                            Replace 'src' with a link to your own app demo video.
+                        -->
+                        <video class="w-full h-full object-cover" 
+                               style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+                               src="doc.mp4" 
+                               autoplay 
+                               loop 
+                               muted 
+                               playsinline>
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                </div>
+
+                <!-- Text Content -->
+                <div class="w-full lg:w-1/3 mt-6 lg:mt-0 lg:pl-8 xl:pl-12">
+                    <h3 class="text-3xl font-bold text-gray-900 mb-4">
+                        See It in Action
+                    </h3>
+                    <p class="text-lg text-gray-600 mb-4">
+                        Watch a quick demo of PDF Editor Ultra's key features, from loading a document to adding your digital signature.
+                    </p>
+                    <p class="text-lg text-gray-600">
+                        Our high-performance canvas renders everything smoothly, giving you a fast, responsive, and desktop-class experience.
+                    </p>
+                    <a href="https://shashank-a-n.github.io/PDF-Editor/" class="mt-6 inline-block px-6 py-3 bg-blue-600 text-white rounded-md font-medium text-base hover:bg-blue-700 transition-colors">
+                        Try the App Live
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-24 bg-gray-50">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900">Packed with Features</h2>
+                <p class="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
+                    All the tools you need for a professional PDF workflow, right in your browser.
+                </p>
+            </div>
+
+            <!-- Core Features -->
+            <h3 class="text-2xl font-semibold text-gray-900 mb-6">Core Features</h3>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="file-stack" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">PDF Management</h4>
+                        <p class="mt-1 text-gray-600">Open, create, save, and export PDFs seamlessly.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="edit" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Advanced Editing</h4>
+                        <p class="mt-1 text-gray-600">Modify text, add shapes, insert images, and annotate.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="pen-tool" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Digital Signatures</h4>
+                        <p class="mt-1 text-gray-600">Draw, type, or upload signatures to sign documents.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="check-square" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Form Fields</h4>
+                        <p class="mt-1 text-gray-600">Create and fill out interactive PDF forms.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="scan-text" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">OCR Support</h4>
+                        <p class="mt-1 text-gray-600">Extract text from images using Tesseract.js.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="palette" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Rich Styling</h4>
+                        <p class="mt-1 text-gray-600">Control fonts, colors, borders, and fills.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="layers" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Page Management</h4>
+                        <p class="mt-1 text-gray-600">Add, delete, duplicate, and reorder pages.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="bookmark" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Layers & Bookmarks</h4>
+                        <p class="mt-1 text-gray-600">Organize complex content efficiently.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="zap" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">High Performance</h4>
+                        <p class="mt-1 text-gray-600">Hardware-accelerated canvas rendering.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UI Features -->
+            <h3 class="text-2xl font-semibold text-gray-900 mb-6 mt-16">Modern UI Features</h3>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="moon" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Dark Mode</h4>
+                        <p class="mt-1 text-gray-600">Automatic theme switching for your comfort.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="keyboard" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Keyboard Shortcuts</h4>
+                        <p class="mt-1 text-gray-600">Professional workflow support for power users.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="undo-2" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Undo/Redo</h4>
+                        <p class="mt-1 text-gray-600">Full history management for every action.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="ruler" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Grid & Rulers</h4>
+                        <p class="mt-1 text-gray-600">Precision alignment tools for perfect layouts.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="magnet" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Snap to Grid</h4>
+                        <p class="mt-1 text-gray-600">Smart object positioning for clean results.</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                        <lucide-icon name="mouse-pointer" size="24"></lucide-icon>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-900">Multi-Select</h4>
+                        <p class="mt-1 text-gray-600">Select and transform multiple objects at once.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technology Stack -->
+    <section id="tech" class="py-24 bg-white">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900">Built with Modern Technology</h2>
+                <p class="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
+                    Using the best open-source libraries for performance and reliability.
+                </p>
+            </div>
+            
+            <div class="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-3 gap-8 text-center">
+                <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <img src="https://placehold.co/80x80/EBF8FF/3182CE?text=PDF.js" alt="PDF.js Logo" class="h-20 w-20 mx-auto rounded-md">
+                    <h4 class="mt-4 text-xl font-semibold text-gray-900">PDF.js</h4>
+                    <p class="mt-1 text-gray-600">Mozilla's PDF rendering library.</p>
+                </div>
+                <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <img src="https://placehold.co/80x80/EBF8FF/3182CE?text=PDF-lib" alt="PDF-lib Logo" class="h-20 w-20 mx-auto rounded-md">
+                    <h4 class="mt-4 text-xl font-semibold text-gray-900">PDF-lib</h4>
+                    <p class="mt-1 text-gray-600">PDF creation and manipulation.</p>
+                </div>
+                <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <img src="https://placehold.co/80x80/EBF8FF/3182CE?text=Tesseract.js" alt="Tesseract.js Logo" class="h-20 w-20 mx-auto rounded-md">
+                    <h4 class="mt-4 text-xl font-semibold text-gray-900">Tesseract.js</h4>
+                    <p class="mt-1 text-gray-600">OCR text recognition.</p>
+                </div>
+                <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <img src="https://placehold.co/80x80/EBF8FF/3182CE?text=Tailwind" alt="Tailwind CSS Logo" class="h-20 w-20 mx-auto rounded-md">
+                    <h4 class="mt-4 text-xl font-semibold text-gray-900">Tailwind CSS</h4>
+                    <p class="mt-1 text-gray-600">Utility-first CSS framework.</p>
+                </div>
+                <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <img src="https://placehold.co/80x80/EBF8FF/3182CE?text=ES6" alt="ES6 Modules Logo" class="h-20 w-20 mx-auto rounded-md">
+                    <h4 class="mt-4 text-xl font-semibold text-gray-900">ES6 Modules</h4>
+                    <p class="mt-1 text-gray-600">Modern JavaScript architecture.</p>
+                </div>
+                <div class="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                    <img src="https://placehold.co/80x80/EBF8FF/3182CE?text=Canvas" alt="Canvas API Logo" class="h-20 w-20 mx-auto rounded-md">
+                    <h4 class="mt-4 text-xl font-semibold text-gray-900">Canvas API</h4>
+                    <p class="mt-1 text-gray-600">Hardware-accelerated rendering.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Getting Started -->
+    <section id="start" class="py-24 bg-gray-50">
+        <div class="container mx-auto px-6 max-w-4xl">
+            <div class="text-left mb-12">
+                <h2 class="text-4xl font-bold text-gray-900">Get Started</h2>
+                <p class="mt-3 text-lg text-gray-600">
+                    Ready to run the project? Follow these simple steps.
+                </p>
+            </div>
+
+            <div class="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
+                <h4 class="text-xl font-semibold text-gray-900 mb-4">Prerequisites</h4>
+                <ul class="list-disc list-inside text-gray-600 space-y-2 mb-6">
+                    <li>A modern web browser (Chrome, Firefox, Safari, Edge)</li>
+                    <li>Local web server (for ES6 module support)</li>
+                </ul>
+
+                <h4 class="text-xl font-semibold text-gray-900 mb-4">Installation</h4>
+                <p class="text-gray-600 mb-4">
+                    1. Clone the repository from GitHub:
+                </p>
+                <pre class="bg-gray-900 text-white p-4 rounded-md overflow-x-auto">
+<code>git clone https://github.com/Shashank-A-N/PDF-Editor.git
+cd PDF-Editor</code></pre>
+                
+                <p class="text-gray-600 mt-4 mb-4">
+                    2. Start a local web server. For example, using Python:
+                </p>
+                <pre class="bg-gray-900 text-white p-4 rounded-md overflow-x-auto">
+<code>python -m http.server</code></pre>
+
+                <p class="text-gray-600 mt-4">
+                    3. Open your browser and navigate to <code>http://localhost:8000</code>
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-400 py-12">
+        <div class="container mx-auto px-6 text-center">
+            <p>&copy; 2024 PDF Editor Ultra. All rights reserved.</p>
+            <p class="text-sm mt-2">A fictional project page created by Gemini.</p>
+        </div>
+    </footer>
+
+</body>
+</html>

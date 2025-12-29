@@ -1,0 +1,64 @@
+{
+  "name": "Letter Template",
+  "description": "Professional business letter template",
+  "pageSize": {
+    "width": 612,
+    "height": 792,
+    "unit": "pt"
+  },
+  "orientation": "portrait",
+  "margins": {
+    "top": 72,
+    "right": 72,
+    "bottom": 72,
+    "left": 72
+  },
+  "background": "#FFFFFF",
+  "elements": [
+    {
+      "type": "text",
+      "content": "[Your Name]",
+      "x": 72,
+      "y": 100,
+      "fontSize": 12,
+      "fontFamily": "Helvetica",
+      "color": "#000000"
+    },
+    {
+      "type": "text",
+      "content": "[Your Address]",
+      "x": 72,
+      "y": 115,
+      "fontSize": 10,
+      "fontFamily": "Helvetica",
+      "color": "#666666"
+    },
+    {
+      "type": "text",
+      "content": "[Date]",
+      "x": 72,
+      "y": 150,
+      "fontSize": 10,
+      "fontFamily": "Helvetica",
+      "color": "#000000"
+    },
+    {
+      "type": "text",
+      "content": "[Recipient Name]",
+      "x": 72,
+      "y": 180,
+      "fontSize": 10,
+      "fontFamily": "Helvetica",
+      "color": "#000000"
+    },
+    {
+      "type": "text",
+      "content": "Dear [Recipient],",
+      "x": 72,
+      "y": 220,
+      "fontSize": 12,
+      "fontFamily": "Helvetica",
+      "color": "#000000"
+    }
+  ]
+}
