@@ -2,7 +2,7 @@
 const CACHE_NAME = 'pdf-toolkit-v2';
 const URLS_TO_CACHE = [
   '/',
-  '/nothing.html', // <--- CHANGE THIS to match your actual file name
+  '/index.html', // <--- CHANGE THIS to match your actual file name
   '/manifest.json'  // <--- Ensure this is included
   // Add other important files here, like your main CSS or JS
   // 'styles/main.css',
@@ -50,4 +50,5 @@ self.addEventListener('activate', event => {
       );
     })
   );
+
 });
