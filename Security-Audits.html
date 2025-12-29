@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Protocol // SENTINEL INTERFACE</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' },
+                        indigo: { 950: '#1e1b4b' },
+                    },
+                    fontFamily: {
+                        sans: ['Rajdhani', 'sans-serif'],
+                        mono: ['Share Tech Mono', 'monospace'],
+                        display: ['Orbitron', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'scan': 'scan 8s linear infinite',
+                        'blink': 'blink 1s step-end infinite',
+                        'type': 'type 0.5s steps(40, end)',
+                    },
+                    keyframes: {
+                        scan: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(100%)' },
+                        },
+                        blink: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* --- PROFESSIONAL THEME VARIABLES --- */
+        :root {
+            --bg-dark: #020617;
+            --panel-bg: rgba(15, 23, 42, 0.75);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --accent: #6366f1;
+            /* Indigo 500 */
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            --terminal-bg: #050a14;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.08), transparent 25%);
+        }
+
+        /* --- UI COMPONENTS --- */
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Technical Corners (border accents) */
+        .tech-corners {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tech-corners::before,
+        .tech-corners::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-color: var(--accent);
+            border-style: solid;
+            transition: all 0.3s;
+            opacity: 0.5;
+        }
+
+        .tech-corners::before {
+            top: 0;
+            left: 0;
+            border-width: 1px 0 0 1px;
+        }
+
+        .tech-corners::after {
+            bottom: 0;
+            right: 0;
+            border-width: 0 1px 1px 0;
+        }
+
+        .tech-corners:hover::before,
+        .tech-corners:hover::after {
+            width: 100%;
+            height: 100%;
+            opacity: 0.1;
+        }
+
+        /* Maximize State - CRITICAL FIX: Z-Index boosted to 200 */
+        .maximized {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 200 !important;
+            border-radius: 0;
+            height: 100vh !important;
+            width: 100vw !important;
+            background: #020617 !important;
+            /* Solid background to cover everything */
+            margin: 0 !important;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- TERMINAL ULTRA --- */
+        .terminal-window {
+            background-color: var(--terminal-bg);
+            font-family: 'Share Tech Mono', monospace;
+            background-image:
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            text-shadow: 0 0 2px rgba(99, 102, 241, 0.3);
+        }
+
+        .cmd-line {
+            display: flex;
+            gap: 0.75rem;
+            padding: 2px 0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .cmd-timestamp {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            user-select: none;
+            padding-top: 2px;
+        }
+
+        .cmd-content {
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .typing-effect {
+            overflow: hidden;
+            white-space: pre-wrap;
+            border-right: .15em solid transparent;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* --- HEX GRID ANIMATION --- */
+        .hex-bg {
+            background-image: url("data:image/svg+xml,%3Csvg width='24' height='40' viewBox='0 0 24 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 40c5.523 0 10-4.477 10-10V10c0-5.523 4.477-10 10-10s10 4.477 10 10v20c0 5.523-4.477 10-10 10S0 35.523 0 30V40z' fill='%236366f1' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        /* --- CHART GRID --- */
+        .chart-grid {
+            background-size: 20px 20px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        }
+
+        /* --- DECRYPTOR STYLES --- */
+        .crypt-cell {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            color: #475569;
+            transition: all 0.1s;
+            cursor: default;
+            user-select: none;
+        }
+
+        .crypt-cell:hover {
+            color: var(--accent);
+            text-shadow: 0 0 8px var(--accent);
+        }
+
+        .crypt-cell.locked {
+            color: var(--success);
+            font-weight: bold;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .crypt-cell.active {
+            color: #fff;
+            background: var(--accent);
+            box-shadow: 0 0 15px var(--accent);
+        }
+
+        /* --- DEFCON STATES --- */
+        body.defcon-1 {
+            --accent: #ef4444;
+            --accent-glow: rgba(239, 68, 68, 0.4);
+        }
+
+        body.defcon-1 .glass-panel {
+            border-color: rgba(239, 68, 68, 0.3);
+            background: rgba(20, 5, 5, 0.85);
+        }
+
+        /* Scanline Overlay */
+        .scanline {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            background: linear-gradient(to bottom, transparent, rgba(99, 102, 241, 0.03), transparent);
+            background-size: 100% 3px;
+            animation: scan 8s linear infinite;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col text-sm hex-bg overflow-x-hidden" id="app-body">
+
+    <!-- Hex Canvas Background -->
+    <canvas id="bg-canvas" class="fixed inset-0 z-0 pointer-events-none opacity-20"></canvas>
+
+    <!-- Top Bar -->
+    <header class="sticky top-0 z-40 bg-[#020617]/90 backdrop-blur-md border-b border-white/5 h-14">
+        <div class="container mx-auto px-4 h-full flex justify-between items-center">
+
+            <!-- Logo Section -->
+            <div class="flex items-center gap-4">
+                <div
+                    class="w-8 h-8 rounded bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i data-lucide="shield" class="text-white w-4 h-4"></i>
+                </div>
+                <div>
+                    <h1 class="font-display font-bold text-base tracking-wider text-white">SENTINEL<span
+                            class="text-indigo-500">OPS</span></h1>
+                    <div class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <p class="text-[10px] text-slate-400 font-mono uppercase tracking-widest" id="system-status">
+                            System Nominal</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Stats -->
+            <div class="hidden md:flex items-center gap-6 border-x border-white/5 px-6 h-8">
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-slate-500 uppercase font-mono">Uptime</span>
+                    <span class="text-xs font-bold text-slate-300 font-mono">41:12:09</span>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-slate-500 uppercase font-mono">Server Load</span>
+                    <div class="w-20 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                        <div class="h-full bg-indigo-500 w-[34%] animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center gap-3">
+                <div
+                    class="hidden sm:flex items-center gap-2 px-3 py-1 rounded border border-slate-800 bg-slate-900/50">
+                    <span class="text-[10px] text-slate-500 font-mono uppercase">DEFCON</span>
+                    <span id="defcon-badge"
+                        class="text-xs font-bold text-white font-display px-2 py-0.5 rounded bg-indigo-600">3</span>
+                </div>
+                <button onclick="toggleAudio()" id="audio-btn"
+                    class="p-2 text-slate-400 hover:text-indigo-400 transition-colors rounded hover:bg-white/5"
+                    title="Toggle SFX">
+                    <i data-lucide="volume-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-6 relative z-10 flex flex-col gap-6">
+
+        <!-- Metrics Row -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <!-- 1. Network Throughput (Live Graph) -->
+            <div class="glass-panel tech-corners p-4 h-32 flex flex-col justify-between relative overflow-hidden group">
+                <!-- Grid Overlay -->
+                <div class="absolute inset-0 chart-grid opacity-20 pointer-events-none"></div>
+
+                <div class="flex justify-between items-start relative z-10">
+                    <div>
+                        <h3 class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Network Traffic</h3>
+                        <div class="flex items-baseline gap-1 mt-1">
+                            <span class="text-2xl font-display font-bold text-white" id="traffic-value">8.4</span>
+                            <span class="text-xs text-indigo-400 font-mono">Gbps</span>
+                        </div>
+                    </div>
+                    <div class="p-1.5 rounded bg-indigo-500/10 text-indigo-400">
+                        <i data-lucide="activity" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <!-- Canvas for Chart -->
+                <canvas id="traffic-chart"
+                    class="absolute bottom-0 left-0 w-full h-16 opacity-50 group-hover:opacity-80 transition-opacity"></canvas>
+            </div>
+
+            <!-- 2. Threat Vector (Circular) -->
+            <div class="glass-panel tech-corners p-4 h-32 flex items-center justify-between relative overflow-hidden">
+                <div>
+                    <h3 class="text-[10px] font-mono uppercase tracking-wider text-slate-500">Global Threat Level</h3>
+                    <div class="mt-2 flex flex-col">
+                        <span class="text-xl font-display font-bold text-slate-200" id="threat-label">MODERATE</span>
+                        <span class="text-xs text-slate-500 font-mono">FPCON BRAVO</span>
+                    </div>
+                </div>
+                <!-- Circular Progress CSS -->
+                <div class="relative w-20 h-20 flex items-center justify-center">
+                    <svg class="w-full h-full transform -rotate-90">
+                        <circle cx="40" cy="40" r="36" stroke="#1e293b" stroke-width="6" fill="transparent" />
+                        <circle id="threat-ring" cx="40" cy="40" r="36" stroke="#6366f1" stroke-width="6"
+                            fill="transparent" stroke-dasharray="226" stroke-dashoffset="100"
+                            class="transition-all duration-1000 ease-out" />
+                    </svg>
+                    <i data-lucide="shield-alert" class="absolute w-6 h-6 text-indigo-400"></i>
+                </div>
+            </div>
+
+            <!-- 3. Active Protocols -->
+            <div class="glass-panel tech-corners p-4 h-32 flex flex-col relative overflow-hidden">
+                <h3 class="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-3">Encryption Layer</h3>
+                <div class="space-y-2 flex-1 overflow-hidden">
+                    <div class="flex justify-between items-center text-xs border-b border-white/5 pb-1">
+                        <span class="text-slate-300 font-mono">AES-256-GCM</span>
+                        <span class="text-emerald-500 font-bold">ACTIVE</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs border-b border-white/5 pb-1">
+                        <span class="text-slate-300 font-mono">RSA-4096</span>
+                        <span class="text-emerald-500 font-bold">VERIFIED</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300 font-mono">Curve25519</span>
+                        <span class="text-emerald-500 font-bold">ACTIVE</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace (Terminal + Viz) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[650px]">
+
+            <!-- TERMINAL ULTRA (7 cols) -->
+            <div id="panel-terminal"
+                class="lg:col-span-7 glass-panel flex flex-col h-[550px] lg:h-full relative overflow-hidden transition-all duration-300 group shadow-2xl shadow-indigo-900/10"
+                onclick="focusTerminal()">
+
+                <!-- Terminal Header -->
+                <div class="flex items-center justify-between px-4 py-3 bg-[#0f172a] border-b border-white/10 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <div class="flex gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
+                            <!-- RED (Close) -->
+                            <div class="w-3 h-3 rounded-full bg-red-500 border border-red-600 shadow-sm cursor-pointer hover:bg-red-400"
+                                onclick="if(document.getElementById('panel-terminal').classList.contains('maximized')) toggleMaximize('panel-terminal'); event.stopPropagation();"
+                                title="Close / Minimize"></div>
+                            <!-- YELLOW (Minimize) -->
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 border border-yellow-600 shadow-sm cursor-pointer hover:bg-yellow-400"
+                                onclick="if(document.getElementById('panel-terminal').classList.contains('maximized')) toggleMaximize('panel-terminal'); event.stopPropagation();"
+                                title="Minimize"></div>
+                            <!-- GREEN (Maximize) -->
+                            <div class="w-3 h-3 rounded-full bg-green-500 border border-green-600 shadow-sm cursor-pointer hover:bg-green-400"
+                                onclick="if(!document.getElementById('panel-terminal').classList.contains('maximized')) toggleMaximize('panel-terminal'); event.stopPropagation();"
+                                title="Maximize"></div>
+                        </div>
+                        <div class="ml-4 flex items-center gap-4 text-[10px] font-mono text-slate-500">
+                            <span class="flex items-center gap-1 text-slate-400"><i data-lucide="server"
+                                    class="w-3 h-3"></i> TTY:1</span>
+                            <span class="hidden sm:inline">|</span>
+                            <span class="hidden sm:inline">SSH: 192.168.1.42</span>
+                            <span class="hidden sm:inline">|</span>
+                            <span class="text-indigo-400 font-bold">ROOT ACCESS</span>
+                        </div>
+                    </div>
+                    <button onclick="toggleMaximize('panel-terminal'); event.stopPropagation();"
+                        class="text-slate-500 hover:text-white transition-colors p-1.5 rounded hover:bg-white/10"
+                        title="Toggle Fullscreen">
+                        <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <div class="scanline"></div>
+
+                <!-- Output Area -->
+                <div id="terminal-output"
+                    class="flex-1 terminal-window p-4 overflow-y-auto text-sm custom-scrollbar cursor-text font-mono leading-relaxed relative z-0">
+                    <div class="cmd-line"><span class="cmd-timestamp text-indigo-400">09:02:11</span> <span
+                            class="cmd-content text-slate-300">Initializing Shadow Kernel v4.2.0...</span></div>
+                    <div class="cmd-line"><span class="cmd-timestamp text-indigo-400">09:02:12</span> <span
+                            class="cmd-content text-slate-300">Mounting encrypted volumes... <span
+                                class="text-emerald-500">[OK]</span></span></div>
+                    <div class="cmd-line"><span class="cmd-timestamp text-indigo-400">09:02:14</span> <span
+                            class="cmd-content text-slate-300">Established uplink to Sentinel Node (US-WEST).</span>
+                    </div>
+                    <div class="my-4 h-px bg-indigo-500/20 w-full"></div>
+                    <div class="cmd-line"><span class="cmd-content text-slate-300">Welcome, Administrator. Type <span
+                                class="text-white font-bold">'help'</span> for command list.</span></div>
+                </div>
+
+                <!-- Status Bar -->
+                <div
+                    class="h-6 bg-[#0a0f1e] border-t border-white/5 flex items-center px-4 text-[9px] font-mono text-slate-500 gap-4 select-none shrink-0">
+                    <span class="text-emerald-500">● ONLINE</span>
+                    <span>LATENCY: 12ms</span>
+                    <span>ENCRYPTION: AES-256</span>
+                    <span class="ml-auto opacity-50">UTF-8</span>
+                </div>
+
+                <!-- Input Area -->
+                <div
+                    class="p-3 bg-[#0f172a] border-t border-white/10 flex items-center gap-3 shrink-0 relative z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
+                    <span class="text-indigo-500 font-bold font-mono text-base">➜</span>
+                    <div class="relative flex-1">
+                        <input type="text" id="terminal-input"
+                            class="w-full bg-transparent border-none outline-none text-slate-200 font-mono text-sm placeholder-slate-700 focus:placeholder-slate-600/0 caret-indigo-500"
+                            placeholder="Awaiting command..." autocomplete="off">
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISUALIZATION STACK (5 cols) -->
+            <div class="lg:col-span-5 flex flex-col gap-6 h-auto lg:h-full">
+
+                <!-- 3D Globe Visualizer -->
+                <div id="panel-globe"
+                    class="glass-panel h-[300px] lg:h-1/2 relative bg-[#050a14] flex flex-col overflow-hidden transition-all duration-300">
+                    <div
+                        class="absolute top-3 left-3 z-10 px-2 py-1 rounded bg-black/40 border border-white/10 backdrop-blur-sm pointer-events-none">
+                        <div class="flex items-center gap-2">
+                            <span class="relative flex h-2 w-2">
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span class="text-[10px] font-mono text-slate-300">LIVE TRACKING</span>
+                        </div>
+                    </div>
+
+                    <button onclick="toggleMaximize('panel-globe')"
+                        class="absolute top-3 right-3 z-10 text-slate-500 hover:text-white transition-colors p-1 bg-black/40 rounded border border-white/10"
+                        title="Toggle Fullscreen">
+                        <i data-lucide="maximize-2" class="w-3 h-3"></i>
+                    </button>
+
+                    <div id="globe-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+                    <!-- Globe Stats Overlay -->
+                    <div class="absolute bottom-3 left-3 right-3 flex justify-between items-end pointer-events-none">
+                        <div class="text-[9px] font-mono text-slate-500">
+                            TARGETS: 0<br>
+                            NODES: 142
+                        </div>
+                        <div class="text-[9px] font-mono text-indigo-400 text-right">
+                            LAT: <span id="geo-lat" class="text-white">34.05</span><br>
+                            LNG: <span id="geo-lng" class="text-white">-118.24</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Multi-Function Panel -->
+                <div class="glass-panel h-[300px] lg:h-1/2 flex flex-col relative overflow-hidden">
+                    <!-- Tab Headers -->
+                    <div class="flex border-b border-white/5">
+                        <button onclick="switchTab('decrypt')" id="tab-decrypt"
+                            class="flex-1 py-2 text-[10px] font-bold font-display tracking-widest text-center transition-all border-b-2 border-indigo-500 text-indigo-300 bg-indigo-500/5">
+                            CRYPTANALYSIS
+                        </button>
+                        <button onclick="switchTab('logs')" id="tab-logs"
+                            class="flex-1 py-2 text-[10px] font-bold font-display tracking-widest text-center transition-all border-b-2 border-transparent text-slate-500 hover:text-slate-300">
+                            SYSTEM LOGS
+                        </button>
+                    </div>
+
+                    <!-- Decryption Module -->
+                    <div id="view-decrypt" class="flex-1 p-0 relative flex flex-col">
+                        <div class="absolute inset-0 grid grid-cols-8 grid-rows-8 gap-px p-4" id="crypt-grid">
+                            <!-- JS Injects Hex Grid Here -->
+                        </div>
+
+                        <!-- Overlay UI -->
+                        <div id="crypt-overlay"
+                            class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm z-10 transition-all">
+                            <div
+                                class="w-16 h-16 rounded-full border-2 border-dashed border-indigo-500/50 flex items-center justify-center mb-4 animate-[spin_10s_linear_infinite]">
+                                <i data-lucide="lock" class="w-6 h-6 text-indigo-400"></i>
+                            </div>
+                            <h3 class="text-white font-display tracking-widest mb-1">ENCRYPTED</h3>
+                            <p class="text-[10px] text-slate-400 font-mono mb-4">Awaiting Key Generation</p>
+                            <button onclick="startDecryptGame()"
+                                class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold font-mono tracking-wider rounded transition-all shadow-lg shadow-indigo-500/25 border border-indigo-400 hover:scale-105 active:scale-95">
+                                INITIALIZE BRUTE FORCE
+                            </button>
+                        </div>
+
+                        <!-- Game Stats (Hidden Initially) -->
+                        <div id="crypt-stats"
+                            class="absolute top-2 right-2 bg-black/80 border border-indigo-500/50 px-2 py-1 rounded hidden z-20">
+                            <span class="text-[10px] font-mono text-indigo-300">TARGET: <span id="target-hex"
+                                    class="text-white font-bold">--</span></span>
+                        </div>
+                    </div>
+
+                    <!-- System Logs (Alternative View) -->
+                    <div id="view-logs" class="hidden flex-1 p-4 overflow-hidden relative">
+                        <div class="space-y-2 font-mono text-[10px] text-slate-400 h-full overflow-y-auto custom-scrollbar"
+                            id="log-feed">
+                            <!-- Logs injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. CONFIGURATION ---
+        const CONFIG = {
+            colors: {
+                indigo: 0x6366f1,
+                bg: 0x050a14,
+                grid: 0x1e293b
+            }
+        };
+
+        // --- 2. AUDIO ENGINE (Synthesized) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let audioEnabled = true;
+
+        function playSound(type) {
+            if (!audioEnabled) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'keystroke') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800 + Math.random() * 200, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'success') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.linearRampToValueAtTime(1000, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const btn = document.getElementById('audio-btn');
+            btn.classList.toggle('text-indigo-400', audioEnabled);
+            btn.classList.toggle('text-slate-400', !audioEnabled);
+        }
+
+        // --- 3. TRAFFIC CHART (Canvas) ---
+        const chartCanvas = document.getElementById('traffic-chart');
+        const chartCtx = chartCanvas.getContext('2d');
+        let chartData = Array(50).fill(10);
+
+        function resizeChart() {
+            if (chartCanvas && chartCanvas.parentElement) {
+                chartCanvas.width = chartCanvas.parentElement.clientWidth;
+                chartCanvas.height = 64; // h-16
+            }
+        }
+        window.addEventListener('resize', resizeChart);
+        resizeChart();
+
+        function updateChart() {
+            // Shift data
+            chartData.shift();
+            // Add new random point (simulating traffic)
+            const last = chartData[chartData.length - 1];
+            let next = last + (Math.random() - 0.5) * 15;
+            if (next < 5) next = 5;
+            if (next > 60) next = 60;
+            chartData.push(next);
+
+            // Update UI Value
+            if (Math.random() > 0.7) {
+                document.getElementById('traffic-value').innerText = (next / 6).toFixed(1);
+            }
+
+            // Draw
+            const w = chartCanvas.width;
+            const h = chartCanvas.height;
+            chartCtx.clearRect(0, 0, w, h);
+
+            chartCtx.beginPath();
+            const step = w / (chartData.length - 1);
+
+            chartCtx.moveTo(0, h - chartData[0]);
+            for (let i = 1; i < chartData.length; i++) {
+                chartCtx.lineTo(i * step, h - chartData[i]);
+            }
+
+            // Gradient Fill
+            const gradient = chartCtx.createLinearGradient(0, 0, 0, h);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // Indigo
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+            chartCtx.lineTo(w, h);
+            chartCtx.lineTo(0, h);
+            chartCtx.fillStyle = gradient;
+            chartCtx.fill();
+
+            // Stroke
+            chartCtx.beginPath();
+            chartCtx.moveTo(0, h - chartData[0]);
+            for (let i = 1; i < chartData.length; i++) {
+                chartCtx.lineTo(i * step, h - chartData[i]);
+            }
+            chartCtx.strokeStyle = '#6366f1';
+            chartCtx.lineWidth = 2;
+            chartCtx.stroke();
+
+            requestAnimationFrame(updateChart);
+        }
+        updateChart();
+
+
+        // --- 4. TERMINAL LOGIC (ULTRA UPGRADE) ---
+        const termOutput = document.getElementById('terminal-output');
+        const termInput = document.getElementById('terminal-input');
+        const fileSystem = {
+            '/': ['home', 'bin', 'etc', 'var'],
+            '/home': ['user'],
+            '/home/user': ['shadow_protocol.enc', 'notes.txt'],
+            '/bin': ['defcon', 'scan', 'decrypt', 'clear', 'ping', 'whoami', 'sys_info', 'minimize', 'exit']
+        };
+        let currentPath = '/home/user';
+        let commandHistory = [];
+        let historyIndex = -1;
+
+        function focusTerminal() {
+            termInput.focus();
+        }
+
+        // Animated Typing
+        function typeText(text, element, speed = 10, callback) {
+            let i = 0;
+            const timer = setInterval(() => {
+                element.textContent += text.charAt(i);
+                i++;
+                termOutput.scrollTop = termOutput.scrollHeight;
+                if (i >= text.length) {
+                    clearInterval(timer);
+                    if (callback) callback();
+                }
+            }, speed);
+        }
+
+        function addTermLine(text, type = 'info', animate = false) {
+            const line = document.createElement('div');
+            line.className = 'cmd-line';
+
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            let colorClass = 'text-slate-300';
+
+            if (type === 'error') colorClass = 'text-red-400';
+            if (type === 'success') colorClass = 'text-emerald-400';
+            if (type === 'warn') colorClass = 'text-amber-400';
+            if (type === 'cmd') colorClass = 'text-indigo-300 font-bold';
+
+            const timestampHtml = `<span class="cmd-timestamp">[${time}]</span>`;
+            const contentSpan = document.createElement('span');
+            contentSpan.className = `cmd-content ${colorClass}`;
+
+            line.innerHTML = timestampHtml;
+            line.appendChild(contentSpan);
+            termOutput.appendChild(line);
+
+            if (animate) {
+                typeText(text, contentSpan);
+            } else {
+                contentSpan.textContent = text;
+            }
+            termOutput.scrollTop = termOutput.scrollHeight;
+        }
+
+        termInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const val = termInput.value.trim();
+                termInput.value = '';
+                if (val) {
+                    playSound('keystroke');
+                    addTermLine(`➜ ${val}`, 'cmd');
+                    commandHistory.push(val);
+                    historyIndex = commandHistory.length;
+                    processCommand(val);
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    termInput.value = commandHistory[historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    termInput.value = commandHistory[historyIndex];
+                } else {
+                    historyIndex = commandHistory.length;
+                    termInput.value = '';
+                }
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                const current = termInput.value;
+                const available = [...fileSystem['/bin'], 'ls', 'cd', 'help'];
+                const match = available.find(c => c.startsWith(current));
+                if (match) termInput.value = match;
+            } else {
+                playSound('keystroke');
+            }
+        });
+
+        function processCommand(raw) {
+            const args = raw.split(' ');
+            const cmd = args[0].toLowerCase();
+
+            if (cmd === 'help') {
+                addTermLine('AVAILABLE COMMANDS:', 'warn');
+                addTermLine('  ls       - List directory contents');
+                addTermLine('  cd       - Change directory');
+                addTermLine('  scan     - Run network vulnerability scan');
+                addTermLine('  decrypt  - Open cryptanalysis tool');
+                addTermLine('  defcon   - Set defense condition [1-5]');
+                addTermLine('  clear    - Clear terminal output');
+                addTermLine('  minimize - Exit fullscreen mode');
+            } else if (cmd === 'clear') {
+                termOutput.innerHTML = '';
+            } else if (cmd === 'minimize' || cmd === 'exit' || cmd === 'close') {
+                const term = document.getElementById('panel-terminal');
+                if (term.classList.contains('maximized')) {
+                    toggleMaximize('panel-terminal');
+                    addTermLine('Window minimized.', 'success');
+                } else {
+                    addTermLine('Window is not maximized.', 'warn');
+                }
+            } else if (cmd === 'ls') {
+                const dir = fileSystem[currentPath];
+                if (dir) addTermLine(dir.join('  '), 'success');
+                else addTermLine('Directory not found', 'error');
+            } else if (cmd === 'scan') {
+                addTermLine('Initializing Shadow Scanner v2.1...', 'info', true);
+                setTimeout(() => {
+                    addTermLine('Scanning subnet 192.168.1.0/24...', 'info', true);
+                    setTimeout(() => addTermLine('Scan Complete: No vulnerabilities found.', 'success'), 1500);
+                }, 800);
+            } else if (cmd === 'defcon') {
+                const lvl = parseInt(args[1]);
+                if (lvl >= 1 && lvl <= 5) {
+                    setDefcon(lvl);
+                    addTermLine(`Defense Condition set to LEVEL ${lvl}`, 'warn');
+                } else {
+                    addTermLine('Usage: defcon [1-5]', 'error');
+                }
+            } else if (cmd === 'whoami') {
+                addTermLine('root', 'success');
+            } else if (cmd === 'sys_info') {
+                addTermLine('KERNEL: ShadowOS 4.2.0-secure');
+                addTermLine('CPU: Quantum Core i9 (128 Cores)');
+                addTermLine('MEM: 64TB Optical RAM');
+            } else if (cmd === 'decrypt') {
+                switchTab('decrypt');
+                addTermLine('Launching Cryptanalysis Module...', 'success');
+            } else {
+                addTermLine(`Command not found: ${cmd}`, 'error');
+                playSound('error');
+            }
+        }
+
+        // --- 5. 3D GLOBE (High Tech) ---
+        let renderer, camera;
+        function initGlobe() {
+            const container = document.getElementById('globe-container');
+            const scene = new THREE.Scene();
+            // Fog for depth
+            scene.fog = new THREE.FogExp2(0x050a14, 0.04);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.z = 12;
+            camera.position.y = 4;
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            const group = new THREE.Group();
+            scene.add(group);
+
+            // 1. Point Cloud Globe
+            const geometry = new THREE.IcosahedronGeometry(4, 4); // High detail
+            const count = geometry.attributes.position.count;
+            const particles = new THREE.BufferGeometry();
+            particles.setAttribute('position', geometry.attributes.position);
+
+            const pMaterial = new THREE.PointsMaterial({
+                color: CONFIG.colors.indigo,
+                size: 0.08,
+                transparent: true,
+                opacity: 0.6
+            });
+            const globePoints = new THREE.Points(particles, pMaterial);
+            group.add(globePoints);
+
+            // 2. Inner Sphere (Dark blocker)
+            const blocker = new THREE.Mesh(
+                new THREE.IcosahedronGeometry(3.9, 2),
+                new THREE.MeshBasicMaterial({ color: 0x020617 })
+            );
+            group.add(blocker);
+
+            // 3. Atmosphere Glow
+            const glowGeo = new THREE.IcosahedronGeometry(4.2, 2);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: CONFIG.colors.indigo,
+                transparent: true,
+                opacity: 0.1,
+                wireframe: true
+            });
+            const atmosphere = new THREE.Mesh(glowGeo, glowMat);
+            group.add(atmosphere);
+
+            // 4. Scanning Ring
+            const ringGeo = new THREE.RingGeometry(4.5, 4.6, 64);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: 0x10b981,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.4
+            });
+            const scanner = new THREE.Mesh(ringGeo, ringMat);
+            scanner.rotation.x = Math.PI / 2;
+            group.add(scanner);
+
+            // Animation Loop
+            function animate() {
+                requestAnimationFrame(animate);
+                group.rotation.y += 0.002;
+                atmosphere.rotation.y -= 0.001;
+
+                // Scanner animation
+                scanner.rotation.x = Math.PI / 2 + Math.sin(Date.now() * 0.001) * 0.2;
+                scanner.scale.setScalar(1 + Math.sin(Date.now() * 0.002) * 0.05);
+
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // Handle Resize
+            window.addEventListener('resize', () => {
+                if (container && renderer) {
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    camera.aspect = container.clientWidth / container.clientHeight;
+                    camera.updateProjectionMatrix();
+                }
+            });
+        }
+        setTimeout(initGlobe, 100);
+
+
+        // --- 6. CRYPTANALYSIS MODULE ---
+        let cryptInterval;
+        let targetHex = "";
+        const cryptGrid = document.getElementById('crypt-grid');
+
+        function initCryptGrid() {
+            cryptGrid.innerHTML = '';
+            for (let i = 0; i < 64; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'crypt-cell flex items-center justify-center rounded';
+                cell.innerText = randByte();
+                cryptGrid.appendChild(cell);
+            }
+        }
+        initCryptGrid();
+
+        function randByte() {
+            return Math.floor(Math.random() * 255).toString(16).toUpperCase().padStart(2, '0');
+        }
+
+        function startDecryptGame() {
+            document.getElementById('crypt-overlay').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('crypt-stats').classList.remove('hidden');
+
+            targetHex = randByte();
+            document.getElementById('target-hex').innerText = targetHex;
+
+            // Highlight a random cell as target (hidden initially logic simulated by simple clicking)
+            const cells = Array.from(cryptGrid.children);
+
+            // Reset
+            cells.forEach(c => {
+                c.className = 'crypt-cell flex items-center justify-center rounded cursor-pointer';
+                c.onclick = () => {
+                    if (c.innerText === targetHex) {
+                        c.classList.add('locked');
+                        playSound('success');
+                        addTermLine(`CRYPT: Segment ${targetHex} Decoded`, 'success');
+                        resetRound();
+                    } else {
+                        playSound('error');
+                        addTermLine('CRYPT: Hash mismatch', 'error');
+                    }
+                }
+            });
+
+            // Start Scramble Effect
+            clearInterval(cryptInterval);
+            cryptInterval = setInterval(() => {
+                cells.forEach(c => {
+                    if (!c.classList.contains('locked')) {
+                        if (Math.random() > 0.9) c.innerText = randByte();
+                    }
+                });
+
+                // Ensure target exists in grid
+                if (!cells.some(c => c.innerText === targetHex && !c.classList.contains('locked'))) {
+                    const freeCells = cells.filter(c => !c.classList.contains('locked'));
+                    if (freeCells.length > 0) {
+                        freeCells[Math.floor(Math.random() * freeCells.length)].innerText = targetHex;
+                    }
+                }
+            }, 100);
+        }
+
+        function resetRound() {
+            targetHex = randByte();
+            document.getElementById('target-hex').innerText = targetHex;
+        }
+
+        function switchTab(tab) {
+            document.getElementById('view-decrypt').classList.toggle('hidden', tab !== 'decrypt');
+            document.getElementById('view-logs').classList.toggle('hidden', tab !== 'logs');
+
+            const btnD = document.getElementById('tab-decrypt');
+            const btnL = document.getElementById('tab-logs');
+
+            if (tab === 'decrypt') {
+                btnD.classList.add('border-indigo-500', 'text-indigo-300', 'bg-indigo-500/5');
+                btnD.classList.remove('border-transparent', 'text-slate-500');
+                btnL.classList.remove('border-indigo-500', 'text-indigo-300', 'bg-indigo-500/5');
+                btnL.classList.add('border-transparent', 'text-slate-500');
+            } else {
+                btnL.classList.add('border-indigo-500', 'text-indigo-300', 'bg-indigo-500/5');
+                btnL.classList.remove('border-transparent', 'text-slate-500');
+                btnD.classList.remove('border-indigo-500', 'text-indigo-300', 'bg-indigo-500/5');
+                btnD.classList.add('border-transparent', 'text-slate-500');
+
+                startFakeLogs();
+            }
+        }
+
+        // --- 7. FAKE LOG GENERATOR ---
+        function startFakeLogs() {
+            const feed = document.getElementById('log-feed');
+            if (feed.children.length > 0) return; // already started
+
+            setInterval(() => {
+                const ms = Math.floor(Math.random() * 200) + 20;
+                const ip = `192.168.1.${Math.floor(Math.random() * 255)}`;
+                const div = document.createElement('div');
+                div.innerHTML = `<span class="text-slate-500">${new Date().toISOString().split('T')[1]}</span> INBOUND_PKT <span class="text-indigo-400">SRC:${ip}</span> LEN:64 TTL:${ms}`;
+                feed.prepend(div);
+                if (feed.children.length > 50) feed.lastChild.remove();
+            }, 1500);
+        }
+
+        // --- 8. GLOBAL UTILS ---
+        function toggleMaximize(id) {
+            const el = document.getElementById(id);
+            const isMax = el.classList.toggle('maximized');
+
+            // Icon Toggle Logic
+            const btn = el.querySelector('button');
+
+            const iconName = isMax ? 'minimize-2' : 'maximize-2';
+            btn.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4"></i>`;
+
+            if (isMax) {
+                btn.classList.add('text-indigo-400', 'bg-white/10');
+                // Ensure focus on input if terminal is maximized
+                if (id === 'panel-terminal') setTimeout(() => document.getElementById('terminal-input').focus(), 100);
+            } else {
+                btn.classList.remove('text-indigo-400', 'bg-white/10');
+            }
+            lucide.createIcons();
+
+            // Trigger resize for charts/globe
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+            }, 100);
+        }
+
+        function setDefcon(lvl) {
+            document.body.className = document.body.className.replace(/defcon-\d/g, '');
+            if (lvl === 1) {
+                document.body.classList.add('defcon-1');
+                document.getElementById('threat-label').innerText = "CRITICAL";
+                document.getElementById('threat-label').className = "text-xl font-display font-bold text-red-500";
+                document.getElementById('threat-ring').setAttribute('stroke', '#ef4444');
+                document.getElementById('threat-ring').setAttribute('stroke-dashoffset', '20'); // More filled
+                playSound('error');
+            } else {
+                document.getElementById('threat-label').innerText = "MODERATE";
+                document.getElementById('threat-label').className = "text-xl font-display font-bold text-slate-200";
+                document.getElementById('threat-ring').setAttribute('stroke', '#6366f1');
+                document.getElementById('threat-ring').setAttribute('stroke-dashoffset', '100');
+            }
+            document.getElementById('defcon-badge').innerText = lvl;
+            document.getElementById('defcon-badge').className = lvl === 1
+                ? "text-xs font-bold text-white font-display px-2 py-0.5 rounded bg-red-600 animate-pulse"
+                : "text-xs font-bold text-white font-display px-2 py-0.5 rounded bg-indigo-600";
+        }
+
+        // Initialize Icons
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

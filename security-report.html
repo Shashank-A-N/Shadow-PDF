@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Protocol // Enterprise SOC</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' },
+                        primary: { 500: '#8b5cf6', 600: '#7c3aed' }, // Violet
+                        accent: { 500: '#06b6d4', 600: '#0891b2' },  // Cyan
+                        success: { 500: '#10b981' },
+                        warning: { 500: '#f59e0b' },
+                        danger: { 500: '#ef4444' },
+                    },
+                    fontFamily: {
+                        display: ['Orbitron', 'sans-serif'],
+                        tech: ['Rajdhani', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(15, 23, 42, 0.6);
+        }
+
+        body {
+            background-color: #020617;
+            color: #cbd5e1;
+            overflow: hidden;
+        }
+
+        /* --- Scrollbars --- */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* --- UI Components --- */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .hud-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hud-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+        }
+
+        .hud-card:hover {
+            border-color: rgba(139, 92, 246, 0.2);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.05);
+        }
+
+        /* --- Animations --- */
+        @keyframes scanline {
+            0% {
+                transform: translateY(-100%);
+            }
+
+            100% {
+                transform: translateY(100vh);
+            }
+        }
+
+        .scan-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            w: 100%;
+            h: 100%;
+            background: linear-gradient(to bottom, transparent, rgba(139, 92, 246, 0.02), transparent);
+            pointer-events: none;
+            z-index: 9999;
+            animation: scanline 8s linear infinite;
+        }
+
+        .animate-blink {
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* --- Grid Pattern --- */
+        .tech-grid {
+            background-image:
+                linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* --- Corner Brackets --- */
+        .corner-bracket {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-color: rgba(139, 92, 246, 0.5);
+            border-style: solid;
+            transition: all 0.3s ease;
+        }
+
+        .cb-tl {
+            top: 0;
+            left: 0;
+            border-width: 1px 0 0 1px;
+        }
+
+        .cb-tr {
+            top: 0;
+            right: 0;
+            border-width: 1px 1px 0 0;
+        }
+
+        .cb-bl {
+            bottom: 0;
+            left: 0;
+            border-width: 0 0 1px 1px;
+        }
+
+        .cb-br {
+            bottom: 0;
+            right: 0;
+            border-width: 0 1px 1px 0;
+        }
+
+        .hud-card:hover .corner-bracket {
+            width: 100%;
+            height: 100%;
+            opacity: 0.1;
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #8b5cf6;
+        }
+
+        .toggle-checkbox:checked+.toggle-label {
+            background-color: #8b5cf6;
+        }
+
+        /* Views */
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Auth Screen - HIGH Z-INDEX */
+        #auth-overlay {
+            backdrop-filter: blur(20px);
+            background-color: rgba(2, 6, 23, 0.95);
+            /* Ensure it is ABOVE the scanline (z-9999) */
+            z-index: 10000;
+        }
+
+        .auth-input {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            font-family: 'Share Tech Mono', monospace;
+            /* Ensure interactions work */
+            pointer-events: auto;
+            position: relative;
+            z-index: 10001;
+        }
+
+        .auth-input:focus {
+            border-color: #8b5cf6;
+            outline: none;
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
+        }
+
+        /* Button specific fixes */
+        #auth-submit-btn,
+        #toggle-auth-mode {
+            pointer-events: auto;
+            cursor: pointer;
+            position: relative;
+            z-index: 10002;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 font-sans selection:bg-primary-500/30">
+
+    <div class="scan-overlay"></div>
+
+    <!-- ================= AUTH OVERLAY ================= -->
+    <div id="auth-overlay" class="fixed inset-0 flex items-center justify-center flex-col">
+        <div class="absolute inset-0 tech-grid opacity-20 pointer-events-none"></div>
+
+        <div class="w-full max-w-md p-8 relative z-10">
+            <!-- Auth Header -->
+            <div class="text-center mb-10">
+                <div
+                    class="w-16 h-16 mx-auto bg-slate-900 border border-primary-500/30 rounded-full flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(139,92,246,0.3)] animate-pulse">
+                    <i class="fa-solid fa-shield-halved text-2xl text-primary-400"></i>
+                </div>
+                <h1 class="text-3xl font-display font-bold text-white tracking-widest mb-1">RESTRICTED ACCESS</h1>
+                <p class="text-xs font-mono text-slate-500 tracking-[0.2em] uppercase">Identity Verification Required
+                </p>
+            </div>
+
+            <!-- Auth Form Container -->
+            <div class="hud-card p-8 rounded-xl border border-white/10 bg-slate-900/80 backdrop-blur-xl shadow-2xl">
+                <div class="corner-bracket cb-tl"></div>
+                <div class="corner-bracket cb-tr"></div>
+                <div class="corner-bracket cb-bl"></div>
+                <div class="corner-bracket cb-br"></div>
+
+                <!-- Error Message Display -->
+                <div id="auth-error"
+                    class="hidden mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-xs font-mono flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
+                    <span id="auth-error-text" class="break-words">Authentication Failed</span>
+                </div>
+
+                <form id="auth-form" class="space-y-5">
+                    <div>
+                        <label class="block text-[10px] font-mono uppercase text-primary-400 mb-1 tracking-wider">Agent
+                            ID (Email)</label>
+                        <div class="relative">
+                            <i data-lucide="user" class="absolute left-3 top-3 w-4 h-4 text-slate-500 z-50"></i>
+                            <input type="email" id="email" required
+                                class="auth-input w-full pl-10 pr-4 py-2.5 rounded text-sm text-white placeholder-slate-600 transition-all"
+                                placeholder="operator@shadow.sec">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-mono uppercase text-primary-400 mb-1 tracking-wider">Access
+                            Code (Password)</label>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-3 top-3 w-4 h-4 text-slate-500 z-50"></i>
+                            <input type="password" id="password" required
+                                class="auth-input w-full pl-10 pr-4 py-2.5 rounded text-sm text-white placeholder-slate-600 transition-all"
+                                placeholder="••••••••">
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" id="auth-submit-btn"
+                            class="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white font-bold font-display tracking-wide rounded transition-all shadow-[0_0_15px_rgba(124,58,237,0.4)] hover:shadow-[0_0_25px_rgba(124,58,237,0.6)] flex items-center justify-center gap-2">
+                            <i data-lucide="key" class="w-4 h-4"></i> AUTHENTICATE
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-6 text-center border-t border-white/5 pt-4">
+                    <button type="button" id="toggle-auth-mode"
+                        class="text-xs text-slate-500 font-mono cursor-pointer hover:text-primary-400 transition-colors bg-transparent border-none">
+                        Need Clearance? <span class="text-white underline decoration-dotted">Request Access</span>
+                    </button>
+                </div>
+            </div>
+
+            <p class="mt-8 text-center text-[10px] text-slate-600 font-mono">
+                UNAUTHORIZED ACCESS ATTEMPTS WILL BE LOGGED. IP: <span class="text-primary-500/50">192.168.X.X</span>
+            </p>
+        </div>
+    </div>
+    <!-- ================= END AUTH OVERLAY ================= -->
+
+
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- Sidebar Navigation -->
+        <aside
+            class="w-20 lg:w-64 flex-shrink-0 glass-panel border-r border-white/5 flex flex-col z-20 transition-all duration-300">
+            <!-- Brand -->
+            <div
+                class="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-white/5 relative overflow-hidden">
+                <div class="absolute inset-0 bg-primary-500/5 animate-pulse"></div>
+                <div
+                    class="w-8 h-8 rounded bg-gradient-to-br from-primary-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-primary-500/20 relative z-10">
+                    <i class="fa-solid fa-shield-halved text-white text-xs"></i>
+                </div>
+                <div class="hidden lg:block ml-3">
+                    <h1 class="font-display font-bold text-lg tracking-wider text-white">SHADOW<span
+                            class="text-primary-500">SOC</span></h1>
+                    <p class="text-[10px] text-slate-500 font-mono tracking-widest uppercase">Enterprise Edition</p>
+                </div>
+            </div>
+
+            <!-- Nav Links -->
+            <nav class="flex-1 py-6 space-y-2 px-2 lg:px-4" id="main-nav">
+
+                <button onclick="switchView('overview', this)"
+                    class="nav-btn active w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-white/5 text-white border border-white/10 group relative overflow-hidden transition-all">
+                    <div
+                        class="absolute inset-0 bg-primary-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300">
+                    </div>
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 text-primary-400"></i>
+                    <span class="hidden lg:block font-tech font-semibold tracking-wide text-sm">OVERVIEW</span>
+                    <div
+                        class="active-indicator absolute right-2 w-1.5 h-1.5 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]">
+                    </div>
+                </button>
+
+                <button onclick="switchView('threats', this)"
+                    class="nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition-all group relative overflow-hidden">
+                    <div
+                        class="absolute inset-0 bg-primary-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300">
+                    </div>
+                    <i data-lucide="activity" class="w-5 h-5 group-hover:text-accent-400"></i>
+                    <span class="hidden lg:block font-tech font-medium tracking-wide text-sm">THREAT INTEL</span>
+                    <div
+                        class="active-indicator hidden absolute right-2 w-1.5 h-1.5 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]">
+                    </div>
+                </button>
+
+                <button onclick="switchView('network', this)"
+                    class="nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition-all group relative overflow-hidden">
+                    <div
+                        class="absolute inset-0 bg-primary-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300">
+                    </div>
+                    <i data-lucide="network" class="w-5 h-5 group-hover:text-accent-400"></i>
+                    <span class="hidden lg:block font-tech font-medium tracking-wide text-sm">NETWORK MAP</span>
+                    <div
+                        class="active-indicator hidden absolute right-2 w-1.5 h-1.5 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]">
+                    </div>
+                </button>
+
+                <button onclick="switchView('logs', this)"
+                    class="nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition-all group relative overflow-hidden">
+                    <div
+                        class="absolute inset-0 bg-primary-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300">
+                    </div>
+                    <i data-lucide="file-check" class="w-5 h-5 group-hover:text-accent-400"></i>
+                    <span class="hidden lg:block font-tech font-medium tracking-wide text-sm">AUDIT LOGS</span>
+                    <div
+                        class="active-indicator hidden absolute right-2 w-1.5 h-1.5 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]">
+                    </div>
+                </button>
+
+                <div class="pt-4 mt-4 border-t border-white/5">
+                    <p class="hidden lg:block px-3 text-xs font-mono text-slate-600 mb-2 uppercase">System</p>
+                    <button onclick="switchView('config', this)"
+                        class="nav-btn w-full flex items-center gap-3 px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition-all group relative overflow-hidden">
+                        <div
+                            class="absolute inset-0 bg-primary-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300">
+                        </div>
+                        <i data-lucide="settings" class="w-5 h-5"></i>
+                        <span class="hidden lg:block font-tech font-medium tracking-wide text-sm">CONFIG</span>
+                        <div
+                            class="active-indicator hidden absolute right-2 w-1.5 h-1.5 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(139,92,246,0.8)]">
+                        </div>
+                    </button>
+                </div>
+            </nav>
+
+            <!-- User Status -->
+            <div class="p-4 border-t border-white/5 bg-slate-900/50">
+                <div class="flex items-center gap-3 mb-3">
+                    <div
+                        class="w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center relative">
+                        <span class="font-bold text-xs text-white">OP</span>
+                        <div
+                            class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-success-500 border-2 border-slate-900 rounded-full">
+                        </div>
+                    </div>
+                    <div class="hidden lg:block overflow-hidden">
+                        <p class="text-sm font-bold text-white truncate" id="user-display-email">Operator_01</p>
+                        <p class="text-[10px] text-slate-500 font-mono truncate" id="user-display-id">LEVEL 5 CLEARANCE
+                        </p>
+                    </div>
+                </div>
+                <button id="logout-btn"
+                    class="w-full py-1.5 rounded border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2">
+                    <i data-lucide="log-out" class="w-3 h-3"></i> <span class="hidden lg:inline">TERMINATE</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-950/50 relative z-10 tech-grid">
+
+            <!-- Top Header -->
+            <header
+                class="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
+                <div class="flex items-center gap-4">
+                    <span class="text-slate-500 text-sm font-mono"><i
+                            class="fa-solid fa-server mr-2"></i>US-EAST-1</span>
+                    <span class="h-4 w-px bg-slate-800"></span>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-success-500 animate-pulse"></span>
+                        <span class="text-success-500 text-xs font-bold tracking-wider font-display">SYSTEM
+                            ONLINE</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <span id="live-clock" class="text-sm font-mono text-primary-400 hidden sm:block">00:00:00 UTC</span>
+
+                    <!-- Notification Bell -->
+                    <div class="relative">
+                        <button onclick="toggleNotifications()"
+                            class="w-8 h-8 flex items-center justify-center rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors">
+                            <i data-lucide="bell" class="w-4 h-4"></i>
+                            <span class="absolute top-1.5 right-2 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                        </button>
+                        <!-- Dropdown -->
+                        <div id="notification-dropdown"
+                            class="hidden absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                            <div class="p-3 border-b border-slate-700 text-xs font-bold text-slate-300">NOTIFICATIONS
+                                (2)</div>
+                            <div class="max-h-60 overflow-y-auto">
+                                <div class="p-3 border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer">
+                                    <p class="text-[10px] text-primary-400 font-mono mb-1">2 mins ago</p>
+                                    <p class="text-xs text-white">Encryption key rotation successful.</p>
+                                </div>
+                                <div class="p-3 hover:bg-slate-800/50 cursor-pointer">
+                                    <p class="text-[10px] text-orange-400 font-mono mb-1">15 mins ago</p>
+                                    <p class="text-xs text-white">Login attempt from unknown IP: 192.168.1.5</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="exportReport()" id="export-btn"
+                        class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-primary-600/10 border border-primary-500/30 text-primary-400 hover:bg-primary-600/20 transition-all text-xs font-bold font-display">
+                        <i data-lucide="download" class="w-3 h-3"></i> EXPORT REPORT
+                    </button>
+                </div>
+            </header>
+
+            <!-- Scrollable Content Container -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-6">
+
+                <!-- Page Title Area -->
+                <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 text-slate-400 text-xs font-mono mb-1">
+                            <span>DASHBOARD</span>
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            <span class="text-white" id="page-breadcrumb">SECURITY OVERVIEW</span>
+                        </div>
+                        <h2 class="text-3xl font-display font-bold text-white tracking-wide" id="page-title">THREAT
+                            MONITORING</h2>
+                    </div>
+
+                    <div id="header-stats" class="flex gap-4">
+                        <div class="px-4 py-2 rounded bg-slate-900 border border-slate-800 flex flex-col items-center">
+                            <span class="text-[10px] text-slate-500 font-mono uppercase">Encryption</span>
+                            <span class="text-primary-400 font-bold font-tech text-lg">AES-256</span>
+                        </div>
+                        <div class="px-4 py-2 rounded bg-slate-900 border border-slate-800 flex flex-col items-center">
+                            <span class="text-[10px] text-slate-500 font-mono uppercase">Firewall</span>
+                            <span class="text-success-500 font-bold font-tech text-lg">ACTIVE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW: OVERVIEW ================= -->
+                <div id="view-overview" class="view-section active">
+                    <div class="grid grid-cols-12 gap-6">
+
+                        <!-- Col 1: 3D Globe & Network Status (Span 8) -->
+                        <div class="col-span-12 lg:col-span-8 space-y-6">
+
+                            <!-- 3D Visualization Card -->
+                            <div class="hud-card rounded-xl h-80 relative group">
+                                <div class="corner-bracket cb-tl"></div>
+                                <div class="corner-bracket cb-tr"></div>
+                                <div class="corner-bracket cb-bl"></div>
+                                <div class="corner-bracket cb-br"></div>
+
+                                <div class="absolute top-4 left-4 z-10">
+                                    <h3 class="text-white font-display text-sm tracking-wider flex items-center gap-2">
+                                        <i data-lucide="globe" class="w-4 h-4 text-accent-500"></i> GLOBAL TRAFFIC
+                                    </h3>
+                                    <p class="text-slate-500 text-[10px] font-mono mt-1">REAL-TIME NODE VISUALIZATION
+                                    </p>
+                                </div>
+
+                                <!-- Three.js Container -->
+                                <div id="globe-container" class="w-full h-full cursor-move"></div>
+
+                                <!-- Overlay Stats -->
+                                <div class="absolute bottom-4 right-4 text-right z-10 pointer-events-none">
+                                    <div class="text-[10px] text-slate-500 font-mono">ACTIVE NODES</div>
+                                    <div class="text-2xl font-display font-bold text-white" id="node-count">4,281</div>
+                                </div>
+                            </div>
+
+                            <!-- Traffic Chart -->
+                            <div class="hud-card rounded-xl p-6">
+                                <div class="flex justify-between items-center mb-6">
+                                    <div>
+                                        <h3 class="text-white font-display text-sm tracking-wider">NETWORK TRAFFIC</h3>
+                                        <p class="text-slate-500 text-[10px] font-mono">INBOUND VS OUTBOUND (MB/S)</p>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-primary-500"></span><span
+                                            class="text-[10px] text-slate-400 mr-2">IN</span>
+                                        <span class="w-2 h-2 rounded-full bg-accent-500"></span><span
+                                            class="text-[10px] text-slate-400">OUT</span>
+                                    </div>
+                                </div>
+                                <div class="h-60 w-full">
+                                    <canvas id="trafficChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Col 2: Side Panel (Span 4) -->
+                        <div class="col-span-12 lg:col-span-4 space-y-6">
+
+                            <!-- Radar Chart: Security Score -->
+                            <div class="hud-card rounded-xl p-6">
+                                <h3 class="text-white font-display text-sm tracking-wider mb-4 text-center">
+                                    VULNERABILITY ASSESSMENT</h3>
+                                <div class="relative h-48 w-full flex justify-center items-center">
+                                    <canvas id="radarChart"></canvas>
+                                    <!-- Center Score -->
+                                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div class="text-center mt-2">
+                                            <span class="block text-2xl font-bold text-white font-display">A+</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex justify-between text-xs border-t border-white/5 pt-4">
+                                    <span class="text-slate-400">Security Score</span>
+                                    <span class="text-success-500 font-mono font-bold">98/100</span>
+                                </div>
+                            </div>
+
+                            <!-- Live Terminal Log -->
+                            <div class="hud-card rounded-xl p-1 flex flex-col h-[380px]">
+                                <div
+                                    class="bg-slate-900/50 p-3 border-b border-white/5 flex justify-between items-center">
+                                    <span class="text-xs font-mono text-primary-400">>_ SYSTEM_LOG</span>
+                                    <span class="animate-blink w-2 h-2 bg-primary-500 rounded-sm"></span>
+                                </div>
+                                <div class="flex-1 overflow-y-auto custom-scrollbar p-4 font-mono text-[11px] leading-relaxed"
+                                    id="console-output">
+                                    <!-- JS Injected Logs -->
+                                </div>
+                            </div>
+
+                        </div>
+                    </div> <!-- End Grid -->
+
+                    <!-- Footer Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                        <div class="hud-card rounded-xl p-5 flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Encrypted
+                                    Storage</p>
+                                <h4 class="text-xl font-display text-white">824.5 GB</h4>
+                                <div class="w-32 h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-primary-600 to-accent-500 w-[65%]"></div>
+                                </div>
+                            </div>
+                            <div
+                                class="h-10 w-10 rounded-lg bg-primary-500/10 flex items-center justify-center text-primary-400 border border-primary-500/20">
+                                <i data-lucide="database" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <div class="hud-card rounded-xl p-5 flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Intrusion
+                                    Attempts</p>
+                                <h4 class="text-xl font-display text-white">0 DETECTED</h4>
+                                <p class="text-[10px] text-success-500 mt-1">Last 24 Hours</p>
+                            </div>
+                            <div
+                                class="h-10 w-10 rounded-lg bg-success-500/10 flex items-center justify-center text-success-500 border border-success-500/20">
+                                <i data-lucide="shield-check" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <div class="hud-card rounded-xl p-5 flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Compliance
+                                </p>
+                                <div class="flex gap-2 mt-1">
+                                    <span
+                                        class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/5 text-white border border-white/10">GDPR</span>
+                                    <span
+                                        class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/5 text-white border border-white/10">ISO27001</span>
+                                </div>
+                            </div>
+                            <div
+                                class="h-10 w-10 rounded-lg bg-accent-500/10 flex items-center justify-center text-accent-400 border border-accent-500/20">
+                                <i data-lucide="file-certificate" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW: THREAT INTEL ================= -->
+                <div id="view-threats" class="view-section">
+                    <div class="hud-card rounded-xl p-6 mb-6">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="p-3 bg-red-500/10 rounded-lg border border-red-500/20 text-red-500">
+                                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-white font-display text-lg">ACTIVE THREATS</h3>
+                                <p class="text-slate-400 text-xs">Real-time vulnerability database</p>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-slate-400">
+                                <thead class="bg-slate-900/50 text-xs uppercase font-mono text-slate-500">
+                                    <tr>
+                                        <th class="p-3">Severity</th>
+                                        <th class="p-3">CVE ID</th>
+                                        <th class="p-3">Status</th>
+                                        <th class="p-3">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    <tr>
+                                        <td class="p-3"><span
+                                                class="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold border border-red-500/20">CRITICAL</span>
+                                        </td>
+                                        <td class="p-3 font-mono text-white">CVE-2025-8392</td>
+                                        <td class="p-3"><span class="text-emerald-400">Patched</span></td>
+                                        <td class="p-3">Buffer overflow in PDF rendering engine.</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3"><span
+                                                class="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-bold border border-orange-500/20">HIGH</span>
+                                        </td>
+                                        <td class="p-3 font-mono text-white">CVE-2025-1029</td>
+                                        <td class="p-3"><span class="text-emerald-400">Patched</span></td>
+                                        <td class="p-3">Cross-site scripting in report generator.</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3"><span
+                                                class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold border border-yellow-500/20">MEDIUM</span>
+                                        </td>
+                                        <td class="p-3 font-mono text-white">CVE-2025-0042</td>
+                                        <td class="p-3"><span class="text-blue-400">Monitoring</span></td>
+                                        <td class="p-3">Potential timing attack in auth handshake.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW: NETWORK MAP ================= -->
+                <div id="view-network" class="view-section">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Node 1 -->
+                        <div class="hud-card p-4 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-10 h-10 rounded bg-slate-800 flex items-center justify-center text-slate-400">
+                                    <i data-lucide="server" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-bold text-sm">US-EAST-01</h4>
+                                    <p class="text-xs text-emerald-400">Online • 14ms</p>
+                                </div>
+                            </div>
+                            <div class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
+                        </div>
+                        <!-- Node 2 -->
+                        <div class="hud-card p-4 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-10 h-10 rounded bg-slate-800 flex items-center justify-center text-slate-400">
+                                    <i data-lucide="server" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-bold text-sm">EU-WEST-04</h4>
+                                    <p class="text-xs text-emerald-400">Online • 84ms</p>
+                                </div>
+                            </div>
+                            <div class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
+                        </div>
+                        <!-- Node 3 -->
+                        <div class="hud-card p-4 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-10 h-10 rounded bg-slate-800 flex items-center justify-center text-slate-400">
+                                    <i data-lucide="server" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white font-bold text-sm">ASIA-PAC-02</h4>
+                                    <p class="text-xs text-emerald-400">Online • 142ms</p>
+                                </div>
+                            </div>
+                            <div class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
+                        </div>
+                        <!-- Node 4 -->
+                        <div class="hud-card p-4 rounded-xl flex items-center justify-between opacity-70">
+                            <div class="flex items-center gap-3">
+                                <div
+                                    class="w-10 h-10 rounded bg-slate-800 flex items-center justify-center text-slate-400">
+                                    <i data-lucide="server-off" class="w-5 h-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-slate-300 font-bold text-sm">SA-EAST-01</h4>
+                                    <p class="text-xs text-orange-400">Maintenance</p>
+                                </div>
+                            </div>
+                            <div class="h-2 w-2 rounded-full bg-orange-500"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW: LOGS ================= -->
+                <div id="view-logs" class="view-section">
+                    <div class="hud-card rounded-xl overflow-hidden">
+                        <div class="bg-slate-900 px-4 py-3 border-b border-slate-800 flex justify-between items-center">
+                            <h3 class="text-sm font-bold text-white font-mono">SYSTEM_AUDIT_TRAIL.LOG</h3>
+                            <button class="text-xs text-primary-400 hover:text-white"><i
+                                    class="fa-solid fa-filter mr-1"></i> FILTER</button>
+                        </div>
+                        <div
+                            class="p-4 bg-slate-950 font-mono text-xs space-y-2 h-[500px] overflow-y-auto custom-scrollbar">
+                            <div class="flex gap-4 text-slate-400 border-b border-slate-800/50 pb-1 mb-2">
+                                <span class="w-32">TIMESTAMP</span>
+                                <span class="w-24">LEVEL</span>
+                                <span class="w-32">MODULE</span>
+                                <span>MESSAGE</span>
+                            </div>
+                            <!-- Static content for logs view, distinct from the live one -->
+                            <div class="flex gap-4 hover:bg-slate-900 p-1 rounded"><span
+                                    class="w-32 text-slate-600">2025-10-24 09:41:02</span><span
+                                    class="w-24 text-emerald-500">INFO</span><span
+                                    class="w-32 text-slate-300">AUTH_SVC</span><span>User session refreshed for
+                                    OP_01</span></div>
+                            <div class="flex gap-4 hover:bg-slate-900 p-1 rounded"><span
+                                    class="w-32 text-slate-600">2025-10-24 09:40:55</span><span
+                                    class="w-24 text-blue-500">DEBUG</span><span
+                                    class="w-32 text-slate-300">NET_Stack</span><span>Packet fragments
+                                    reassembled</span></div>
+                            <div class="flex gap-4 hover:bg-slate-900 p-1 rounded"><span
+                                    class="w-32 text-slate-600">2025-10-24 09:38:12</span><span
+                                    class="w-24 text-emerald-500">INFO</span><span
+                                    class="w-32 text-slate-300">DB_SHARD</span><span>Index optimization complete</span>
+                            </div>
+                            <div class="flex gap-4 hover:bg-slate-900 p-1 rounded"><span
+                                    class="w-32 text-slate-600">2025-10-24 09:35:00</span><span
+                                    class="w-24 text-orange-500">WARN</span><span
+                                    class="w-32 text-slate-300">FIREWALL</span><span>Rate limit exceeded for
+                                    10.0.0.5</span></div>
+                            <div class="flex gap-4 hover:bg-slate-900 p-1 rounded"><span
+                                    class="w-32 text-slate-600">2025-10-24 09:30:00</span><span
+                                    class="w-24 text-emerald-500">INFO</span><span
+                                    class="w-32 text-slate-300">SYSTEM</span><span>Hourly backup successful</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW: CONFIG ================= -->
+                <div id="view-config" class="view-section">
+                    <div class="max-w-2xl mx-auto space-y-6">
+                        <!-- Security Settings -->
+                        <div class="hud-card rounded-xl p-6">
+                            <h3 class="text-white font-display text-lg mb-6 border-b border-white/5 pb-2">SECURITY
+                                PROTOCOLS</h3>
+
+                            <div class="space-y-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="text-white font-bold text-sm">Active Firewall</h4>
+                                        <p class="text-xs text-slate-500">Block all unauthorized inbound connections</p>
+                                    </div>
+                                    <div
+                                        class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="toggle" id="toggle1"
+                                            class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-700 right-5 checked:right-0" />
+                                        <label for="toggle1"
+                                            class="toggle-label block overflow-hidden h-5 rounded-full bg-slate-700 cursor-pointer"></label>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="text-white font-bold text-sm">AES-256 Encryption</h4>
+                                        <p class="text-xs text-slate-500">Encrypt data at rest in local storage</p>
+                                    </div>
+                                    <div
+                                        class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="toggle" id="toggle2" checked
+                                            class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-700" />
+                                        <label for="toggle2"
+                                            class="toggle-label block overflow-hidden h-5 rounded-full bg-primary-600 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notifications -->
+                        <div class="hud-card rounded-xl p-6">
+                            <h3 class="text-white font-display text-lg mb-6 border-b border-white/5 pb-2">ALERTS</h3>
+
+                            <div class="space-y-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="text-white font-bold text-sm">Critical Alerts</h4>
+                                        <p class="text-xs text-slate-500">Push notifications for severe threats</p>
+                                    </div>
+                                    <div
+                                        class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input type="checkbox" name="toggle" id="toggle3" checked
+                                            class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-700" />
+                                        <label for="toggle3"
+                                            class="toggle-label block overflow-hidden h-5 rounded-full bg-primary-600 cursor-pointer"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- STANDARD SCRIPT: UI & DECOUPLED LOGIC -->
+    <script>
+        // Global State for UI
+        window.isLoginMode = true;
+
+        // Ensure these functions are globally available before Module loads
+        window.toggleAuthModeUI = function () {
+            window.isLoginMode = !window.isLoginMode;
+            const btn = document.getElementById('auth-submit-btn');
+            const toggleText = document.getElementById('toggle-auth-mode');
+            const errorBox = document.getElementById('auth-error');
+
+            if (window.isLoginMode) {
+                btn.innerHTML = `<i data-lucide="key" class="w-4 h-4"></i> AUTHENTICATE`;
+                toggleText.innerHTML = `Need Clearance? <span class="text-white underline decoration-dotted">Request Access</span>`;
+            } else {
+                btn.innerHTML = `<i data-lucide="user-plus" class="w-4 h-4"></i> REGISTER IDENTITY`;
+                toggleText.innerHTML = `Have Clearance? <span class="text-white underline decoration-dotted">Authenticate</span>`;
+            }
+            if (window.lucide) window.lucide.createIcons();
+            if (errorBox) errorBox.classList.add('hidden');
+        };
+
+        // Attach listeners immediately when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleBtn = document.getElementById('toggle-auth-mode');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', window.toggleAuthModeUI);
+            }
+
+            // Init icons
+            if (window.lucide) window.lucide.createIcons();
+        });
+    </script>
+
+    <!-- MODULE SCRIPT: FIREBASE -->
+    <script type="module">
+        // Import Firebase (Using ES Modules for simple file usage)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCv_0Cn6SRenJBVLojJoT2h4C0vtkafiZs",
+            authDomain: "glitch-10327.firebaseapp.com",
+            projectId: "glitch-10327",
+            storageBucket: "glitch-10327.firebasestorage.app",
+            messagingSenderId: "304917207309",
+            appId: "1:304917207309:web:6244380c8ac459dc693844",
+            measurementId: "G-DHSXSMFNCE"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // UI References
+        const authOverlay = document.getElementById('auth-overlay');
+        const authForm = document.getElementById('auth-form');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const authSubmitBtn = document.getElementById('auth-submit-btn');
+        const userDisplayEmail = document.getElementById('user-display-email');
+        const userDisplayId = document.getElementById('user-display-id');
+        const logoutBtn = document.getElementById('logout-btn');
+        const authErrorBox = document.getElementById('auth-error');
+        const authErrorText = document.getElementById('auth-error-text');
+
+        // Handle Form Submit
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = emailInput.value;
+            const password = passwordInput.value;
+
+            // UI State: Loading
+            const originalBtnText = authSubmitBtn.innerHTML;
+            authSubmitBtn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> PROCESSING...`;
+            authSubmitBtn.disabled = true;
+            authErrorBox.classList.add('hidden');
+
+            // Timeout Promise to prevent "Stuck" state
+            const timeout = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("Connection Timeout")), 10000); // 10s timeout
+            });
+
+            try {
+                // Race between Auth and Timeout
+                if (window.isLoginMode) {
+                    await Promise.race([signInWithEmailAndPassword(auth, email, password), timeout]);
+                } else {
+                    await Promise.race([createUserWithEmailAndPassword(auth, email, password), timeout]);
+                }
+                // Success is handled by onAuthStateChanged observer
+            } catch (error) {
+                console.error("Auth Error:", error);
+                authErrorBox.classList.remove('hidden');
+
+                // Detailed Error Handling for Debugging
+                let msg = error.message;
+
+                // User-Friendly translations
+                if (error.code === 'auth/wrong-password') msg = "Invalid Access Code.";
+                if (error.code === 'auth/user-not-found') msg = "Agent Identity Not Found.";
+                if (error.code === 'auth/email-already-in-use') msg = "Identity Already Registered.";
+                if (error.code === 'auth/weak-password') msg = "Access Code Weak (Min 6 chars).";
+                if (error.code === 'auth/network-request-failed') msg = "Network Error. Check Connection.";
+                if (error.code === 'auth/unauthorized-domain') msg = "Unauthorized Domain. Add this URL to Firebase Console.";
+                if (error.message === 'Connection Timeout') msg = "Connection Timed Out. Firebase blocked?";
+
+                authErrorText.innerText = msg;
+
+            } finally {
+                // Always reset button if we are still on the auth screen
+                // (If success, overlay fades out anyway, but good to reset state)
+                if (authOverlay.classList.contains('hidden') === false) {
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.innerHTML = originalBtnText;
+                    if (window.lucide) window.lucide.createIcons();
+                }
+            }
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth);
+        });
+
+        // Auth State Observer (The Gatekeeper)
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in.
+                console.log("Identity Verified:", user.email);
+
+                // Hide Overlay with transition
+                authOverlay.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => authOverlay.classList.add('hidden'), 500);
+
+                // Update UI with User Info
+                userDisplayEmail.innerText = user.email.split('@')[0]; // Show part before @ for style
+                userDisplayId.innerText = `AGENT_ID: ${user.uid.substring(0, 8).toUpperCase()}`;
+
+                // Init icons again just in case
+                if (window.lucide) window.lucide.createIcons();
+
+            } else {
+                // User is signed out.
+                console.log("No Identity Verified");
+
+                // Show Overlay
+                authOverlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+
+                // Reset Form UI
+                authSubmitBtn.disabled = false;
+                if (window.isLoginMode) authSubmitBtn.innerHTML = `<i data-lucide="key" class="w-4 h-4"></i> AUTHENTICATE`;
+                else authSubmitBtn.innerHTML = `<i data-lucide="user-plus" class="w-4 h-4"></i> REGISTER IDENTITY`;
+                if (window.lucide) window.lucide.createIcons();
+            }
+        });
+
+    </script>
+
+    <!-- STANDARD SCRIPT: VISUALIZATIONS & LOGIC -->
+    <script>
+        // --- 1. Init Icons ---
+        lucide.createIcons();
+
+        // --- 2. Live Clock ---
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('live-clock').textContent = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- 3. View Switcher Logic (Revised) ---
+        const pageTitle = document.getElementById('page-title');
+        const breadcrumb = document.getElementById('page-breadcrumb');
+        const headerStats = document.getElementById('header-stats');
+        let globeRenderer, globeCamera; // To handle resize
+
+        window.switchView = function (viewId, btnElement) {
+            // Update Active Nav State
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-white/5', 'border-white/10', 'active', 'text-white');
+                btn.classList.add('text-slate-400', 'border-transparent');
+
+                // Active indicator might be within button but hidden
+                const indicator = btn.querySelector('.active-indicator');
+                if (indicator) indicator.classList.add('hidden');
+
+                // Reset icon colors - IMPORTANT: Lucide replaces <i> with <svg>, so query both
+                const icon = btn.querySelector('i, svg');
+                if (icon) icon.classList.remove('text-primary-400');
+            });
+
+            btnElement.classList.add('bg-white/5', 'border-white/10', 'active', 'text-white');
+            btnElement.classList.remove('text-slate-400', 'border-transparent');
+
+            // Activate current indicator
+            const currentIndicator = btnElement.querySelector('.active-indicator');
+            if (currentIndicator) currentIndicator.classList.remove('hidden');
+
+            // Activate current icon - IMPORTANT: Lucide replaces <i> with <svg>
+            const currentIcon = btnElement.querySelector('i, svg');
+            if (currentIcon) currentIcon.classList.add('text-primary-400');
+
+            // Switch Sections
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            const targetView = document.getElementById('view-' + viewId);
+            if (targetView) {
+                targetView.classList.add('active');
+
+                // Update Header Text
+                if (viewId === 'overview') {
+                    pageTitle.innerText = 'THREAT MONITORING';
+                    breadcrumb.innerText = 'SECURITY OVERVIEW';
+                    if (headerStats) headerStats.classList.remove('hidden');
+                    // Trigger Resize for charts/globe
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 50);
+                } else if (viewId === 'threats') {
+                    pageTitle.innerText = 'THREAT INTELLIGENCE';
+                    breadcrumb.innerText = 'VULNERABILITY DB';
+                    if (headerStats) headerStats.classList.add('hidden');
+                } else if (viewId === 'network') {
+                    pageTitle.innerText = 'NETWORK TOPOLOGY';
+                    breadcrumb.innerText = 'INFRASTRUCTURE MAP';
+                    if (headerStats) headerStats.classList.add('hidden');
+                } else if (viewId === 'logs') {
+                    pageTitle.innerText = 'SYSTEM AUDIT';
+                    breadcrumb.innerText = 'LOGS';
+                    if (headerStats) headerStats.classList.add('hidden');
+                } else if (viewId === 'config') {
+                    pageTitle.innerText = 'SYSTEM CONFIGURATION';
+                    breadcrumb.innerText = 'SETTINGS';
+                    if (headerStats) headerStats.classList.add('hidden');
+                }
+            }
+        };
+
+        // --- 4. Notification Toggle ---
+        window.toggleNotifications = function () {
+            const dropdown = document.getElementById('notification-dropdown');
+            dropdown.classList.toggle('hidden');
+        };
+
+        // --- 5. Export Functionality (Real Download) ---
+        window.exportReport = function () {
+            const btn = document.getElementById('export-btn');
+            const originalContent = btn.innerHTML;
+
+            // Loading State
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> GENERATING...`;
+            btn.classList.add('cursor-wait');
+
+            // Simulate Process
+            setTimeout(() => {
+                const logs = `SHADOW PROTOCOL SECURITY REPORT\nGENERATED: ${new Date().toISOString()}\n\n[INFO] System Scan Complete\n[INFO] Firewall: Active\n[INFO] Encryption: AES-256\n[OK] No Critical Threats Found\n\n-- END OF REPORT --`;
+                const blob = new Blob([logs], { type: 'text/plain' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Security_Report_${Date.now()}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                // Success State
+                btn.innerHTML = `<i class="fa-solid fa-check"></i> DOWNLOADED`;
+                btn.classList.remove('text-primary-400', 'border-primary-500/30');
+                btn.classList.add('text-emerald-400', 'border-emerald-500/30');
+
+                // Reset
+                setTimeout(() => {
+                    btn.innerHTML = originalContent;
+                    btn.classList.remove('cursor-wait', 'text-emerald-400', 'border-emerald-500/30');
+                    btn.classList.add('text-primary-400', 'border-primary-500/30');
+                }, 2000);
+            }, 1500);
+        };
+
+
+        // --- 6. Three.js Globe (Resilient) ---
+        const initGlobe = () => {
+            const container = document.getElementById('globe-container');
+            if (!container) return;
+
+            const scene = new THREE.Scene();
+            scene.background = null;
+
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            globeCamera = camera; // Store global
+            camera.position.z = 25;
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            globeRenderer = renderer; // Store global
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            const geometry = new THREE.IcosahedronGeometry(10, 2);
+            const materialFill = new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.8 });
+            const materialWire = new THREE.MeshBasicMaterial({ color: 0x8b5cf6, wireframe: true, transparent: true, opacity: 0.15 });
+
+            const sphere = new THREE.Mesh(geometry, materialFill);
+            const wireframe = new THREE.Mesh(geometry, materialWire);
+
+            sphere.add(wireframe);
+            scene.add(sphere);
+
+            // Particles
+            const particleGeo = new THREE.BufferGeometry();
+            const particleCount = 60;
+            const posArray = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                const r = 10.2;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                posArray[i] = r * Math.sin(phi) * Math.cos(theta);
+                posArray[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+                posArray[i + 2] = r * Math.cos(phi);
+            }
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const particleMat = new THREE.PointsMaterial({ size: 0.3, color: 0x06b6d4, transparent: true, opacity: 0.8 });
+            const particles = new THREE.Points(particleGeo, particleMat);
+            scene.add(particles);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                if (document.getElementById('view-overview').classList.contains('active')) {
+                    sphere.rotation.y += 0.002;
+                    sphere.rotation.x += 0.0005;
+                    particles.rotation.y += 0.002;
+                    particles.rotation.x += 0.0005;
+                    const time = Date.now() * 0.001;
+                    materialWire.opacity = 0.15 + Math.sin(time) * 0.05;
+                    renderer.render(scene, camera);
+                }
+            }
+            animate();
+        };
+
+        // Window Resize Handler for ThreeJS & ChartJS
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('globe-container');
+            if (container && globeRenderer && globeCamera && container.clientWidth > 0) {
+                const newW = container.clientWidth;
+                const newH = container.clientHeight;
+                globeRenderer.setSize(newW, newH);
+                globeCamera.aspect = newW / newH;
+                globeCamera.updateProjectionMatrix();
+            }
+        });
+
+        // Init Globe after DOM load
+        setTimeout(initGlobe, 100);
+
+        // --- 7. Chart.js (Dynamic Data) ---
+        const ctxTraffic = document.getElementById('trafficChart').getContext('2d');
+        const grad1 = ctxTraffic.createLinearGradient(0, 0, 0, 300);
+        grad1.addColorStop(0, 'rgba(139, 92, 246, 0.4)');
+        grad1.addColorStop(1, 'rgba(139, 92, 246, 0)');
+        const grad2 = ctxTraffic.createLinearGradient(0, 0, 0, 300);
+        grad2.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
+        grad2.addColorStop(1, 'rgba(6, 182, 212, 0)');
+
+        const trafficChart = new Chart(ctxTraffic, {
+            type: 'line',
+            data: {
+                labels: Array.from({ length: 12 }, (_, i) => i + ':00'),
+                datasets: [
+                    { label: 'Inbound', data: [45, 52, 38, 65, 78, 92, 85, 96, 115, 102, 98, 110], borderColor: '#8b5cf6', backgroundColor: grad1, fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0 },
+                    { label: 'Outbound', data: [20, 25, 22, 30, 45, 35, 40, 48, 55, 50, 45, 52], borderColor: '#06b6d4', backgroundColor: grad2, fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'Rajdhani' } } },
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }
+                },
+                interaction: { intersect: false, mode: 'index' },
+                animation: false // Disable animation for performance on updates
+            }
+        });
+
+        // Live Chart Updates
+        setInterval(() => {
+            const d1 = trafficChart.data.datasets[0].data;
+            const d2 = trafficChart.data.datasets[1].data;
+            d1.shift(); d1.push(Math.floor(Math.random() * 60) + 40);
+            d2.shift(); d2.push(Math.floor(Math.random() * 40) + 20);
+            trafficChart.update();
+
+            // Random Node Count Update
+            if (Math.random() > 0.7) {
+                const nodeEl = document.getElementById('node-count');
+                let count = parseInt(nodeEl.innerText.replace(',', ''));
+                count += Math.floor(Math.random() * 10) - 5;
+                nodeEl.innerText = count.toLocaleString();
+            }
+        }, 2000);
+
+        // Radar Chart (Static)
+        new Chart(document.getElementById('radarChart').getContext('2d'), {
+            type: 'radar',
+            data: {
+                labels: ['Encryption', 'Firewall', 'Access', 'Updates', 'Physical', 'Network'],
+                datasets: [{
+                    label: 'Security Score',
+                    data: [95, 90, 98, 85, 100, 92],
+                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                    borderColor: '#10b981',
+                    pointBackgroundColor: '#10b981',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(255,255,255,0.1)' },
+                        grid: { color: 'rgba(255,255,255,0.1)' },
+                        pointLabels: { color: '#94a3b8', font: { family: 'Rajdhani', size: 10 } },
+                        ticks: { display: false, backdropColor: 'transparent' },
+                        suggestedMin: 50, suggestedMax: 100
+                    }
+                }
+            }
+        });
+
+        // --- 8. Logger Logic ---
+        const logContainer = document.getElementById('console-output');
+        function addLogEntry(entry) {
+            const div = document.createElement('div');
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+            let color = "text-slate-400";
+            if (entry.type === "success") color = "text-emerald-400";
+            if (entry.type === "warn") color = "text-primary-400";
+            if (entry.type === "error") color = "text-red-400";
+
+            div.className = "mb-1.5 opacity-0 animate-in fade-in slide-in-from-left-2 duration-300";
+            div.innerHTML = `
+                <span class="text-slate-600 mr-2">[${timestamp}]</span>
+                <span class="text-xs font-bold w-10 inline-block text-slate-500">${entry.sys}</span>
+                <span class="${color}">${entry.msg}</span>
+            `;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        const systems = ["AUTH", "NETW", "CORE", "DATA", "SCAN"];
+        const messages = [
+            "Heartbeat received from cluster A", "Validating SSL certificate chain",
+            "Garbage collection triggered", "Indexing new PDF artifact",
+            "Latency check: 14ms (Optimal)", "Syncing ledger with master node"
+        ];
+
+        // Initial Logs
+        for (let i = 0; i < 5; i++) {
+            addLogEntry({ sys: "INIT", msg: "System initialization sequence " + i, type: "info" });
+        }
+
+        // Random Logs
+        setInterval(() => {
+            const sys = systems[Math.floor(Math.random() * systems.length)];
+            const msg = messages[Math.floor(Math.random() * messages.length)];
+            const type = Math.random() > 0.8 ? "warn" : "info";
+            addLogEntry({ sys, msg, type });
+        }, 3000);
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Shadow Manifesto | Advanced Protocol</title>
+    <meta name="description" content="Secure. Decentralized. Private. The Shadow Protocol Manifesto.">
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        /* --- ADVANCED THEME SYSTEM --- */
+        :root {
+            --bg-deep: #05070a;
+            --bg-panel: rgba(13, 18, 30, 0.7);
+            --accent-primary: #8b5cf6;
+            /* Purple */
+            --accent-secondary: #06b6d4;
+            /* Cyan */
+            --accent-success: #10b981;
+            /* Emerald */
+            --text-glow: 0 0 10px rgba(139, 92, 246, 0.5);
+            --border-glass: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* Typography */
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .font-rajdhani {
+            font-family: 'Rajdhani', sans-serif;
+        }
+
+        .font-tech {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Canvas Layer */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 50% 50%, #111827 0%, #000000 100%);
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: var(--bg-panel);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: var(--border-glass);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Obsidian Cards (Advanced) */
+        .obsidian-card {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 1rem;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .obsidian-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(800px circle at var(--mouse-x) var(--mouse-y), rgba(139, 92, 246, 0.1), transparent 40%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .obsidian-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            border-color: rgba(139, 92, 246, 0.5);
+            box-shadow: 0 20px 40px -15px rgba(139, 92, 246, 0.3);
+        }
+
+        .obsidian-card:hover::after {
+            opacity: 1;
+        }
+
+        /* Hacker Text Effect Cursor */
+        .hacker-text::after {
+            content: '_';
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Live Ticker */
+        .ticker-wrap {
+            width: 100%;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            white-space: nowrap;
+        }
+
+        .ticker-content {
+            display: inline-block;
+            animation: ticker 60s linear infinite;
+        }
+
+        @keyframes ticker {
+            0% {
+                transform: translate3d(0, 0, 0);
+            }
+
+            100% {
+                transform: translate3d(-50%, 0, 0);
+            }
+        }
+
+        /* Identity Card (Holographic) */
+        .id-card {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(23, 37, 84, 0.9));
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.1), inset 0 0 20px rgba(56, 189, 248, 0.05);
+            position: relative;
+        }
+
+        .id-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                top: 0;
+                opacity: 1;
+            }
+
+            100% {
+                top: 100%;
+                opacity: 0;
+            }
+        }
+
+        /* Utility */
+        .text-glow {
+            text-shadow: var(--text-glow);
+        }
+
+        .clip-text-gradient {
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Scanline Overlay */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.15;
+        }
+    </style>
+</head>
+
+<body class="antialiased selection:bg-purple-500/30 selection:text-white">
+
+    <div class="scanlines"></div>
+    <div id="bg-canvas"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/10 bg-[#05070a]/90 backdrop-blur-md">
+        <div class="container mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-4 group">
+                <div class="relative w-10 h-10">
+                    <div
+                        class="absolute inset-0 bg-purple-600 rounded-lg blur opacity-50 group-hover:opacity-100 transition duration-500">
+                    </div>
+                    <div
+                        class="relative w-full h-full bg-slate-900 border border-slate-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-cube text-purple-400"></i>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-orbitron font-bold text-white tracking-widest text-lg"
+                        data-value="SHADOW">SHADOW</span>
+                    <span class="font-tech text-[10px] text-purple-400 tracking-[0.3em]">PROTOCOL v2.0</span>
+                </div>
+            </a>
+
+            <div class="hidden md:flex items-center gap-6">
+                <!-- Live Status -->
+                <div class="flex items-center gap-2 px-3 py-1 rounded bg-white/5 border border-white/5">
+                    <span class="relative flex h-2 w-2">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-xs font-mono text-emerald-400">NET_ACTIVE</span>
+                </div>
+
+                <div class="h-8 w-px bg-white/10"></div>
+
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-500 font-mono">SESSION ID</div>
+                    <div class="text-xs text-slate-300 font-mono" id="session-id">LOADING...</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="relative pt-44 pb-32 px-6 overflow-hidden">
+        <div class="container mx-auto max-w-5xl relative z-10 text-center">
+
+            <div
+                class="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-purple-900/20 border border-purple-500/30 text-purple-300 text-xs font-tech mb-8 backdrop-blur-sm animate-fade-in-up">
+                <i class="fas fa-terminal text-xs"></i>
+                <span>INITIALIZING SECURE HANDSHAKE...</span>
+            </div>
+
+            <h1 class="text-6xl md:text-8xl font-black font-orbitron mb-8 leading-none tracking-tight">
+                THE <span
+                    class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-400 to-cyan-400 hacker-text"
+                    data-value="MANIFESTO">MANIFESTO</span>
+            </h1>
+
+            <p class="text-lg md:text-xl text-slate-400 leading-relaxed max-w-2xl mx-auto font-light mb-12">
+                We are building the <span class="text-white font-semibold">Privacy Layer</span> for the document web.
+                Zero servers. Zero tracking. Just code that runs on your machine.
+            </p>
+
+            <div class="flex flex-col sm:flex-row justify-center items-center gap-6">
+                <a href="#signature-terminal"
+                    class="group relative px-8 py-4 bg-white text-black font-bold font-orbitron text-sm rounded-sm overflow-hidden hover:scale-105 transition-transform">
+                    <div
+                        class="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-10 transition-opacity">
+                    </div>
+                    <span class="relative flex items-center gap-2">
+                        INITIATE SIGNING <i
+                            class="fas fa-arrow-down group-hover:translate-y-1 transition-transform"></i>
+                    </span>
+                </a>
+                <a href="index.html"
+                    class="px-8 py-4 bg-transparent border border-slate-700 text-slate-300 font-bold font-orbitron text-sm rounded-sm hover:bg-slate-800 hover:text-white transition-colors">
+                    EXPLORE TOOLS
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Live Network Ticker -->
+    <div class="ticker-wrap py-2 mb-20">
+        <div class="ticker-content font-mono text-xs text-slate-400" id="network-ticker">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <!-- The 4 Core Modules -->
+    <section class="pb-32 px-6 relative">
+        <div class="container mx-auto max-w-7xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 perspective-1000">
+
+                <!-- Card 1 -->
+                <div class="obsidian-card p-12 group" onmousemove="handleCardMove(event)">
+                    <div
+                        class="absolute top-0 right-0 p-6 opacity-20 group-hover:opacity-40 transition-opacity duration-500">
+                        <i
+                            class="fas fa-shield-halved text-8xl text-purple-500 transform group-hover:rotate-12 transition-transform"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <div
+                            class="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-6 border border-purple-500/30">
+                            <span class="font-tech text-purple-400 font-bold">01</span>
+                        </div>
+                        <h3 class="text-3xl font-orbitron font-bold text-white mb-4">Zero-Knowledge Core</h3>
+                        <p class="text-slate-400 leading-relaxed text-lg">
+                            We treat user data as toxic waste. By utilizing <span
+                                class="text-purple-300">WebAssembly</span>, we ensure document processing happens
+                            entirely within your browser's sandbox. No packets leave your device.
+                        </p>
+                    </div>
+                    <!-- Tech Specs Footer -->
+                    <div class="mt-8 pt-6 border-t border-white/5 flex gap-4 text-xs font-mono text-slate-500">
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-purple-500"></i> AES-256</div>
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-purple-500"></i> CLIENT-SIDE
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="obsidian-card p-12 group" onmousemove="handleCardMove(event)">
+                    <div
+                        class="absolute top-0 right-0 p-6 opacity-20 group-hover:opacity-40 transition-opacity duration-500">
+                        <i
+                            class="fas fa-network-wired text-8xl text-cyan-500 transform group-hover:-rotate-12 transition-transform"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <div
+                            class="w-12 h-12 bg-cyan-500/20 rounded-lg flex items-center justify-center mb-6 border border-cyan-500/30">
+                            <span class="font-tech text-cyan-400 font-bold">02</span>
+                        </div>
+                        <h3 class="text-3xl font-orbitron font-bold text-white mb-4">Sovereign Utility</h3>
+                        <p class="text-slate-400 leading-relaxed text-lg">
+                            Tools should empower, not extract. We reject subscription models for basic utilities. Merge,
+                            split, and edit PDFs without arbitrary limits or watermarks.
+                        </p>
+                    </div>
+                    <div class="mt-8 pt-6 border-t border-white/5 flex gap-4 text-xs font-mono text-slate-500">
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-cyan-500"></i> UNLIMITED</div>
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-cyan-500"></i> NO ACCOUNTS
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="obsidian-card p-12 group" onmousemove="handleCardMove(event)">
+                    <div
+                        class="absolute top-0 right-0 p-6 opacity-20 group-hover:opacity-40 transition-opacity duration-500">
+                        <i
+                            class="fas fa-code-branch text-8xl text-pink-500 transform group-hover:rotate-12 transition-transform"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <div
+                            class="w-12 h-12 bg-pink-500/20 rounded-lg flex items-center justify-center mb-6 border border-pink-500/30">
+                            <span class="font-tech text-pink-400 font-bold">03</span>
+                        </div>
+                        <h3 class="text-3xl font-orbitron font-bold text-white mb-4">Auditable Trust</h3>
+                        <p class="text-slate-400 leading-relaxed text-lg">
+                            "Trust me" is not a security strategy. Our core processing engines are open for inspection.
+                            Verify the cryptography yourself. Transparency is our only currency.
+                        </p>
+                    </div>
+                    <div class="mt-8 pt-6 border-t border-white/5 flex gap-4 text-xs font-mono text-slate-500">
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-pink-500"></i> OPEN SOURCE
+                        </div>
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-pink-500"></i> VERIFIABLE</div>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="obsidian-card p-12 group" onmousemove="handleCardMove(event)">
+                    <div
+                        class="absolute top-0 right-0 p-6 opacity-20 group-hover:opacity-40 transition-opacity duration-500">
+                        <i
+                            class="fas fa-microchip text-8xl text-emerald-500 transform group-hover:-rotate-12 transition-transform"></i>
+                    </div>
+                    <div class="relative z-10">
+                        <div
+                            class="w-12 h-12 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-6 border border-emerald-500/30">
+                            <span class="font-tech text-emerald-400 font-bold">04</span>
+                        </div>
+                        <h3 class="text-3xl font-orbitron font-bold text-white mb-4">Augmented Intelligence</h3>
+                        <p class="text-slate-400 leading-relaxed text-lg">
+                            We integrate Gemini AI strictly as a co-pilot. It analyzes and suggests, but you retain
+                            final command. AI should be a bicycle for the mind, not a black box for your data.
+                        </p>
+                    </div>
+                    <div class="mt-8 pt-6 border-t border-white/5 flex gap-4 text-xs font-mono text-slate-500">
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-emerald-500"></i> GEMINI PRO
+                        </div>
+                        <div class="flex items-center gap-1"><i class="fas fa-check text-emerald-500"></i> HUMAN-IN-LOOP
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Advanced Signature Terminal -->
+    <section id="signature-terminal" class="py-24 relative bg-[#020305]">
+        <!-- Decorative Grid Background -->
+        <div class="absolute inset-0 opacity-10"
+            style="background-image: linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px); background-size: 50px 50px;">
+        </div>
+
+        <div class="container mx-auto max-w-4xl relative z-10">
+
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-orbitron font-bold text-white mb-4">PROTOCOL UPLINK</h2>
+                <div class="h-1 w-24 bg-gradient-to-r from-purple-500 to-cyan-500 mx-auto rounded-full"></div>
+            </div>
+
+            <!-- Panel Container -->
+            <div class="glass-panel rounded-2xl p-1 border border-white/10 shadow-2xl">
+                <div
+                    class="bg-[#0f172a]/80 rounded-xl p-8 md:p-12 min-h-[400px] flex items-center justify-center relative overflow-hidden">
+
+                    <!-- State 1: Unsigned -->
+                    <div id="state-unsigned" class="w-full text-center transition-all duration-500">
+                        <i class="fas fa-fingerprint text-6xl text-slate-600 mb-8 animate-pulse"></i>
+                        <p class="font-mono text-slate-400 mb-8 max-w-lg mx-auto">
+                            "I acknowledge my right to privacy. I reject surveillance. I support open tools."
+                        </p>
+
+                        <button onclick="signProtocol()"
+                            class="group relative inline-flex items-center gap-3 px-10 py-4 bg-white text-black font-bold font-orbitron tracking-wider rounded hover:bg-slate-200 transition-colors">
+                            <span>CRYPTOGRAPHIC SIGN</span>
+                            <i class="fas fa-key text-purple-600 group-hover:rotate-12 transition-transform"></i>
+
+                            <!-- Button Glow -->
+                            <div
+                                class="absolute -inset-1 bg-gradient-to-r from-purple-600 to-cyan-600 rounded blur opacity-25 group-hover:opacity-50 transition duration-200 -z-10">
+                            </div>
+                        </button>
+
+                        <div class="mt-8 text-[10px] font-mono text-slate-600">
+                            SECURE SHA-256 HASH GENERATION • LOCAL STORAGE PERSISTENCE
+                        </div>
+                    </div>
+
+                    <!-- State 2: Processing (Hidden by default) -->
+                    <div id="state-processing"
+                        class="hidden absolute inset-0 bg-[#0f172a] z-20 flex flex-col items-center justify-center">
+                        <div
+                            class="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-6">
+                        </div>
+                        <div class="font-mono text-emerald-400 text-sm" id="process-text">GENERATING KEYS...</div>
+                    </div>
+
+                    <!-- State 3: Signed / ID Card (Hidden by default) -->
+                    <div id="state-signed" class="hidden w-full max-w-md animate-fade-in-up">
+
+                        <!-- Holographic ID Card -->
+                        <div class="id-card rounded-xl p-6 relative overflow-hidden group">
+                            <!-- Header -->
+                            <div class="flex justify-between items-start mb-6">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-8 h-8 rounded bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
+                                        <i class="fas fa-shield-alt text-white text-xs"></i>
+                                    </div>
+                                    <div class="leading-tight">
+                                        <div class="font-orbitron font-bold text-white text-sm">OPERATIVE</div>
+                                        <div class="font-mono text-[10px] text-cyan-400">LEVEL 1 CLEARANCE</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-mono text-[10px] text-slate-400">STATUS</div>
+                                    <div class="font-bold text-emerald-400 text-xs">VERIFIED</div>
+                                </div>
+                            </div>
+
+                            <!-- Content -->
+                            <div class="flex gap-6 items-center mb-6">
+                                <!-- Avatar Placeholder -->
+                                <div
+                                    class="w-20 h-20 bg-slate-800 rounded border border-white/10 flex items-center justify-center relative overflow-hidden">
+                                    <i class="fas fa-user-astronaut text-4xl text-slate-600"></i>
+                                    <div class="absolute inset-0 bg-gradient-to-t from-purple-500/20 to-transparent">
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2 flex-1">
+                                    <div>
+                                        <div class="text-[10px] text-slate-500 font-mono">OPERATIVE HASH</div>
+                                        <div class="font-mono text-xs text-white truncate w-48" id="card-hash">0x...
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="text-[10px] text-slate-500 font-mono">ACTIVATION DATE</div>
+                                        <div class="font-mono text-xs text-white" id="card-date">2025-01-01</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="pt-4 border-t border-white/10 flex justify-between items-center">
+                                <div class="font-tech text-[10px] text-slate-500">SHADOW PROTOCOL // AUTHENTICATED</div>
+                                <i class="fas fa-qrcode text-white/20 text-2xl"></i>
+                            </div>
+
+                            <!-- Holo Shine -->
+                            <div
+                                class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex gap-4 mt-8 justify-center">
+                            <a href="index.html"
+                                class="px-6 py-2 bg-emerald-600 text-white text-sm font-bold font-orbitron rounded hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-900/50">
+                                ENTER DASHBOARD
+                            </a>
+                            <button onclick="downloadID()"
+                                class="px-6 py-2 border border-slate-600 text-slate-300 text-sm font-bold font-orbitron rounded hover:bg-slate-800 transition-colors">
+                                SAVE ID
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 bg-[#020305] py-12 text-center text-slate-600 text-sm font-tech">
+        <div class="mb-4">
+            <i class="fas fa-network-wired text-purple-900 text-2xl"></i>
+        </div>
+        <p>&copy; 2025 Shadow PDF Toolkit. Decentralized & Open Source.</p>
+        <div class="mt-4 flex justify-center gap-4 text-xs">
+            <a href="#" class="hover:text-purple-400">GITHUB</a>
+            <a href="#" class="hover:text-purple-400">DOCS</a>
+            <a href="#" class="hover:text-purple-400">PRIVACY</a>
+        </div>
+    </footer>
+
+    <script>
+        // --- 1. HACKER TEXT EFFECT ---
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&";
+
+        document.querySelectorAll(".hacker-text").forEach(element => {
+            element.onmouseover = event => {
+                let iteration = 0;
+                const originalText = event.target.dataset.value;
+
+                clearInterval(event.target.interval);
+
+                event.target.interval = setInterval(() => {
+                    event.target.innerText = originalText
+                        .split("")
+                        .map((letter, index) => {
+                            if (index < iteration) return originalText[index];
+                            return letters[Math.floor(Math.random() * 26)];
+                        })
+                        .join("");
+
+                    if (iteration >= originalText.length) {
+                        clearInterval(event.target.interval);
+                    }
+
+                    iteration += 1 / 3;
+                }, 30);
+            }
+            // Trigger once on load
+            setTimeout(() => element.onmouseover({ target: element }), 500);
+        });
+
+        // --- 2. THREE.JS WIREFRAME GLOBE ---
+        const initGlobe = () => {
+            const container = document.getElementById('bg-canvas');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Globe Group
+            const globeGroup = new THREE.Group();
+            scene.add(globeGroup);
+
+            // 1. Wireframe Sphere
+            const geometry = new THREE.IcosahedronGeometry(10, 2);
+            const wireframeMaterial = new THREE.MeshBasicMaterial({
+                color: 0x334155,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.15
+            });
+            const globe = new THREE.Mesh(geometry, wireframeMaterial);
+            globeGroup.add(globe);
+
+            // 2. Nodes (Particles on surface)
+            const particlesGeo = new THREE.BufferGeometry();
+            const particleCount = 200;
+            const posArray = new Float32Array(particleCount * 3);
+
+            // Distribute points on sphere surface
+            for (let i = 0; i < particleCount; i++) {
+                const phi = Math.acos(-1 + (2 * i) / particleCount);
+                const theta = Math.sqrt(particleCount * Math.PI) * phi;
+
+                const r = 10;
+                posArray[i * 3] = r * Math.cos(theta) * Math.sin(phi);
+                posArray[i * 3 + 1] = r * Math.sin(theta) * Math.sin(phi);
+                posArray[i * 3 + 2] = r * Math.cos(phi);
+            }
+
+            particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const particlesMat = new THREE.PointsMaterial({
+                size: 0.15,
+                color: 0x8b5cf6,
+                transparent: true,
+                opacity: 0.8
+            });
+            const particles = new THREE.Points(particlesGeo, particlesMat);
+            globeGroup.add(particles);
+
+            // Camera
+            camera.position.z = 22;
+
+            // Mouse Interaction
+            let mouseX = 0;
+            let mouseY = 0;
+            let targetRotationX = 0;
+            let targetRotationY = 0;
+
+            window.addEventListener('mousemove', (e) => {
+                mouseX = (e.clientX - window.innerWidth / 2) * 0.0001;
+                mouseY = (e.clientY - window.innerHeight / 2) * 0.0001;
+            });
+
+            // Animation Loop
+            const clock = new THREE.Clock();
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const elapsedTime = clock.getElapsedTime();
+
+                // Rotate Globe
+                globeGroup.rotation.y += 0.002;
+
+                // Mouse Influence (smooth dampening)
+                targetRotationY += (mouseX - targetRotationY) * 0.05;
+                targetRotationX += (mouseY - targetRotationX) * 0.05;
+
+                globeGroup.rotation.y += targetRotationY;
+                globeGroup.rotation.x += targetRotationX;
+
+                // Pulse Effect
+                const scale = 1 + Math.sin(elapsedTime * 2) * 0.01;
+                globe.scale.set(scale, scale, scale);
+
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // Resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        };
+
+        // --- 3. LIVE TICKER LOGIC ---
+        const tickerItems = [
+            "NODE_241 [TOKYO] ONLINE",
+            "SIGNATURE VERIFIED: 0x8f...2a",
+            "PROTOCOL UPDATE: v2.0.1 STABLE",
+            "ENCRYPTION KEY ROTATION COMPLETE",
+            "NEW OPERATIVE: SECTOR 7",
+            "NODE_99 [BERLIN] SYNCING...",
+            "THREAT LEVEL: LOW",
+            "PACKET LOSS: 0.001%",
+            "NEW OPERATIVE JOINED: 0x71...bb",
+            "SYSTEM INTEGRITY: 100%"
+        ];
+
+        const tickerContainer = document.getElementById('network-ticker');
+        // Duplicate items for seamless scroll
+        tickerContainer.innerHTML = [...tickerItems, ...tickerItems, ...tickerItems].map(item =>
+            `<span class="mx-8"><i class="fas fa-circle text-[6px] text-emerald-500 align-middle mr-2"></i>${item}</span>`
+        ).join('');
+
+
+        // --- 4. SIGNATURE & CARD LOGIC ---
+        const generateSessionId = () => Math.random().toString(36).substring(2, 10).toUpperCase();
+        document.getElementById('session-id').innerText = generateSessionId();
+
+        // 3D Tilt Effect for Cards
+        function handleCardMove(e) {
+            const card = e.currentTarget;
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            card.style.setProperty('--mouse-x', `${x}px`);
+            card.style.setProperty('--mouse-y', `${y}px`);
+        }
+
+        function signProtocol() {
+            const unsigned = document.getElementById('state-unsigned');
+            const processing = document.getElementById('state-processing');
+            const signed = document.getElementById('state-signed');
+            const processText = document.getElementById('process-text');
+
+            // 1. Transition to processing
+            unsigned.style.opacity = '0';
+            setTimeout(() => {
+                unsigned.classList.add('hidden');
+                processing.classList.remove('hidden');
+            }, 500);
+
+            // 2. Mock Processing Steps
+            const steps = ["GENERATING KEYS...", "HASHING IDENTITY...", "MINTING CARD...", "FINALIZING..."];
+            let stepIndex = 0;
+
+            const interval = setInterval(() => {
+                if (stepIndex < steps.length) {
+                    processText.innerText = steps[stepIndex];
+                    stepIndex++;
+                } else {
+                    clearInterval(interval);
+                    finishSigning();
+                }
+            }, 800);
+
+            function finishSigning() {
+                // Generate Fake Hash
+                const hash = '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+                document.getElementById('card-hash').innerText = hash;
+                document.getElementById('card-date').innerText = new Date().toISOString().split('T')[0];
+
+                // Save to local storage
+                localStorage.setItem('shadow_signed', 'true');
+                localStorage.setItem('shadow_hash', hash);
+
+                // Show Signed State
+                processing.classList.add('hidden');
+                signed.classList.remove('hidden');
+
+                // Add "Verified" badge to nav
+                const navBadge = document.querySelector('nav .bg-emerald-500'); // If we had one, simplified for now
+            }
+        }
+
+        function downloadID() {
+            alert("This feature would generate a .png of your card using html2canvas in production.");
+        }
+
+        // Check if already signed on load
+        window.addEventListener('DOMContentLoaded', () => {
+            initGlobe();
+            lucide.createIcons();
+
+            if (localStorage.getItem('shadow_signed') === 'true') {
+                document.getElementById('state-unsigned').classList.add('hidden');
+                document.getElementById('state-signed').classList.remove('hidden');
+                document.getElementById('card-hash').innerText = localStorage.getItem('shadow_hash');
+            }
+        });
+
+    </script>
+</body>
+
+</html>

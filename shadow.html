@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Shadow | The Architects</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* --- CORE VARIABLES --- */
+        :root {
+            --bg-main: #020617;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --card-bg: rgba(15, 23, 42, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --font-orbitron: 'Orbitron', sans-serif;
+            --font-rajdhani: 'Rajdhani', sans-serif;
+            --font-mono: 'Share Tech Mono', monospace;
+        }
+
+        body.light-mode {
+            --bg-main: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --card-border: #cbd5e1;
+            --accent-purple: #6366f1;
+            --accent-cyan: #0ea5e9;
+        }
+
+        /* --- BASE STYLES --- */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), color 0.5s ease;
+        }
+
+        /* --- 3D BACKGROUND CONTAINER --- */
+        #bg-3d-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            background: radial-gradient(circle at 50% 50%, #171728 0%, #020617 100%);
+        }
+
+        body.light-mode #bg-3d-container {
+            background: radial-gradient(circle at 50% 50%, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        /* --- UTILITIES & GLASSMORPHISM --- */
+        .glass-nav {
+            background: rgba(2, 6, 23, 0.7);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        body.light-mode .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        /* 3D Tilt Card Base */
+        .obsidian-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(16px);
+            border-radius: 1rem;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: perspective(1000px);
+            transition: transform 0.1s ease-out, border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .obsidian-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 1rem;
+            padding: 2px;
+            background: linear-gradient(45deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .obsidian-card:hover {
+            border-color: var(--accent-purple);
+            box-shadow: 0 20px 50px -10px rgba(139, 92, 246, 0.15);
+        }
+
+        .card-content {
+            transform: translateZ(20px);
+            /* Pop out text */
+        }
+
+        /* --- TYPOGRAPHY --- */
+        .font-orbitron {
+            font-family: var(--font-orbitron);
+        }
+
+        .font-rajdhani {
+            font-family: var(--font-rajdhani);
+        }
+
+        .font-mono {
+            font-family: var(--font-mono);
+        }
+
+        .text-gradient {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        /* --- ANIMATIONS --- */
+        .scroll-reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .scroll-reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Glitch Effect */
+        .glitch-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .glitch-wrapper::before,
+        .glitch-wrapper::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-main);
+            opacity: 0.8;
+        }
+
+        .glitch-wrapper::before {
+            color: #0ff;
+            z-index: -1;
+            animation: glitch-anim-1 3s infinite linear alternate-reverse;
+        }
+
+        .glitch-wrapper::after {
+            color: #f0f;
+            z-index: -2;
+            animation: glitch-anim-2 2.5s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim-1 {
+            0% {
+                clip-path: inset(20% 0 80% 0);
+                transform: translate(-2px, 1px);
+            }
+
+            100% {
+                clip-path: inset(60% 0 10% 0);
+                transform: translate(2px, -1px);
+            }
+        }
+
+        @keyframes glitch-anim-2 {
+            0% {
+                clip-path: inset(10% 0 50% 0);
+                transform: translate(2px, -1px);
+            }
+
+            100% {
+                clip-path: inset(80% 0 5% 0);
+                transform: translate(-2px, 1px);
+            }
+        }
+
+        /* Terminal Typing Cursor */
+        .cursor-blink {
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Hex Profile Image */
+        .hex-border {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(to bottom right, var(--accent-purple), var(--accent-cyan));
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.5s ease;
+        }
+
+        .hex-inner {
+            width: 96px;
+            height: 96px;
+            background: var(--bg-main);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .obsidian-card:hover .hex-border {
+            transform: rotate(180deg);
+        }
+
+        .obsidian-card:hover .hex-inner img {
+            transform: rotate(-180deg) scale(1.1);
+        }
+
+        .hex-inner img {
+            transition: transform 0.5s ease;
+        }
+    </style>
+</head>
+
+<body class="antialiased selection:bg-purple-500 selection:text-white">
+
+    <!-- 3D Canvas -->
+    <div id="bg-3d-container"></div>
+
+    <!-- Nav -->
+    <nav class="fixed top-0 w-full z-50 glass-nav transition-all duration-300">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="#" class="flex items-center gap-3 group">
+                <div
+                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_25px_rgba(99,102,241,0.8)] transition-all duration-300">
+                    <i data-lucide="aperture" class="text-white w-6 h-6 animate-[spin_10s_linear_infinite]"></i>
+                </div>
+                <div class="flex flex-col">
+                    <h1 class="font-orbitron font-bold text-xl tracking-wider text-white leading-none">SHADOW<span
+                            class="text-purple-500">.CORP</span></h1>
+                    <span
+                        class="text-[0.6rem] font-mono text-gray-500 tracking-[0.2em] group-hover:text-purple-400 transition-colors">PRIVACY
+                        ARCHITECTS</span>
+                </div>
+            </a>
+
+            <div class="flex items-center gap-8">
+                <div class="hidden md:flex gap-8 font-rajdhani font-bold tracking-wide text-sm text-gray-400">
+                    <a href="#mission" class="hover:text-white transition-colors relative group">
+                        MISSION
+                        <span
+                            class="absolute -bottom-1 left-0 w-0 h-0.5 bg-purple-500 transition-all group-hover:w-full"></span>
+                    </a>
+                    <a href="#operatives" class="hover:text-white transition-colors relative group">
+                        OPERATIVES
+                        <span
+                            class="absolute -bottom-1 left-0 w-0 h-0.5 bg-purple-500 transition-all group-hover:w-full"></span>
+                    </a>
+                    <a href="#terminal" class="hover:text-white transition-colors relative group">
+                        SYSTEM LOGS
+                        <span
+                            class="absolute -bottom-1 left-0 w-0 h-0.5 bg-purple-500 transition-all group-hover:w-full"></span>
+                    </a>
+                </div>
+                <button onclick="toggleTheme()"
+                    class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 text-gray-300 transition-all active:scale-95">
+                    <i id="theme-icon" data-lucide="moon" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="relative pt-40 pb-20 overflow-hidden">
+        <div class="container mx-auto px-6 relative z-10">
+            <div class="flex flex-col items-center text-center">
+
+                <div
+                    class="scroll-reveal inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-purple-500/5 border border-purple-500/20 text-purple-400 text-xs font-mono mb-8 backdrop-blur-md">
+                    <span class="relative flex h-2 w-2">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                    </span>
+                    SECURE CONNECTION ESTABLISHED // ENCRYPTION: AES-256
+                </div>
+
+                <h1
+                    class="scroll-reveal text-6xl md:text-8xl font-orbitron font-black mb-6 leading-tight tracking-tight">
+                    ENTER THE <br />
+                    <span class="glitch-wrapper text-gradient" data-text="SHADOW">SHADOW</span>
+                </h1>
+
+                <p
+                    class="scroll-reveal max-w-2xl mx-auto text-lg md:text-xl text-gray-400 font-rajdhani leading-relaxed mb-10">
+                    We build the silent layer of the internet. Privacy-first tools powered by local intelligence.
+                    <span class="text-white font-semibold">Your data never leaves your device.</span>
+                </p>
+
+                <div class="scroll-reveal flex flex-wrap justify-center gap-4">
+                    <a href="#mission"
+                        class="group relative px-8 py-4 bg-purple-600 rounded-xl font-bold font-orbitron tracking-wider text-white overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_40px_rgba(139,92,246,0.5)]">
+                        <span class="relative z-10 flex items-center gap-2">
+                            INITIATE PROTOCOL <i data-lucide="arrow-right"
+                                class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+                        </span>
+                        <div
+                            class="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                        </div>
+                    </a>
+
+                    <a href="https://github.com/Shashank-A-N/Shadow-PDF" target="_blank"
+                        class="px-8 py-4 rounded-xl border border-white/20 hover:bg-white/5 text-white font-bold font-orbitron tracking-wider transition-all backdrop-blur-sm flex items-center gap-2">
+                        <i data-lucide="github" class="w-4 h-4"></i> SOURCE CODE
+                    </a>
+                </div>
+
+                <!-- Live Telemetry -->
+                <div class="scroll-reveal mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl">
+                    <div class="p-4 border border-white/5 rounded-lg bg-black/20 backdrop-blur-sm">
+                        <div class="text-3xl font-mono font-bold text-white count-up" data-target="1042">0</div>
+                        <div class="text-xs text-gray-500 font-orbitron tracking-widest mt-1">NODES ACTIVE</div>
+                    </div>
+                    <div class="p-4 border border-white/5 rounded-lg bg-black/20 backdrop-blur-sm">
+                        <div class="text-3xl font-mono font-bold text-purple-400 count-up" data-target="99">0</div>
+                        <div class="text-xs text-gray-500 font-orbitron tracking-widest mt-1">% UPTIME</div>
+                    </div>
+                    <div class="p-4 border border-white/5 rounded-lg bg-black/20 backdrop-blur-sm">
+                        <div class="text-3xl font-mono font-bold text-cyan-400 count-up" data-target="85000">0</div>
+                        <div class="text-xs text-gray-500 font-orbitron tracking-widest mt-1">THREATS BLOCKED</div>
+                    </div>
+                    <div class="p-4 border border-white/5 rounded-lg bg-black/20 backdrop-blur-sm">
+                        <div class="text-3xl font-mono font-bold text-white">0ms</div>
+                        <div class="text-xs text-gray-500 font-orbitron tracking-widest mt-1">DATA EGRESS</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mission Grid -->
+    <section id="mission" class="py-24 relative">
+        <div class="container mx-auto px-6">
+            <div class="scroll-reveal flex items-end justify-between mb-16 border-b border-white/10 pb-6">
+                <div>
+                    <h2 class="font-orbitron text-3xl md:text-4xl font-bold text-white">CORE DIRECTIVES</h2>
+                    <p class="font-mono text-purple-500 mt-2 text-sm">>> ACCESSING CLASSIFIED_FILES...</p>
+                </div>
+                <i data-lucide="cpu" class="w-10 h-10 text-gray-700 hidden md:block"></i>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 perspective-container">
+                <!-- Card 1 -->
+                <div class="obsidian-card p-8 group tilt-card" data-tilt>
+                    <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-50 transition-opacity">
+                        <i data-lucide="shield" class="w-24 h-24 text-purple-500 -rotate-12"></i>
+                    </div>
+                    <div class="card-content relative z-10">
+                        <div
+                            class="w-14 h-14 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-xl border border-purple-500/30 flex items-center justify-center mb-6 text-purple-400 group-hover:scale-110 transition-transform duration-300">
+                            <i data-lucide="lock" class="w-7 h-7"></i>
+                        </div>
+                        <h3
+                            class="font-orbitron text-2xl font-bold mb-4 text-white group-hover:text-purple-300 transition-colors">
+                            Zero Trust</h3>
+                        <p class="text-gray-400 font-rajdhani text-lg leading-relaxed">
+                            We assume the network is compromised. Our architecture executes strictly client-side using
+                            WebAssembly sandboxes. No server sees your input.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="obsidian-card p-8 group tilt-card" data-tilt>
+                    <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-50 transition-opacity">
+                        <i data-lucide="brain-circuit" class="w-24 h-24 text-cyan-500 -rotate-12"></i>
+                    </div>
+                    <div class="card-content relative z-10">
+                        <div
+                            class="w-14 h-14 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl border border-cyan-500/30 flex items-center justify-center mb-6 text-cyan-400 group-hover:scale-110 transition-transform duration-300">
+                            <i data-lucide="zap" class="w-7 h-7"></i>
+                        </div>
+                        <h3
+                            class="font-orbitron text-2xl font-bold mb-4 text-white group-hover:text-cyan-300 transition-colors">
+                            Neural Edge</h3>
+                        <p class="text-gray-400 font-rajdhani text-lg leading-relaxed">
+                            Leveraging Gemini Nano and ONNX runtime to bring Large Language Model capabilities directly
+                            to the browser tab. Latency is obsolete.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="obsidian-card p-8 group tilt-card" data-tilt>
+                    <div class="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-50 transition-opacity">
+                        <i data-lucide="git-branch" class="w-24 h-24 text-pink-500 -rotate-12"></i>
+                    </div>
+                    <div class="card-content relative z-10">
+                        <div
+                            class="w-14 h-14 bg-gradient-to-br from-pink-500/20 to-rose-500/20 rounded-xl border border-pink-500/30 flex items-center justify-center mb-6 text-pink-400 group-hover:scale-110 transition-transform duration-300">
+                            <i data-lucide="code-2" class="w-7 h-7"></i>
+                        </div>
+                        <h3
+                            class="font-orbitron text-2xl font-bold mb-4 text-white group-hover:text-pink-300 transition-colors">
+                            Open Source</h3>
+                        <p class="text-gray-400 font-rajdhani text-lg leading-relaxed">
+                            Security through obscurity is a fallacy. Our core encryption libraries are public, audited,
+                            and verified by the community.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Operatives -->
+    <section id="operatives" class="py-24 bg-black/20 border-y border-white/5">
+        <div class="container mx-auto px-6">
+            <div class="scroll-reveal text-center mb-16">
+                <h2 class="text-4xl font-orbitron font-black text-white mb-4">THE OPERATIVES</h2>
+                <div class="flex items-center justify-center gap-2 text-gray-500 font-mono text-xs tracking-[0.3em]">
+                    <span>//</span>
+                    <span>CLASS: ARCHITECT</span>
+                    <span>//</span>
+                    <span>STATUS: ACTIVE</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Op 1 -->
+                <div class="scroll-reveal obsidian-card p-6 flex flex-col items-center text-center tilt-card" data-tilt>
+                    <div class="hex-border mb-6">
+                        <div class="hex-inner">
+                            <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Phantom&backgroundColor=1f2937"
+                                alt="Avatar" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                    <h3 class="font-orbitron text-xl font-bold text-white">Ghost</h3>
+                    <span
+                        class="text-xs font-mono text-purple-400 border border-purple-500/30 px-2 py-1 rounded bg-purple-500/10 mt-2 mb-4">LEAD
+                        ENGINEER</span>
+                    <div class="w-full h-px bg-white/10 mb-4"></div>
+                    <p class="text-sm text-gray-400 font-rajdhani">Architect of the client-side encryption protocol.
+                        Specializes in WebAssembly optimization.</p>
+                </div>
+
+                <!-- Op 2 -->
+                <div class="scroll-reveal obsidian-card p-6 flex flex-col items-center text-center tilt-card" data-tilt
+                    style="transition-delay: 100ms">
+                    <div class="hex-border mb-6"
+                        style="background: linear-gradient(to bottom right, var(--accent-cyan), #3b82f6);">
+                        <div class="hex-inner">
+                            <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Spectre&backgroundColor=1f2937"
+                                alt="Avatar" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                    <h3 class="font-orbitron text-xl font-bold text-white">Spectre</h3>
+                    <span
+                        class="text-xs font-mono text-cyan-400 border border-cyan-500/30 px-2 py-1 rounded bg-cyan-500/10 mt-2 mb-4">AI
+                        SPECIALIST</span>
+                    <div class="w-full h-px bg-white/10 mb-4"></div>
+                    <p class="text-sm text-gray-400 font-rajdhani">Integrates LLMs into static structures. Expert in
+                        vector embeddings and RAG.</p>
+                </div>
+
+                <!-- Op 3 -->
+                <div class="scroll-reveal obsidian-card p-6 flex flex-col items-center text-center tilt-card" data-tilt
+                    style="transition-delay: 200ms">
+                    <div class="hex-border mb-6"
+                        style="background: linear-gradient(to bottom right, #ec4899, #f43f5e);">
+                        <div class="hex-inner">
+                            <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Viper&backgroundColor=1f2937"
+                                alt="Avatar" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                    <h3 class="font-orbitron text-xl font-bold text-white">Viper</h3>
+                    <span
+                        class="text-xs font-mono text-pink-400 border border-pink-500/30 px-2 py-1 rounded bg-pink-500/10 mt-2 mb-4">UI/UX</span>
+                    <div class="w-full h-px bg-white/10 mb-4"></div>
+                    <p class="text-sm text-gray-400 font-rajdhani">Crafting the Obsidian interface. Believes that
+                        security tools shouldn't look boring.</p>
+                </div>
+
+                <!-- Op 4 -->
+                <div class="scroll-reveal obsidian-card p-6 flex flex-col items-center text-center tilt-card" data-tilt
+                    style="transition-delay: 300ms">
+                    <div class="hex-border mb-6"
+                        style="background: linear-gradient(to bottom right, #10b981, #059669);">
+                        <div class="hex-inner">
+                            <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Ghost&backgroundColor=1f2937"
+                                alt="Avatar" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                    <h3 class="font-orbitron text-xl font-bold text-white">Phantom</h3>
+                    <span
+                        class="text-xs font-mono text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded bg-emerald-500/10 mt-2 mb-4">AUDITOR</span>
+                    <div class="w-full h-px bg-white/10 mb-4"></div>
+                    <p class="text-sm text-gray-400 font-rajdhani">Ensures no byte leaves the browser without consent.
+                        Breaker of walls.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Terminal Section -->
+    <section id="terminal" class="py-24">
+        <div class="container mx-auto px-6">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <div class="scroll-reveal">
+                    <h2 class="text-3xl font-orbitron font-bold mb-6 text-white">LIVE SYSTEM LOGS</h2>
+                    <p class="text-gray-400 mb-8 leading-relaxed font-rajdhani text-lg">
+                        Real-time monitoring of our decentralized node architecture. The Shadow Protocol is constantly
+                        evolving to meet new cryptographic standards.
+                    </p>
+                    <div class="flex flex-col gap-4">
+                        <div class="flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/5">
+                            <div
+                                class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                                <i data-lucide="activity" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white font-orbitron text-sm">System Health</h4>
+                                <p class="text-xs text-green-400 font-mono">OPTIMAL (99.9%)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 p-4 rounded-lg bg-white/5 border border-white/5">
+                            <div
+                                class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400">
+                                <i data-lucide="globe" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white font-orbitron text-sm">Global Nodes</h4>
+                                <p class="text-xs text-purple-400 font-mono">DISTRIBUTED</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terminal Window -->
+                <div class="scroll-reveal obsidian-card p-0 overflow-hidden shadow-2xl">
+                    <div class="bg-gray-900 px-4 py-2 flex items-center gap-2 border-b border-white/10">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="ml-2 text-xs font-mono text-gray-500">admin@shadow-corp:~</span>
+                    </div>
+                    <div class="p-6 bg-black/80 font-mono text-xs md:text-sm h-80 overflow-y-auto custom-scrollbar"
+                        id="terminal-content">
+                        <div class="text-gray-500 mb-2">Last login: Today at 09:41:00 on ttys001</div>
+                        <div class="text-green-400 mb-4">Initializing Shadow Protocol v2.5.0...</div>
+                        <!-- JS will populate this -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 bg-black/40 backdrop-blur-xl pt-16 pb-8">
+        <div class="container mx-auto px-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="ghost" class="text-purple-500 w-8 h-8"></i>
+                    <span class="font-orbitron font-bold text-2xl text-white">SHADOW</span>
+                </div>
+                <div class="flex gap-6">
+                    <a href="https://github.com/Shashank-A-N" target="_blank"
+                        class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center hover:bg-purple-600 hover:text-white transition-all text-gray-400"><i
+                            class="fab fa-github"></i></a>
+                    <a href="https://www.instagram.com/is_shashank/?hl=en" target="_blank"
+                        class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center hover:bg-pink-600 hover:text-white transition-all text-gray-400"><i
+                            class="fab fa-instagram"></i></a>
+                    <a href="https://www.linkedin.com/in/shashankan" target="_blank"
+                        class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all text-gray-400"><i
+                            class="fab fa-linkedin-in"></i></a>
+                </div>
+            </div>
+            <div class="text-center md:text-left border-t border-white/5 pt-8">
+                <p class="text-xs text-gray-600 font-mono tracking-widest">&copy; 2025 SHADOW CORPORATION. DECENTRALIZED
+                    & ENCRYPTED.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // --- 1. INITIALIZATION ---
+        lucide.createIcons();
+
+        // --- 2. THREE.JS ADVANCED BACKGROUND ---
+        const container = document.getElementById('bg-3d-container');
+        let scene, camera, renderer, particles, wireframeSphere;
+        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+
+        function initThree() {
+            scene = new THREE.Scene();
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 25;
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Performance opt
+            container.appendChild(renderer.domElement);
+
+            // Object 1: Neural Core (Icosahedron Wireframe)
+            const geometryCore = new THREE.IcosahedronGeometry(10, 1);
+            const wireframeMaterial = new THREE.MeshBasicMaterial({
+                color: 0x8b5cf6,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.15
+            });
+            wireframeSphere = new THREE.Mesh(geometryCore, wireframeMaterial);
+            scene.add(wireframeSphere);
+
+            // Object 2: Particle Cloud
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 700;
+            const posArray = new Float32Array(particlesCount * 3);
+
+            for (let i = 0; i < particlesCount * 3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 60; // Spread
+            }
+
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+            // Check theme for color
+            const isLight = document.body.classList.contains('light-mode');
+            const pColor = isLight ? 0x6366f1 : 0x8b5cf6;
+
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: 0.15,
+                color: pColor,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particles);
+
+            // Mouse Move Listener
+            document.addEventListener('mousemove', (event) => {
+                mouseX = event.clientX - window.innerWidth / 2;
+                mouseY = event.clientY - window.innerHeight / 2;
+            });
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            targetX = mouseX * 0.001;
+            targetY = mouseY * 0.001;
+
+            // Smooth rotation based on mouse
+            wireframeSphere.rotation.y += 0.002;
+            wireframeSphere.rotation.x += 0.001;
+
+            particles.rotation.y += 0.0005 + (targetX * 0.05);
+            particles.rotation.x += 0.0005 + (targetY * 0.05);
+
+            // Gentle breathing effect for core
+            const time = Date.now() * 0.001;
+            const scale = 1 + Math.sin(time) * 0.05;
+            wireframeSphere.scale.set(scale, scale, scale);
+
+            renderer.render(scene, camera);
+        }
+
+        // Resize Handler
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+
+        initThree();
+
+
+        // --- 3. SCROLL ANIMATIONS (Intersection Observer) ---
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: "0px"
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+
+                    // Trigger count up if it's a number
+                    const counters = entry.target.querySelectorAll('.count-up');
+                    counters.forEach(counter => startCountAnimation(counter));
+
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.scroll-reveal').forEach(el => observer.observe(el));
+
+        // Count Up Animation
+        function startCountAnimation(el) {
+            const target = parseInt(el.getAttribute('data-target'));
+            let current = 0;
+            const increment = target / 50; // Speed
+            const timer = setInterval(() => {
+                current += increment;
+                if (current >= target) {
+                    el.innerText = target.toLocaleString() + (el.innerText.includes('%') ? '%' : '');
+                    clearInterval(timer);
+                } else {
+                    el.innerText = Math.floor(current).toLocaleString();
+                }
+            }, 30);
+        }
+
+
+        // --- 4. 3D TILT EFFECT FOR CARDS (Vanilla JS) ---
+        const cards = document.querySelectorAll('.tilt-card');
+
+        cards.forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Calculate percentage
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+
+                const rotateX = ((y - centerY) / centerY) * -10; // Max rotation deg
+                const rotateY = ((x - centerX) / centerX) * 10;
+
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+            });
+        });
+
+
+        // --- 5. TERMINAL SIMULATION ---
+        const terminalContent = document.getElementById('terminal-content');
+        const logs = [
+            { text: "Loading neural modules...", color: "text-blue-400" },
+            { text: "Verifying checksums: OK", color: "text-green-400" },
+            { text: "Establishing secure websocket connection...", color: "text-gray-400" },
+            { text: "Analyzing local threat vectors...", color: "text-purple-400" },
+            { text: "Warning: Unsecured packet detected blocked.", color: "text-red-400" },
+            { text: "Encryption Key rotated successfully.", color: "text-green-400" },
+            { text: "Waiting for user input...", color: "text-white blink" }
+        ];
+
+        let logIndex = 0;
+
+        function typeLog() {
+            if (logIndex < logs.length) {
+                const log = logs[logIndex];
+                const div = document.createElement('div');
+                div.className = `font-mono mb-2 ${log.color}`;
+                div.innerHTML = `> <span class="typing"></span>`;
+                terminalContent.appendChild(div);
+
+                // Typewriter effect for the specific line
+                const span = div.querySelector('.typing');
+                let charIndex = 0;
+                const typeText = setInterval(() => {
+                    if (charIndex < log.text.length) {
+                        span.textContent += log.text.charAt(charIndex);
+                        charIndex++;
+                        terminalContent.scrollTop = terminalContent.scrollHeight; // Auto scroll
+                    } else {
+                        clearInterval(typeText);
+                        // Add cursor blink if it's the last one
+                        if (log.text.includes("Waiting")) {
+                            span.innerHTML += '<span class="cursor-blink">_</span>';
+                        }
+                        logIndex++;
+                        setTimeout(typeLog, Math.random() * 1000 + 500); // Random delay between lines
+                    }
+                }, 30);
+            }
+        }
+
+        // Start terminal after delay
+        setTimeout(typeLog, 2000);
+
+
+        // --- 6. THEME TOGGLE ---
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const icon = document.getElementById('theme-icon');
+
+            if (document.body.classList.contains('light-mode')) {
+                icon.setAttribute('data-lucide', 'sun');
+                icon.style.color = '#f59e0b';
+                // Update 3D colors
+                particles.material.color.setHex(0x6366f1);
+                wireframeSphere.material.color.setHex(0x4f46e5);
+            } else {
+                icon.setAttribute('data-lucide', 'moon');
+                icon.style.color = '#d1d5db';
+                // Update 3D colors
+                particles.material.color.setHex(0x8b5cf6);
+                wireframeSphere.material.color.setHex(0x8b5cf6);
+            }
+            lucide.createIcons();
+        }
+
+    </script>
+</body>
+
+</html>
