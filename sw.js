@@ -1,12 +1,11 @@
 // sw.js
 const CACHE_NAME = 'pdf-toolkit-v2';
 const URLS_TO_CACHE = [
-  '/',
-  '/index.html', // <--- CHANGE THIS to match your actual file name
-  '/manifest.json'  // <--- Ensure this is included
-  // Add other important files here, like your main CSS or JS
-  // 'styles/main.css',
-  // 'scripts/app.js'
+  './',                // Changed from '/' to './' (Current folder)
+  './index.html',      // Ensure this matches your ACTUAL main html file name
+  './manifest.json',   // Changed from '/manifest.json' to './manifest.json'
+  './styles.css',      // Add your CSS file if it exists
+  './script.js'        // Add your JS file if it exists
 ];
 
 // Install the service worker
@@ -52,3 +51,4 @@ self.addEventListener('activate', event => {
   );
 
 });
+
