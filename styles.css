@@ -4236,3 +4236,12 @@ body.light-mode .obsidian-card li {
         transform: translateY(0);
     }
 }
+
+body.light-mode .mega-menu svg {
+    fill: white !important;
+    background: rgb(185, 126, 185) !important;
+}
+
+body.light-mode .mega-menu svg:hover {
+    background: rgb(131, 3, 131) !important;
+}
